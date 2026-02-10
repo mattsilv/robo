@@ -19,6 +19,26 @@ struct RoomResultView: View {
         floorArea * 10.7639
     }
 
+    private var ceilingHeight: Double {
+        RoomDataProcessor.estimateCeilingHeight(room.walls)
+    }
+
+    private var ceilingHeightFt: Double {
+        ceilingHeight * 3.28084
+    }
+
+    private var totalWallArea: Double {
+        RoomDataProcessor.computeTotalWallArea(room.walls)
+    }
+
+    private var totalWallAreaSqFt: Double {
+        totalWallArea * 10.7639
+    }
+
+    private var roomDims: (length: Double, width: Double)? {
+        RoomDataProcessor.estimateRoomDimensions(room.walls)
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -35,6 +55,23 @@ struct RoomResultView: View {
                     .textFieldStyle(.roundedBorder)
                     .padding(.horizontal, 24)
 
+                // Room dimensions headline
+                if let dims = roomDims {
+                    VStack(spacing: 4) {
+                        Text(String(format: "%.0fft × %.0fft", dims.length * 3.28084, dims.width * 3.28084))
+                            .font(.title.bold())
+                        Text(String(format: "%.1f sq ft · %.1fft ceiling",
+                                    floorAreaSqFt, ceilingHeightFt))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.accentColor.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 24)
+                }
+
                 // Stats grid
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                     statCard(value: "\(room.walls.count)", label: "Walls", icon: "square.split.2x1")
@@ -44,16 +81,22 @@ struct RoomResultView: View {
                 }
                 .padding(.horizontal, 24)
 
-                // Floor area
-                VStack(spacing: 4) {
-                    Text(String(format: "%.1f sq ft", floorAreaSqFt))
-                        .font(.title2.bold())
-                    Text(String(format: "(%.1f m²)", floorArea))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                // Detailed metrics
+                VStack(spacing: 12) {
+                    metricRow(label: "Floor Area",
+                              value: String(format: "%.1f sq ft", floorAreaSqFt),
+                              detail: String(format: "%.1f m²", floorArea))
+                    metricRow(label: "Ceiling Height",
+                              value: String(format: "%.1fft", ceilingHeightFt),
+                              detail: String(format: "%.2f m", ceilingHeight))
+                    metricRow(label: "Wall Area",
+                              value: String(format: "%.0f sq ft", totalWallAreaSqFt),
+                              detail: String(format: "%.1f m²", totalWallArea))
+                    metricRow(label: "Shape",
+                              value: RoomDataProcessor.describeRoomShape(room.walls).capitalized,
+                              detail: nil)
                 }
                 .padding()
-                .frame(maxWidth: .infinity)
                 .background(.secondary.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal, 24)
@@ -135,6 +178,23 @@ struct RoomResultView: View {
         .padding(.vertical, 12)
         .background(.secondary.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func metricRow(label: String, value: String, detail: String?) -> some View {
+        HStack {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(value)
+                    .font(.headline)
+                if let detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 
     private func exportRoom() {

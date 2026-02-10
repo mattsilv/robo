@@ -177,6 +177,7 @@ struct LiDARScanView: View {
                 roomName: name,
                 wallCount: room.walls.count,
                 floorAreaSqM: summary["estimated_floor_area_sqm"] as? Double ?? 0,
+                ceilingHeightM: summary["ceiling_height_m"] as? Double ?? 0,
                 objectCount: room.objects.count,
                 summaryJSON: summaryData,
                 fullRoomDataJSON: fullData

@@ -15,8 +15,8 @@ Robo is an iOS app that exposes phone sensors as HTTP API endpoints, allowing AI
 ### M1 (Current)
 - ✅ Barcode scanner with VisionKit
 - ✅ Real-time data submission to cloud
-- ✅ Device management and settings
-- ✅ Cloudflare Workers backend (Hono + D1 + R2)
+- ✅ Device registration with auth middleware
+- ✅ Cloudflare Workers backend (Hono + D1)
 
 ### Coming Soon
 - M2: Inbox card system + Camera + AI analysis
@@ -42,11 +42,11 @@ Robo is an iOS app that exposes phone sensors as HTTP API endpoints, allowing AI
    cd robo
    ```
 
-2. **Configure environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your Apple Team ID and Cloudflare Account ID
-   ```
+2. **Configure your environment**
+
+   **Workers:** Update `workers/wrangler.toml` with your D1 database ID (see step 3).
+
+   **iOS:** Edit `ios/project.yml` line 11 — set `DEVELOPMENT_TEAM` to your Apple Team ID.
 
 3. **Deploy Workers backend**
    ```bash
@@ -101,16 +101,16 @@ Robo is an iOS app that exposes phone sensors as HTTP API endpoints, allowing AI
 
 ## API Endpoints
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/health` | Health check |
-| POST | `/api/devices/register` | Register device |
-| POST | `/api/sensors/data` | Submit sensor data |
-| POST | `/api/sensors/upload` | Get presigned R2 URL |
-| GET | `/api/inbox/:device_id` | Poll pending cards |
-| POST | `/api/inbox/push` | Agent pushes card |
-| POST | `/api/inbox/:card_id/respond` | User responds |
-| POST | `/api/opus/analyze` | Trigger AI analysis |
+| Method | Path | Auth | Purpose |
+|--------|------|:----:|---------|
+| GET | `/health` | - | Health check |
+| POST | `/api/devices/register` | - | Register device |
+| GET | `/api/devices/:device_id` | - | Get device info |
+| POST | `/api/sensors/data` | `X-Device-ID` | Submit sensor data |
+| GET | `/api/inbox/:device_id` | - | Poll pending cards |
+| POST | `/api/inbox/push` | `X-Device-ID` | Agent pushes card |
+| POST | `/api/inbox/:card_id/respond` | `X-Device-ID` | User responds |
+| POST | `/api/opus/analyze` | - | Trigger AI analysis (M2+) |
 
 ### Example: Device Registration
 
@@ -128,6 +128,15 @@ Response:
   "registered_at": "2026-02-10T18:19:39.262Z",
   "last_seen_at": null
 }
+```
+
+### Example: Submit Sensor Data (requires auth)
+
+```bash
+curl -X POST https://robo-api.silv.workers.dev/api/sensors/data \
+  -H "Content-Type: application/json" \
+  -H "X-Device-ID: 550e8400-e29b-41d4-a716-446655440000" \
+  -d '{"device_id":"550e8400-e29b-41d4-a716-446655440000","sensor_type":"barcode","data":{"value":"012345678901"}}'
 ```
 
 ## Development

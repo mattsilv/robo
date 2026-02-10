@@ -1,4 +1,3 @@
-import { zValidator } from '@hono/zod-validator';
 import type { Context } from 'hono';
 import { SensorDataSchema, type Env } from '../types';
 
@@ -36,30 +35,5 @@ export const submitSensorData = async (c: Context<{ Bindings: Env }>) => {
   } catch (error) {
     console.error('Failed to submit sensor data:', error);
     return c.json({ error: 'Failed to submit sensor data' }, 500);
-  }
-};
-
-export const getUploadUrl = async (c: Context<{ Bindings: Env }>) => {
-  const body = await c.req.json();
-  const { device_id, sensor_type, content_type } = body;
-
-  if (!device_id || !sensor_type || !content_type) {
-    return c.json({ error: 'Missing required fields: device_id, sensor_type, content_type' }, 400);
-  }
-
-  try {
-    const key = `${device_id}/${sensor_type}/${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-    // For R2 presigned URLs, we'll use a simplified approach
-    // In a real implementation, you'd generate a presigned URL
-    // For now, return the key for direct upload via Workers
-    return c.json({
-      upload_url: `/api/sensors/upload/${key}`,
-      key,
-      expires_at: new Date(Date.now() + 3600000).toISOString(), // 1 hour
-    }, 200);
-  } catch (error) {
-    console.error('Failed to generate upload URL:', error);
-    return c.json({ error: 'Failed to generate upload URL' }, 500);
   }
 };

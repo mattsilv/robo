@@ -21,6 +21,6 @@ struct RoboApp: App {
                     await deviceService.bootstrap(apiService: apiService)
                 }
         }
-        .modelContainer(for: ScanRecord.self)
+        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self])
     }
 }

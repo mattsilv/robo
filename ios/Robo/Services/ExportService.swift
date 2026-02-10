@@ -1,4 +1,5 @@
 import Foundation
+import RoomPlan
 
 struct ExportableScan: Sendable {
     let barcodeValue: String
@@ -83,8 +84,72 @@ enum ExportService {
         return zipURL
     }
 
+    // MARK: - Room Export
+
+    /// Creates a ZIP file containing room_summary.json and room_full.json.
+    static func createRoomExportZip(room: ExportableRoom) throws -> URL {
+        let fm = FileManager.default
+        let exportDir = fm.temporaryDirectory
+            .appendingPathComponent("robo-room-\(UUID().uuidString)")
+        try fm.createDirectory(at: exportDir, withIntermediateDirectories: true)
+
+        // Write room_summary.json
+        let summaryData = try JSONSerialization.data(
+            withJSONObject: room.summary,
+            options: [.prettyPrinted, .sortedKeys]
+        )
+        try summaryData.write(to: exportDir.appendingPathComponent("room_summary.json"))
+
+        // Write room_full.json
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let fullData = try encoder.encode(room.fullRoom)
+        try fullData.write(to: exportDir.appendingPathComponent("room_full.json"))
+
+        // ZIP
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        let zipName = "robo-room-\(dateFormatter.string(from: Date())).zip"
+        let zipURL = fm.temporaryDirectory.appendingPathComponent(zipName)
+
+        if fm.fileExists(atPath: zipURL.path) {
+            try fm.removeItem(at: zipURL)
+        }
+
+        var coordinatorError: NSError?
+        var moveError: Error?
+
+        NSFileCoordinator().coordinate(
+            readingItemAt: exportDir,
+            options: [.forUploading],
+            error: &coordinatorError
+        ) { tempZipURL in
+            do {
+                try fm.copyItem(at: tempZipURL, to: zipURL)
+            } catch {
+                moveError = error
+            }
+        }
+
+        try? fm.removeItem(at: exportDir)
+
+        if let coordinatorError {
+            throw coordinatorError
+        }
+        if let moveError {
+            throw moveError
+        }
+
+        return zipURL
+    }
+
     private static func formatSymbology(_ raw: String) -> String {
         raw.replacingOccurrences(of: "VNBarcodeSymbology", with: "")
             .lowercased()
     }
+}
+
+struct ExportableRoom {
+    let summary: [String: Any]
+    let fullRoom: CapturedRoom
 }

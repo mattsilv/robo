@@ -16,6 +16,9 @@ struct RoboApp: App {
             ContentView()
                 .environment(deviceService)
                 .environment(apiService)
+                .task {
+                    await deviceService.bootstrap(apiService: apiService)
+                }
         }
     }
 }

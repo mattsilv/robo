@@ -75,6 +75,7 @@ class APIService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-ID")
 
         return try await performRequest(request)
     }
@@ -83,6 +84,7 @@ class APIService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-ID")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         return try await performRequest(request)

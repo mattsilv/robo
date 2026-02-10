@@ -5,10 +5,11 @@ import { prettyJSON } from 'hono/pretty-json';
 import type { Env } from './types';
 
 // Import route handlers
-import { registerDevice } from './routes/devices';
-import { submitSensorData, getUploadUrl } from './routes/sensors';
+import { registerDevice, getDevice } from './routes/devices';
+import { submitSensorData } from './routes/sensors';
 import { getInbox, pushCard, respondToCard } from './routes/inbox';
 import { analyzeWithOpus } from './routes/opus';
+import { deviceAuth } from './middleware/deviceAuth';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -24,23 +25,26 @@ app.get('/health', (c) => {
 
 // Device routes
 app.post('/api/devices/register', registerDevice);
+app.get('/api/devices/:device_id', getDevice);
 
-// Sensor routes
-app.post('/api/sensors/data', submitSensorData);
-app.post('/api/sensors/upload', getUploadUrl);
+// Sensor routes (auth required)
+app.post('/api/sensors/data', deviceAuth, submitSensorData);
 
 // Inbox routes
 app.get('/api/inbox/:device_id', getInbox);
-app.post('/api/inbox/push', pushCard);
-app.post('/api/inbox/:card_id/respond', respondToCard);
+app.post('/api/inbox/push', deviceAuth, pushCard);
+app.post('/api/inbox/:card_id/respond', deviceAuth, respondToCard);
 
 // Opus integration
 app.post('/api/opus/analyze', analyzeWithOpus);
 
 // Error handling
 app.onError((err, c) => {
+  if (err instanceof SyntaxError && err.message.includes('JSON')) {
+    return c.json({ error: 'Malformed JSON in request body' }, 400);
+  }
   console.error('Error:', err);
-  return c.json({ error: err.message || 'Internal Server Error' }, 500);
+  return c.json({ error: 'Internal Server Error' }, 500);
 });
 
 // 404 handler

@@ -2,13 +2,19 @@ import Foundation
 import UIKit
 
 struct DeviceConfig: Codable {
-    let id: String
-    let name: String
+    var id: String
+    var name: String
     var apiBaseURL: String
 
+    static let unregisteredID = "unregistered"
+
     static let `default` = DeviceConfig(
-        id: UUID().uuidString,
+        id: unregisteredID,
         name: UIDevice.current.name,
         apiBaseURL: "https://robo-api.silv.workers.dev"
     )
+
+    var isRegistered: Bool {
+        id != Self.unregisteredID
+    }
 }

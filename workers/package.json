@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:migrate": "wrangler d1 migrations apply robo-db"
+    "db:migrate": "wrangler d1 migrations apply robo-db",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "cloudflare",

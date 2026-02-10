@@ -1,6 +1,5 @@
 import type { Context } from 'hono';
 import { PushCardSchema, RespondCardSchema, type Env, type InboxCard } from '../types';
-import { randomUUID } from 'node:crypto';
 
 export const getInbox = async (c: Context<{ Bindings: Env }>) => {
   const deviceId = c.req.param('device_id');
@@ -31,7 +30,7 @@ export const pushCard = async (c: Context<{ Bindings: Env }>) => {
   }
 
   const { device_id, card_type, title, body: cardBody } = validated.data;
-  const cardId = randomUUID();
+  const cardId = crypto.randomUUID();
   const now = new Date().toISOString();
 
   try {

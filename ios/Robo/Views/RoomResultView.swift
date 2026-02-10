@@ -3,6 +3,7 @@ import RoomPlan
 
 struct RoomResultView: View {
     let room: CapturedRoom
+    @Binding var roomName: String
     let onSave: () -> Void
     let onDiscard: () -> Void
 
@@ -19,84 +20,88 @@ struct RoomResultView: View {
     }
 
     var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 24) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 64))
+                    .foregroundStyle(.green)
+                    .padding(.top, 24)
 
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 64))
-                .foregroundStyle(.green)
+                Text("Scan Complete")
+                    .font(.title.bold())
 
-            Text("Scan Complete")
-                .font(.title.bold())
+                // Room name
+                TextField("Room name (optional)", text: $roomName)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal, 24)
 
-            // Stats grid
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                statCard(value: "\(room.walls.count)", label: "Walls", icon: "square.split.2x1")
-                statCard(value: "\(room.doors.count)", label: "Doors", icon: "door.left.hand.open")
-                statCard(value: "\(room.windows.count)", label: "Windows", icon: "window.vertical.open")
-                statCard(value: "\(room.objects.count)", label: "Objects", icon: "cube")
-            }
-            .padding(.horizontal, 24)
+                // Stats grid
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    statCard(value: "\(room.walls.count)", label: "Walls", icon: "square.split.2x1")
+                    statCard(value: "\(room.doors.count)", label: "Doors", icon: "door.left.hand.open")
+                    statCard(value: "\(room.windows.count)", label: "Windows", icon: "window.vertical.open")
+                    statCard(value: "\(room.objects.count)", label: "Objects", icon: "cube")
+                }
+                .padding(.horizontal, 24)
 
-            // Floor area
-            VStack(spacing: 4) {
-                Text(String(format: "%.1f sq ft", floorAreaSqFt))
-                    .font(.title2.bold())
-                Text(String(format: "(%.1f m²)", floorArea))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(.secondary.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .padding(.horizontal, 24)
+                // Floor area
+                VStack(spacing: 4) {
+                    Text(String(format: "%.1f sq ft", floorAreaSqFt))
+                        .font(.title2.bold())
+                    Text(String(format: "(%.1f m²)", floorArea))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(.secondary.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 24)
 
-            Spacer()
+                // Actions
+                VStack(spacing: 12) {
+                    Button {
+                        onSave()
+                    } label: {
+                        Label("Save to History", systemImage: "square.and.arrow.down")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.accentColor)
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
 
-            // Actions
-            VStack(spacing: 12) {
-                Button {
-                    onSave()
-                } label: {
-                    Label("Save to History", systemImage: "square.and.arrow.down")
+                    Button {
+                        exportRoom()
+                    } label: {
+                        HStack {
+                            if isExporting {
+                                ProgressView()
+                                    .tint(.accentColor)
+                            } else {
+                                Image(systemName: "square.and.arrow.up")
+                            }
+                            Text("Share as ZIP")
+                        }
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.accentColor)
-                        .foregroundStyle(.white)
+                        .background(.secondary.opacity(0.15))
+                        .foregroundColor(.accentColor)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-
-                Button {
-                    exportRoom()
-                } label: {
-                    HStack {
-                        if isExporting {
-                            ProgressView()
-                                .tint(.accentColor)
-                        } else {
-                            Image(systemName: "square.and.arrow.up")
-                        }
-                        Text("Share as ZIP")
                     }
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(.secondary.opacity(0.15))
-                    .foregroundColor(.accentColor)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .disabled(isExporting)
+                    .disabled(isExporting)
 
-                Button("Discard", role: .destructive) {
-                    onDiscard()
+                    Button("Discard", role: .destructive) {
+                        onDiscard()
+                    }
+                    .font(.subheadline)
+                    .padding(.top, 4)
                 }
-                .font(.subheadline)
-                .padding(.top, 4)
+                .padding(.horizontal, 40)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 40)
-            .padding(.bottom, 24)
         }
         .alert("Export Failed", isPresented: .constant(exportError != nil)) {
             Button("OK") { exportError = nil }

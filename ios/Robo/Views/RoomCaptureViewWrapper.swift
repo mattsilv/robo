@@ -2,6 +2,7 @@ import SwiftUI
 import RoomPlan
 
 struct RoomCaptureViewWrapper: UIViewRepresentable {
+    @Binding var stopRequested: Bool
     let onCaptureComplete: (CapturedRoom) -> Void
     let onCaptureError: (Error) -> Void
 
@@ -13,7 +14,14 @@ struct RoomCaptureViewWrapper: UIViewRepresentable {
         return captureView
     }
 
-    func updateUIView(_ uiView: RoomCaptureView, context: Context) {}
+    func updateUIView(_ uiView: RoomCaptureView, context: Context) {
+        if stopRequested {
+            uiView.captureSession.stop()
+            DispatchQueue.main.async {
+                stopRequested = false
+            }
+        }
+    }
 
     static func dismantleUIView(_ uiView: RoomCaptureView, coordinator: Coordinator) {
         uiView.captureSession.stop()

@@ -9,6 +9,8 @@ struct LiDARScanView: View {
     @State private var phase: ScanPhase = .instructions
     @State private var capturedRoom: CapturedRoom?
     @State private var error: String?
+    @State private var stopRequested = false
+    @State private var roomName = ""
 
     private enum ScanPhase {
         case instructions
@@ -33,9 +35,12 @@ struct LiDARScanView: View {
                         scanningView
                     case .results:
                         if let capturedRoom {
-                            RoomResultView(room: capturedRoom, onSave: saveRoom, onDiscard: {
-                                dismiss()
-                            })
+                            RoomResultView(
+                                room: capturedRoom,
+                                roomName: $roomName,
+                                onSave: saveRoom,
+                                onDiscard: { dismiss() }
+                            )
                         }
                     }
                 }
@@ -44,14 +49,16 @@ struct LiDARScanView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(phase == .scanning ? "Stop" : "Cancel") {
-                        if phase == .scanning {
-                            // Stopping handled by RoomCaptureView's built-in Done button
-                            dismiss()
-                        } else {
+                    if phase == .scanning {
+                        Button("Done") {
+                            stopRequested = true
+                        }
+                    } else if phase == .instructions {
+                        Button("Cancel") {
                             dismiss()
                         }
                     }
+                    // No cancel button on results — user chooses Save or Discard
                 }
             }
             .alert("Scan Error", isPresented: .constant(error != nil)) {
@@ -129,6 +136,7 @@ struct LiDARScanView: View {
 
     private var scanningView: some View {
         RoomCaptureViewWrapper(
+            stopRequested: $stopRequested,
             onCaptureComplete: { room in
                 // Haptic feedback
                 let generator = UINotificationFeedbackGenerator()
@@ -156,9 +164,14 @@ struct LiDARScanView: View {
             let summaryData = try RoomDataProcessor.encodeSummary(summary)
             let fullData = try RoomDataProcessor.encodeFullRoom(room)
 
-            let formatter = DateFormatter()
-            formatter.dateFormat = "MMM d, h:mm a"
-            let name = "Room Scan \(formatter.string(from: Date()))"
+            let name: String
+            if roomName.trimmingCharacters(in: .whitespaces).isEmpty {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "MMM d, h:mm a"
+                name = "Room Scan \(formatter.string(from: Date()))"
+            } else {
+                name = roomName
+            }
 
             let record = RoomScanRecord(
                 roomName: name,

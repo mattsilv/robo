@@ -104,9 +104,10 @@ struct BarcodeScannerView: View {
 
         let symbology = barcode.observation.symbology.rawValue
 
-        // Save to SwiftData
+        // Save to SwiftData (explicit save — autosave is unreliable during dismiss)
         let record = ScanRecord(barcodeValue: code, symbology: symbology)
         modelContext.insert(record)
+        try? modelContext.save()
 
         // Show toast (replaces previous)
         currentToast = ToastItem(code: code, symbology: symbology)

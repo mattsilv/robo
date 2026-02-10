@@ -37,7 +37,16 @@ struct SettingsView: View {
 
                 Section("About") {
                     LabeledContent("Version", value: "1.0 (M1)")
-                    LabeledContent("Build", value: "1")
+                    LabeledContent("Build", value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—")
+
+                    HStack {
+                        Text("Built by")
+                        Link("Matt Silverman", destination: URL(string: "https://silv.app")!)
+                        Text("and")
+                        Link("Claude Code", destination: URL(string: "https://claude.ai/code")!)
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("Settings")

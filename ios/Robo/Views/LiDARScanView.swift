@@ -183,6 +183,7 @@ struct LiDARScanView: View {
                 fullRoomDataJSON: fullData
             )
             modelContext.insert(record)
+            try modelContext.save()
 
             dismiss()
         } catch {

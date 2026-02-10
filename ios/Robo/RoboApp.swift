@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 @main
 struct RoboApp: App {
@@ -20,5 +21,6 @@ struct RoboApp: App {
                     await deviceService.bootstrap(apiService: apiService)
                 }
         }
+        .modelContainer(for: ScanRecord.self)
     }
 }

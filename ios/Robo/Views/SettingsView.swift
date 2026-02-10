@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(DeviceService.self) private var deviceService
+    @AppStorage("scanQuality") private var scanQuality: String = "balanced"
     @State private var apiURL: String = ""
     @State private var showingSaveConfirmation = false
 
@@ -11,6 +12,14 @@ struct SettingsView: View {
                 Section("Device") {
                     LabeledContent("Device ID", value: deviceService.config.id)
                     LabeledContent("Device Name", value: deviceService.config.name)
+                }
+
+                Section("Scanner") {
+                    Picker("Scan Quality", selection: $scanQuality) {
+                        Text("Fast").tag("fast")
+                        Text("Balanced").tag("balanced")
+                    }
+                    .pickerStyle(.menu)
                 }
 
                 Section("API Configuration") {

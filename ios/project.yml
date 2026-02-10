@@ -4,7 +4,7 @@ options:
   deploymentTarget:
     iOS: "17.0"
   developmentLanguage: en
-  xcodeVersion: "15.0"
+  xcodeVersion: "16.0"
 
 settings:
   base:
@@ -51,6 +51,7 @@ targets:
                 UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
         UIApplicationSupportsIndirectInputEvents: true
         UILaunchScreen: {}
+        UIRequiresFullScreen: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSCameraUsageDescription: "Robo needs camera access to scan barcodes and capture photos for AI analysis"

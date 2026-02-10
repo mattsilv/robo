@@ -118,6 +118,14 @@ APPLE_TEAM_ID=R3Z5CY34Q5
 CLOUDFLARE_ACCOUNT_ID=<your-account-id>
 ```
 
+## Cloudflare Resources
+
+**D1 Database:** robo-db (`fb24f9a0-d52b-4a74-87ca-54069ec9471a`)
+**R2 Bucket:** robo-data
+**Workers API:** https://robo-api.silv.workers.dev
+
+See `docs/cloudflare-resources.md` for complete resource inventory.
+
 ## Critical Gotchas
 
 ### iOS

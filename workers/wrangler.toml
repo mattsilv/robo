@@ -1,0 +1,19 @@
+name = "robo-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "robo-db"
+database_id = "fb24f9a0-d52b-4a74-87ca-54069ec9471a"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "robo-data"
+
+[vars]
+ENVIRONMENT = "production"

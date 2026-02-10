@@ -146,3 +146,92 @@ Before committing:
 - [ ] TypeScript types defined for all API routes
 - [ ] Error handling for all network calls
 - [ ] Camera/sensor permissions documented in Info.plist
+
+## PR Review Guide
+
+**For reviewers new to this codebase:**
+
+### Quick Orientation (5 min)
+1. Read [README.md](README.md) - Architecture and quick start
+2. Check [docs/cloudflare-resources.md](docs/cloudflare-resources.md) - Infrastructure inventory
+3. Review this file (CLAUDE.md) - Coding conventions
+
+### Key Design Decisions to Understand
+
+**Backend (Workers):**
+- **Manual Zod validation** over `@hono/zod-validator` - See [docs/solutions/build-errors/hono-zod-cloudflare-workers-validation-20260210.md](docs/solutions/build-errors/hono-zod-cloudflare-workers-validation-20260210.md)
+- **D1 only in M1** - R2 integration deferred to M2
+- **nodejs_compat flag required** - For Node.js built-ins (crypto, buffer)
+
+**iOS:**
+- **@Observable pattern** over Combine/SwiftUI @Published - Modern iOS 17+ approach
+- **DataScannerViewController** over AVFoundation - Higher-level VisionKit API
+- **xcodegen** for project management - Avoids .xcodeproj merge conflicts
+
+### What to Review
+
+**Architecture & Design:**
+- [ ] Does the solution fit the problem scope (hackathon MVP)?
+- [ ] Are abstractions appropriate (not over-engineered)?
+- [ ] Are there simpler alternatives to complex code?
+
+**Code Quality:**
+- [ ] Swift: No force-unwraps, proper optionals handling, guard statements
+- [ ] TypeScript: Proper types, no `any`, Zod schemas match endpoints
+- [ ] Error handling: User-facing errors are clear, technical details logged
+
+**Security:**
+- [ ] No hardcoded secrets or API keys
+- [ ] Sensitive data only in .env (never committed)
+- [ ] Input validation on all API endpoints
+
+**Testing:**
+- [ ] Can someone else clone and run this? (README accuracy)
+- [ ] Are manual testing steps documented?
+- [ ] Does the build succeed? (`xcodebuild` for iOS, `wrangler deploy` for Workers)
+
+### How to Give Feedback
+
+**Preferred format:**
+```markdown
+## [Section/File]
+
+**Observation:** [What you noticed]
+**Suggestion:** [Specific recommendation]
+**Reasoning:** [Why this matters]
+**Priority:** [Critical/High/Medium/Low]
+```
+
+**Example:**
+```markdown
+## iOS - BarcodeScannerView.swift:73
+
+**Observation:** Haptic feedback occurs before API call completes
+**Suggestion:** Consider moving haptic to after successful API response
+**Reasoning:** User gets feedback even if network fails
+**Priority:** Low (M1 scope is fine, consider for M2)
+```
+
+### Where to Find Things
+
+- **API Endpoints:** `workers/src/routes/*.ts`
+- **iOS Views:** `ios/Robo/Views/*.swift`
+- **Data Models:** `ios/Robo/Models/*.swift` and `workers/src/types.ts`
+- **Database Schema:** `workers/migrations/0001_initial_schema.sql`
+- **Solved Problems:** `docs/solutions/build-errors/`
+- **Infrastructure:** `docs/cloudflare-resources.md`
+
+### Questions to Ask
+
+- "Why this approach over [alternative]?" - Check commit messages and solution docs
+- "What's the trade-off here?" - Likely speed vs complexity for hackathon deadline
+- "Will this scale?" - M1 is MVP, scalability addressed in M2-M4
+
+### Response Time Expectations
+
+This is a **hackathon project** (deadline: Feb 16, 3 PM EST). Prioritize:
+1. **Blocking issues** (security, broken builds) - Immediate
+2. **High-value suggestions** (simple wins, quick fixes) - Within hours
+3. **Nice-to-haves** (refactors, optimizations) - Note for post-M1
+
+**Thank you for reviewing!** 🙏

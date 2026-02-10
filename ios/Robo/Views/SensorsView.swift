@@ -1,10 +1,14 @@
 import SwiftUI
 
 struct SensorsView: View {
+    @State private var showingScanner = false
+
     var body: some View {
         NavigationStack {
             List {
-                NavigationLink(destination: Text("Barcode Scanner (Coming in Issue #4)")) {
+                Button {
+                    showingScanner = true
+                } label: {
                     Label("Barcode Scanner", systemImage: "barcode.viewfinder")
                 }
 
@@ -17,6 +21,9 @@ struct SensorsView: View {
                 }
             }
             .navigationTitle("Sensors")
+            .sheet(isPresented: $showingScanner) {
+                BarcodeScannerView()
+            }
         }
     }
 }

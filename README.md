@@ -237,7 +237,8 @@ This is a hackathon project, but contributions are welcome after the initial sub
 
 ## Acknowledgments
 
-- Built with [Claude Code](https://claude.com/claude-code)
+Built by [Matt Silverman](https://silv.app) and [Claude Code](https://claude.ai/code)
+
 - [Hono](https://hono.dev/) web framework
 - [VisionKit](https://developer.apple.com/documentation/visionkit) for barcode scanning
 - [Cloudflare Workers](https://workers.cloudflare.com/) for serverless backend

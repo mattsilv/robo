@@ -6,10 +6,24 @@ struct RoboApp: App {
     @State private var deviceService = DeviceService()
     @State private var apiService: APIService
 
+    let modelContainer: ModelContainer
+
     init() {
         let deviceService = DeviceService()
         _deviceService = State(initialValue: deviceService)
         _apiService = State(initialValue: APIService(deviceService: deviceService))
+
+        do {
+            let schema = Schema(versionedSchema: RoboSchemaV1.self)
+            let config = ModelConfiguration(schema: schema)
+            modelContainer = try ModelContainer(
+                for: schema,
+                migrationPlan: RoboMigrationPlan.self,
+                configurations: [config]
+            )
+        } catch {
+            fatalError("Failed to initialize SwiftData: \(error)")
+        }
     }
 
     var body: some Scene {
@@ -21,6 +35,6 @@ struct RoboApp: App {
                     await deviceService.bootstrap(apiService: apiService)
                 }
         }
-        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self])
+        .modelContainer(modelContainer)
     }
 }

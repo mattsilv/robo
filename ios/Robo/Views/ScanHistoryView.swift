@@ -11,6 +11,8 @@ struct ScanHistoryView: View {
     @State private var selectedSegment = 0
     @State private var showingClearConfirmation = false
     @State private var copiedToastVisible = false
+    @State private var shareURL: URL?
+    @State private var exportingRoomID: PersistentIdentifier?
 
     var body: some View {
         NavigationStack {
@@ -117,8 +119,38 @@ struct ScanHistoryView: View {
             List {
                 ForEach(roomScans) { room in
                     RoomScanRow(room: room)
+                        .swipeActions(edge: .trailing) {
+                            Button {
+                                exportRoom(room)
+                            } label: {
+                                Label("Share", systemImage: "square.and.arrow.up")
+                            }
+                            .tint(.blue)
+
+                            Button(role: .destructive) {
+                                modelContext.delete(room)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                exportRoom(room)
+                            } label: {
+                                Label("Share", systemImage: "square.and.arrow.up")
+                            }
+                            .tint(.blue)
+                        }
                 }
                 .onDelete(perform: deleteRoomScans)
+            }
+            .sheet(isPresented: Binding(
+                get: { shareURL != nil },
+                set: { if !$0 { shareURL = nil } }
+            )) {
+                if let shareURL {
+                    ActivityView(activityItems: [shareURL])
+                }
             }
         }
     }
@@ -145,6 +177,27 @@ struct ScanHistoryView: View {
         } else {
             for room in roomScans {
                 modelContext.delete(room)
+            }
+        }
+    }
+
+    private func exportRoom(_ room: RoomScanRecord) {
+        exportingRoomID = room.persistentModelID
+        Task.detached {
+            do {
+                let url = try ExportService.createRoomExportZipFromData(
+                    roomName: room.roomName,
+                    summaryJSON: room.summaryJSON,
+                    fullRoomDataJSON: room.fullRoomDataJSON
+                )
+                await MainActor.run {
+                    shareURL = url
+                    exportingRoomID = nil
+                }
+            } catch {
+                await MainActor.run {
+                    exportingRoomID = nil
+                }
             }
         }
     }

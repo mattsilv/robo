@@ -143,6 +143,55 @@ enum ExportService {
         return zipURL
     }
 
+    /// Creates a ZIP from already-serialized room data (for exporting from history).
+    static func createRoomExportZipFromData(
+        roomName: String,
+        summaryJSON: Data,
+        fullRoomDataJSON: Data
+    ) throws -> URL {
+        let fm = FileManager.default
+        let exportDir = fm.temporaryDirectory
+            .appendingPathComponent("robo-room-\(UUID().uuidString)")
+        try fm.createDirectory(at: exportDir, withIntermediateDirectories: true)
+
+        try summaryJSON.write(to: exportDir.appendingPathComponent("room_summary.json"))
+        try fullRoomDataJSON.write(to: exportDir.appendingPathComponent("room_full.json"))
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        let safeName = roomName.isEmpty ? "room" : roomName
+            .replacingOccurrences(of: " ", with: "-")
+            .lowercased()
+        let zipName = "robo-\(safeName)-\(dateFormatter.string(from: Date())).zip"
+        let zipURL = fm.temporaryDirectory.appendingPathComponent(zipName)
+
+        if fm.fileExists(atPath: zipURL.path) {
+            try fm.removeItem(at: zipURL)
+        }
+
+        var coordinatorError: NSError?
+        var moveError: Error?
+
+        NSFileCoordinator().coordinate(
+            readingItemAt: exportDir,
+            options: [.forUploading],
+            error: &coordinatorError
+        ) { tempZipURL in
+            do {
+                try fm.copyItem(at: tempZipURL, to: zipURL)
+            } catch {
+                moveError = error
+            }
+        }
+
+        try? fm.removeItem(at: exportDir)
+
+        if let coordinatorError { throw coordinatorError }
+        if let moveError { throw moveError }
+
+        return zipURL
+    }
+
     private static func formatSymbology(_ raw: String) -> String {
         raw.replacingOccurrences(of: "VNBarcodeSymbology", with: "")
             .lowercased()

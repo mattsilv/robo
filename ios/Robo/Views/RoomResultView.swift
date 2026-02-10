@@ -12,7 +12,7 @@ struct RoomResultView: View {
     @State private var exportError: String?
 
     private var floorArea: Double {
-        RoomDataProcessor.estimateFloorArea(room.walls)
+        RoomDataProcessor.estimateFloorArea(room)
     }
 
     private var floorAreaSqFt: Double {

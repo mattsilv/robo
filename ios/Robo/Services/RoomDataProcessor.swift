@@ -1,5 +1,6 @@
 import Foundation
 import RoomPlan
+import simd
 
 enum RoomDataProcessor {
 
@@ -12,7 +13,7 @@ enum RoomDataProcessor {
     /// Includes both metric and imperial, plus computed insights.
     static func summarizeRoom(_ room: CapturedRoom) -> [String: Any] {
         let ceilingHeight = estimateCeilingHeight(room.walls)
-        let floorArea = estimateFloorArea(room.walls)
+        let floorArea = estimateFloorArea(room)
         let totalWallArea = computeTotalWallArea(room.walls)
         let volume = floorArea * ceilingHeight
 
@@ -111,24 +112,37 @@ enum RoomDataProcessor {
         walls.map { Double($0.dimensions.y) }.max() ?? 0
     }
 
-    /// Floor area from wall positions using the shoelace formula.
-    static func estimateFloorArea(_ walls: [CapturedRoom.Surface]) -> Double {
-        guard walls.count >= 4 else {
-            let perimeter = walls.reduce(0.0) { $0 + Double($1.dimensions.x) }
-            let side = perimeter / 4.0
-            return side * side
+    /// Floor area from CapturedRoom. Prefers floor surfaces (iOS 17+),
+    /// falls back to wall bounding box, then perimeter estimate.
+    static func estimateFloorArea(_ room: CapturedRoom) -> Double {
+        // Best: use actual floor surfaces with polygon corners
+        if !room.floors.isEmpty {
+            return room.floors.reduce(0.0) { total, floor in
+                let corners = floor.polygonCorners
+                if corners.count >= 3 {
+                    return total + polygonArea(corners)
+                }
+                // Rectangular floor fallback
+                return total + Double(floor.dimensions.x) * Double(floor.dimensions.z)
+            }
         }
-
-        let points = walls.map { wall -> (Double, Double) in
-            let col3 = wall.transform.columns.3
-            return (Double(col3.x), Double(col3.z))
+        // Fallback: bounding box from wall positions
+        if let dims = estimateRoomDimensions(room.walls) {
+            return dims.length * dims.width
         }
+        // Last resort: assume square from perimeter
+        let perimeter = room.walls.reduce(0.0) { $0 + Double($1.dimensions.x) }
+        let side = perimeter / 4.0
+        return side * side
+    }
 
+    /// Shoelace formula for polygon area from 3D corner points (uses X and Z).
+    private static func polygonArea(_ corners: [simd_float3]) -> Double {
         var area = 0.0
-        for i in 0..<points.count {
-            let j = (i + 1) % points.count
-            area += points[i].0 * points[j].1
-            area -= points[j].0 * points[i].1
+        for i in 0..<corners.count {
+            let j = (i + 1) % corners.count
+            area += Double(corners[i].x) * Double(corners[j].z)
+            area -= Double(corners[j].x) * Double(corners[i].z)
         }
         return abs(area) / 2.0
     }

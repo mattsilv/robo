@@ -1,0 +1,35 @@
+# Xcode
+*.xcodeproj
+*.xcworkspace
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+Packages/
+.swiftpm/
+
+# Node.js / Workers
+node_modules/
+.wrangler/
+dist/
+.dev.vars
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride

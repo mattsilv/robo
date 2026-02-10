@@ -91,26 +91,31 @@ Phone Sensors → Robo App → [Your Choice:]
 
 ---
 
-## Demo Scenario (LiDAR)
+## Demo Scenario (LiDAR + Guided Capture)
 
 **Setup:** 2 minutes
 - Download Robo from App Store
 - Configure endpoint URL (or use email)
 
-**Demo:** 30 seconds
-- Point phone at room
-- Tap "Scan with LiDAR"
-- 3D point cloud appears in agent chat
-- Agent: "Your room is 12ft × 14ft. Here's where that couch would fit..."
+**Demo:** 3 minutes (guided capture ensures complete data on the first try)
+1. Tap Create → LiDAR Room Scanner
+2. Read 4 quick scanning tips (lighting, coverage, pacing, timing)
+3. Tap "Start Scanning" — Apple's RoomPlan shows real-time AR guidance
+4. Walk slowly around room perimeter — walls, doors, windows detected live
+5. Tap Done → review scan summary (wall count, floor area, detected objects)
+6. Share as ZIP → room_summary.json + room_full.json sent to your agent
+7. Agent: "Your room is 12ft × 14ft with 2 windows. Here's where that couch would fit..."
 
-**Wow factor:** "Wait, you can get LiDAR data into Claude now?"
+**Wow factor:** "Wait, you can get LiDAR data into Claude now? And it guided you through the whole scan?"
+
+**Core UX principle: Guided capture.** Robo ensures users capture complete data on the first try. Before scanning, you see essential tips. During scanning, Apple's RoomPlan provides real-time AR guidance. No guessing, no re-scans, no frustration.
 
 ---
 
 ## Roadmap
 
-**M1 (Hackathon MVP):** Barcode scanning, D1 backend, email/zip export (free tier, no backend required)
-**M2:** Camera + LiDAR support
+**M1 (Hackathon MVP):** Barcode scanning, LiDAR room scanning (guided capture), D1 backend, email/zip export (free tier, no backend required)
+**M2:** Camera support, live sensor feeds
 **M3:** Background capture, multiple agent connections
 
 ---
@@ -124,7 +129,7 @@ A: Those apps only support photos. No barcode scanning, no LiDAR, no live sensor
 A: No. Free tier exports data via email. Or connect to any HTTP endpoint (your agent, Zapier, etc.). Paid hosted backend is optional.
 
 **Q: What sensors are supported?**
-A: M1 (now): Barcode + email/zip export. M2: Camera, LiDAR. M3+: GPS, accelerometer, microphone.
+A: M1 (now): Barcode + LiDAR room scanning + email/zip export. M2: Camera. M3+: GPS, accelerometer, microphone.
 
 **Q: Can I use this for enterprise?**
 A: Yes, but that's not the initial target. See `docs/enterprise-use-cases.md` (future).

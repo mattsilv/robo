@@ -16,11 +16,14 @@ You can build AI agents easily with Claude Projects or custom GPTs. But getting 
 - **Open source** - Fork it, extend it, audit the code
 - **Free tier** - Email/zip export works without any backend (privacy-first)
 
-**Demo scenario (30 seconds):**
+**Core UX principle: Guided capture.** Robo ensures users capture complete data on the first try. Before scanning, you see essential tips. During scanning, Apple's RoomPlan provides real-time AR guidance. No guessing, no re-scans, no frustration.
+
+**Demo scenario (3 minutes):**
 1. Download Robo from App Store
-2. Point phone at room, tap "Scan with LiDAR"
-3. 3D point cloud appears in your Claude Project
-4. Agent: "Your room is 12ft × 14ft. Here's where that couch would fit..."
+2. Tap Create → LiDAR Room Scanner → read 4 scanning tips
+3. Tap "Start Scanning" — walk the room with AR guidance
+4. Review scan summary → Share as ZIP
+5. Agent: "Your room is 12ft × 14ft. Here's where that couch would fit..."
 
 **Why it matters:** Getting LiDAR data into Claude today is impossible. Robo makes it trivial.
 

@@ -21,7 +21,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Robo needs camera access to scan barcodes and capture photos for AI analysis</string>
+	<string>Robo needs camera access to scan barcodes, capture photos, and perform LiDAR room scanning for AI analysis</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Robo needs photo library access to save captured images</string>
 	<key>UIApplicationSceneManifest</key>

@@ -1,7 +1,6 @@
 # Xcode
 *.xcodeproj
 *.xcworkspace
-.DS_Store
 xcuserdata/
 *.xcuserstate
 DerivedData/
@@ -9,27 +8,75 @@ DerivedData/
 *.ipa
 *.dSYM.zip
 *.dSYM
+build/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
 
 # Swift Package Manager
 .build/
 Packages/
 .swiftpm/
+Package.resolved
+
+# TestFlight / App Store
+*.mobileprovision
+*.certSigningRequest
+exportOptions.plist
 
 # Node.js / Workers
 node_modules/
 .wrangler/
 dist/
 .dev.vars
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Environment
+# Environment & Secrets
 .env
-.env.local
+.env.*
+!.env.example
+*.local
+
+# API Keys & Credentials (safety net)
+**/secrets.json
+**/credentials.json
+**/*.pem
+**/*.key
+**/*.p12
+**/*.mobileprovision
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
 # macOS
 .DS_Store
 .AppleDouble
 .LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated documentation
+docs/build/
+site/

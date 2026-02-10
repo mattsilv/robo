@@ -3,16 +3,16 @@
 <plist version="1.0">
 <dict>
     <key>method</key>
-    <string>app-store</string>
+    <string>app-store-connect</string>
     <key>teamID</key>
     <string>R3Z5CY34Q5</string>
-    <key>uploadBitcode</key>
-    <false/>
     <key>uploadSymbols</key>
     <true/>
     <key>signingStyle</key>
     <string>automatic</string>
     <key>destination</key>
     <string>upload</string>
+    <key>testFlightInternalTestingOnly</key>
+    <true/>
 </dict>
 </plist>

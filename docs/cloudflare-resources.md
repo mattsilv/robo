@@ -31,6 +31,14 @@
 | POST | `/api/inbox/:card_id/respond` | User responds |
 | POST | `/api/opus/analyze` | Trigger Opus analysis |
 
+## App Store Connect
+- **App Name:** ROBO.APP
+- **App ID:** `6759011077`
+- **Bundle ID:** `com.silv.Robo`
+- **SKU:** `robo`
+- **Apple ID:** `matt@argentlabs.xyz`
+- **Dashboard:** https://appstoreconnect.apple.com/apps/6759011077/distribution/ios/version/inflight
+
 ## Wrangler Commands
 
 ```bash

@@ -5,6 +5,27 @@ iOS app that exposes phone sensors (barcode, camera, LiDAR) as API endpoints for
 
 **Deadline:** Mon Feb 16, 3:00 PM EST
 
+## Elevator Pitch (Vibe Coders)
+
+You can build AI agents easily with Claude Projects or custom GPTs. But getting phone sensor data into those agents? That still requires building a native iOS app - months of Swift, Xcode, and App Store friction.
+
+**Robo is the missing bridge:** Open-source iOS app (robo.app) that turns your phone's sensors into APIs any AI agent can use.
+
+- **No iOS development required** - Skip the Swift learning curve
+- **Provider-agnostic** - Works with Claude, ChatGPT, your custom backend, or just email
+- **Open source** - Fork it, extend it, audit the code
+- **Free tier** - Email/zip export works without any backend (privacy-first)
+
+**Demo scenario (30 seconds):**
+1. Download Robo from App Store
+2. Point phone at room, tap "Scan with LiDAR"
+3. 3D point cloud appears in your Claude Project
+4. Agent: "Your room is 12ft × 14ft. Here's where that couch would fit..."
+
+**Why it matters:** Getting LiDAR data into Claude today is impossible. Robo makes it trivial.
+
+See [docs/use-cases.md](docs/use-cases.md) for detailed examples.
+
 ## Technology Stack
 
 ### iOS (Swift)
@@ -71,11 +92,26 @@ robo/
 
 ## Build Commands
 
-### iOS
+### iOS — prefer CLI over Xcode UI
+Use command-line builds whenever possible. Only use XcodeBuildMCP simulator tools for UI testing that doesn't need sensors. Barcode, LiDAR, and camera features require a physical device.
+
 ```bash
 cd ios
 xcodegen generate         # Generate .xcodeproj from project.yml
 xcodebuild -scheme Robo -configuration Debug | xcsift  # Build (errors only)
+
+# Build for physical device
+xcodebuild -scheme Robo -configuration Debug \
+  -destination 'generic/platform=iOS' \
+  -allowProvisioningUpdates \
+  CODE_SIGN_IDENTITY="Apple Development" \
+  DEVELOPMENT_TEAM=R3Z5CY34Q5
+
+# Install and launch on physical device (no Xcode UI needed)
+DEVICE_ID=7BDE5F34-030C-589D-9F0F-65C6B8DD2B48
+APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData/Robo-*/Build/Products/Debug-iphoneos -name "Robo.app" -maxdepth 1 | head -1)
+xcrun devicectl device install app --device $DEVICE_ID "$APP_PATH"
+xcrun devicectl device process launch --device $DEVICE_ID com.silv.Robo
 ```
 
 ### Workers

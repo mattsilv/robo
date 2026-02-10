@@ -1,24 +1,48 @@
 import SwiftUI
 import VisionKit
+import AudioToolbox
+import SwiftData
 
 struct BarcodeScannerView: View {
-    @Environment(APIService.self) private var apiService
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("scanQuality") private var scanQuality: String = "balanced"
 
-    @State private var scannedCode: String?
-    @State private var isProcessing = false
+    @State private var lastScannedCode: String?
+    @State private var lastScanTime: Date = .distantPast
+    @State private var currentToast: ToastItem?
     @State private var error: String?
-    @State private var showingResult = false
+
+    private struct ToastItem: Identifiable {
+        let id = UUID()
+        let code: String
+        let symbology: String
+    }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                if DataScannerViewController.isSupported && DataScannerViewController.isAvailable {
-                    DataScannerRepresentable(
-                        recognizedDataTypes: [.barcode()],
-                        onScan: handleScan
-                    )
-                    .ignoresSafeArea()
+                if DataScannerViewController.isSupported {
+                    if DataScannerViewController.isAvailable {
+                        DataScannerRepresentable(
+                            recognizedDataTypes: [.barcode()],
+                            qualityLevel: scanQuality == "fast" ? .fast : .balanced,
+                            onScan: handleScan
+                        )
+                        .ignoresSafeArea()
+                    } else {
+                        ContentUnavailableView {
+                            Label("Camera Access Required", systemImage: "camera.fill")
+                        } description: {
+                            Text("Robo needs camera access to scan barcodes. Open Settings to enable it.")
+                        } actions: {
+                            Button("Open Settings") {
+                                if let url = URL(string: UIApplication.openSettingsURLString) {
+                                    UIApplication.shared.open(url)
+                                }
+                            }
+                        }
+                    }
                 } else {
                     ContentUnavailableView(
                         "Scanner Not Available",
@@ -27,12 +51,15 @@ struct BarcodeScannerView: View {
                     )
                 }
 
-                if isProcessing {
-                    ProgressView("Processing...")
-                        .padding()
-                        .background(.regularMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                // Toast overlay
+                VStack {
+                    Spacer()
+                    if let toast = currentToast {
+                        ScanToast(code: toast.code, symbology: toast.symbology)
+                            .padding(.bottom, 20)
+                    }
                 }
+                .animation(.spring(duration: 0.3), value: currentToast?.id)
             }
             .navigationTitle("Barcode Scanner")
             .navigationBarTitleDisplayMode(.inline)
@@ -41,15 +68,6 @@ struct BarcodeScannerView: View {
                     Button("Done") {
                         dismiss()
                     }
-                }
-            }
-            .alert("Scanned Barcode", isPresented: $showingResult) {
-                Button("OK") {
-                    scannedCode = nil
-                }
-            } message: {
-                if let code = scannedCode {
-                    Text("Code: \(code)")
                 }
             }
             .alert("Error", isPresented: .constant(error != nil)) {
@@ -66,35 +84,40 @@ struct BarcodeScannerView: View {
 
     private func handleScan(_ result: RecognizedItem) {
         guard case .barcode(let barcode) = result,
-              let code = barcode.payloadStringValue,
-              !isProcessing else { return }
+              let code = barcode.payloadStringValue else { return }
+
+        // 3-second deduplication for same barcode
+        let now = Date()
+        if code == lastScannedCode && now.timeIntervalSince(lastScanTime) < 3 {
+            return
+        }
+
+        lastScannedCode = code
+        lastScanTime = now
 
         // Haptic feedback
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
 
-        scannedCode = code
-        isProcessing = true
+        // System sound
+        AudioServicesPlaySystemSound(1057)
 
+        let symbology = barcode.observation.symbology.rawValue
+
+        // Save to SwiftData
+        let record = ScanRecord(barcodeValue: code, symbology: symbology)
+        modelContext.insert(record)
+
+        // Show toast (replaces previous)
+        currentToast = ToastItem(code: code, symbology: symbology)
+
+        // Auto-dismiss toast after 2 seconds
+        let toastId = currentToast?.id
         Task {
-            do {
-                // Submit to API
-                let data: [String: Any] = [
-                    "code": code,
-                    "type": barcode.observation.symbology.rawValue
-                ]
-
-                _ = try await apiService.submitSensorData(
-                    sensorType: .barcode,
-                    data: data
-                )
-
-                showingResult = true
-            } catch {
-                self.error = error.localizedDescription
+            try? await Task.sleep(for: .seconds(2))
+            if currentToast?.id == toastId {
+                currentToast = nil
             }
-
-            isProcessing = false
         }
     }
 }
@@ -103,20 +126,25 @@ struct BarcodeScannerView: View {
 
 struct DataScannerRepresentable: UIViewControllerRepresentable {
     let recognizedDataTypes: Set<DataScannerViewController.RecognizedDataType>
+    let qualityLevel: DataScannerViewController.QualityLevel
     let onScan: (RecognizedItem) -> Void
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
         let scanner = DataScannerViewController(
             recognizedDataTypes: recognizedDataTypes,
-            qualityLevel: .balanced,
+            qualityLevel: qualityLevel,
             isHighlightingEnabled: true
         )
         scanner.delegate = context.coordinator
+        try? scanner.startScanning()
         return scanner
     }
 
     func updateUIViewController(_ uiViewController: DataScannerViewController, context: Context) {
-        try? uiViewController.startScanning()
+        // Restart scanning if needed (e.g., after backgrounding)
+        if !uiViewController.isScanning {
+            try? uiViewController.startScanning()
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -142,7 +170,6 @@ struct DataScannerRepresentable: UIViewControllerRepresentable {
             didAdd addedItems: [RecognizedItem],
             allItems: [RecognizedItem]
         ) {
-            // Auto-scan the first item
             if let first = addedItems.first {
                 onScan(first)
             }
@@ -152,5 +179,5 @@ struct DataScannerRepresentable: UIViewControllerRepresentable {
 
 #Preview {
     BarcodeScannerView()
-        .environment(APIService(deviceService: DeviceService()))
+        .modelContainer(for: ScanRecord.self, inMemory: true)
 }

@@ -12,7 +12,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     PRODUCT_NAME: Robo
     MARKETING_VERSION: 1.0
-    CURRENT_PROJECT_VERSION: 2
+    CURRENT_PROJECT_VERSION: 5
     SWIFT_VERSION: 5.9
     IPHONEOS_DEPLOYMENT_TARGET: 17.0
     TARGETED_DEVICE_FAMILY: 1  # iPhone only
@@ -54,5 +54,6 @@ targets:
         UIRequiresFullScreen: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        ITSAppUsesNonExemptEncryption: false
         NSCameraUsageDescription: "Robo needs camera access to scan barcodes, capture photos, and perform LiDAR room scanning for AI analysis"
         NSPhotoLibraryUsageDescription: "Robo needs photo library access to save captured images"

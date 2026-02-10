@@ -13,6 +13,8 @@ struct ScanHistoryView: View {
     @State private var copiedToastVisible = false
     @State private var shareURL: URL?
     @State private var exportingRoomID: PersistentIdentifier?
+    @State private var showingBarcodeScanner = false
+    @State private var showingLiDARScanner = false
 
     var body: some View {
         NavigationStack {
@@ -86,11 +88,20 @@ struct ScanHistoryView: View {
     @ViewBuilder
     private var barcodeList: some View {
         if scans.isEmpty {
-            ContentUnavailableView(
-                "No Scans Yet",
-                systemImage: "barcode.viewfinder",
-                description: Text("Tap \(AppStrings.Tabs.gather) to scan a barcode.")
-            )
+            ContentUnavailableView {
+                Label("No Scans Yet", systemImage: "barcode.viewfinder")
+            } description: {
+                Text("Scan barcodes and QR codes to see them here.")
+            } actions: {
+                Button {
+                    showingBarcodeScanner = true
+                } label: {
+                    Text("Scan Barcode")
+                }
+            }
+            .fullScreenCover(isPresented: $showingBarcodeScanner) {
+                BarcodeScannerView()
+            }
         } else {
             List {
                 ForEach(scans) { scan in
@@ -110,11 +121,20 @@ struct ScanHistoryView: View {
     @ViewBuilder
     private var roomList: some View {
         if roomScans.isEmpty {
-            ContentUnavailableView(
-                "No Room Scans Yet",
-                systemImage: "camera.metering.spot",
-                description: Text("Tap \(AppStrings.Tabs.gather) to scan a room with LiDAR.")
-            )
+            ContentUnavailableView {
+                Label("No Room Scans Yet", systemImage: "camera.metering.spot")
+            } description: {
+                Text("Scan rooms with LiDAR to see them here.")
+            } actions: {
+                Button {
+                    showingLiDARScanner = true
+                } label: {
+                    Text("Scan Room")
+                }
+            }
+            .fullScreenCover(isPresented: $showingLiDARScanner) {
+                LiDARScanView()
+            }
         } else {
             List {
                 ForEach(roomScans) { room in

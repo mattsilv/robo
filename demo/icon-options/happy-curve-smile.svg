@@ -1,0 +1,9 @@
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <rect width="120" height="120" rx="28" fill="#2563EB"/>
+  <circle cx="42" cy="48" r="14" fill="white"/>
+  <circle cx="78" cy="48" r="14" fill="white"/>
+  <circle cx="42" cy="48" r="7" fill="#1a4fc0"/>
+  <circle cx="78" cy="48" r="7" fill="#1a4fc0"/>
+  <!-- Happy curved smile -->
+  <path d="M 34 80 Q 60 102 86 80" fill="none" stroke="white" stroke-width="8" stroke-linecap="round"/>
+</svg>

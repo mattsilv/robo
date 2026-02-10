@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ROBO.APP — The Native App Sidekick for AI Agents</title>
+  <meta name="description" content="Robo turns your iPhone's LiDAR, camera, and barcode scanner into API endpoints any AI agent can use. No iOS development required.">
+  <meta property="og:title" content="ROBO.APP — The Native App Sidekick for AI Agents">
+  <meta property="og:description" content="Turn native iOS capabilities — LiDAR, HealthKit, BLE, GPS — into endpoints any AI agent can use.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://robo.app">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="ROBO.APP — The Native App Sidekick for AI Agents">
+  <meta name="twitter:description" content="Turn native iOS capabilities — LiDAR, HealthKit, BLE, GPS — into endpoints any AI agent can use.">
+  <meta name="twitter:creator" content="@mattsilv">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563EB'/><circle cx='11' cy='13' r='4' fill='white'/><circle cx='21' cy='13' r='4' fill='white'/><circle cx='11' cy='13' r='2' fill='%231a4fc0'/><circle cx='21' cy='13' r='2' fill='%231a4fc0'/><path d='M 10 21 Q 16 26 22 21' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+    :root {
+      --blue: #2563EB;
+      --blue-light: #3b82f6;
+      --blue-glow: rgba(37, 99, 235, 0.35);
+      --blue-dim: rgba(37, 99, 235, 0.12);
+      --bg: #06060a;
+      --surface: #0d0d14;
+      --border: rgba(255,255,255,0.06);
+      --text: #e2e2e8;
+      --text-dim: #6b6b7b;
+      --text-muted: #3d3d4d;
+    }
+
+    html { scroll-behavior: smooth }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* ── dot grid background ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── ambient glow ── */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -40%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, var(--blue-glow) 0%, transparent 70%);
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+      animation: ambientPulse 6s ease-in-out infinite;
+    }
+
+    @keyframes ambientPulse {
+      0%, 100% { opacity: 0.4; transform: translateX(-50%) scale(1); }
+      50% { opacity: 0.6; transform: translateX(-50%) scale(1.1); }
+    }
+
+    /* ── main container ── */
+    .container {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 3rem 1.5rem;
+      max-width: 640px;
+      width: 100%;
+      gap: 0;
+    }
+
+    /* ── staggered fade-in ── */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(16px);
+      animation: fadeUp 0.7s ease-out forwards;
+    }
+    .fade-in:nth-child(1) { animation-delay: 0.1s }
+    .fade-in:nth-child(2) { animation-delay: 0.25s }
+    .fade-in:nth-child(3) { animation-delay: 0.4s }
+    .fade-in:nth-child(4) { animation-delay: 0.55s }
+    .fade-in:nth-child(5) { animation-delay: 0.7s }
+    .fade-in:nth-child(6) { animation-delay: 0.85s }
+    .fade-in:nth-child(7) { animation-delay: 1.0s }
+
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── robot icon ── */
+    .robot-wrap {
+      margin-bottom: 1.75rem;
+    }
+
+    .robot-svg {
+      width: 120px;
+      height: 120px;
+      animation: robotFloat 4s ease-in-out infinite;
+      filter: drop-shadow(0 0 30px var(--blue-glow));
+    }
+
+    @keyframes robotFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    /* ── wordmark ── */
+    .wordmark {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      font-size: 3rem;
+      letter-spacing: 0.06em;
+      color: #fff;
+      margin-bottom: 0.75rem;
+      line-height: 1;
+    }
+
+    .wordmark .dot {
+      color: var(--blue-light);
+    }
+
+    /* ── tagline ── */
+    .tagline {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 400;
+      color: var(--text-dim);
+      letter-spacing: 0.02em;
+      margin-bottom: 2.25rem;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    /* ── badge ── */
+    .badge-wrap {
+      margin-bottom: 2.5rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 1rem;
+      border: 1px solid var(--blue);
+      border-radius: 100px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--blue-light);
+      background: var(--blue-dim);
+      animation: badgePulse 3s ease-in-out infinite;
+    }
+
+    .badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--blue-light);
+      animation: dotBlink 2s ease-in-out infinite;
+    }
+
+    @keyframes badgePulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.15); }
+      50% { box-shadow: 0 0 20px 2px rgba(37, 99, 235, 0.15); }
+    }
+
+    @keyframes dotBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ── description ── */
+    .description {
+      font-size: 1.05rem;
+      line-height: 1.7;
+      color: var(--text-dim);
+      text-align: center;
+      margin-bottom: 2.75rem;
+      max-width: 480px;
+    }
+
+    /* ── features ── */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      margin-bottom: 3rem;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      width: 100%;
+      max-width: 560px;
+    }
+
+    .feature {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1.25rem 0.75rem;
+      background: var(--surface);
+      text-align: center;
+    }
+
+    .feature-icon {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: var(--blue-dim);
+      color: var(--blue-light);
+      font-size: 1rem;
+    }
+
+    .feature-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      line-height: 1.3;
+    }
+
+    /* ── links ── */
+    .links {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 3.5rem;
+    }
+
+    .link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text-dim);
+      text-decoration: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 400;
+      letter-spacing: 0.02em;
+      transition: all 0.25s ease;
+    }
+
+    .link:hover {
+      border-color: var(--blue);
+      color: var(--blue-light);
+      background: var(--blue-dim);
+    }
+
+    .link svg {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+
+    /* ── footer ── */
+    .footer {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+    }
+
+    .footer a {
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    .footer a:hover {
+      color: var(--blue-light);
+    }
+
+    /* ── responsive ── */
+    @media (min-width: 640px) {
+      .container { padding: 4rem 2rem; }
+      .robot-svg { width: 160px; height: 160px; }
+      .wordmark { font-size: 4rem; }
+      .tagline { font-size: 0.95rem; }
+      .description { font-size: 1.1rem; }
+      .feature { padding: 1.5rem 1rem; }
+      .feature-label { font-size: 0.7rem; }
+    }
+
+    @media (max-width: 520px) {
+      .features { grid-template-columns: repeat(2, 1fr); }
+      .links { flex-direction: column; width: 100%; max-width: 280px; }
+      .link { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+
+    <!-- Robot Icon -->
+    <div class="robot-wrap fade-in">
+      <svg class="robot-svg" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="120" height="120" rx="28" fill="#2563EB"/>
+        <circle cx="42" cy="48" r="14" fill="white"/>
+        <circle cx="78" cy="48" r="14" fill="white"/>
+        <circle cx="42" cy="48" r="7" fill="#1a4fc0"/>
+        <circle cx="78" cy="48" r="7" fill="#1a4fc0"/>
+        <path d="M 34 80 Q 60 102 86 80" fill="none" stroke="white" stroke-width="8" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <!-- Wordmark -->
+    <h1 class="wordmark fade-in">ROBO<span class="dot">.</span>APP</h1>
+
+    <!-- Tagline -->
+    <p class="tagline fade-in">The native app sidekick for AI agents</p>
+
+    <!-- Badge -->
+    <div class="badge-wrap fade-in">
+      <span class="badge">Claude Code 2026 Hackathon</span>
+    </div>
+
+    <!-- Teaser -->
+    <p class="description fade-in">
+      LiDAR, HealthKit, Bluetooth beacons, GPS — locked inside your phone. Until now. Robo turns native iOS capabilities into endpoints any AI agent can use. No iOS development required.
+    </p>
+
+    <!-- Features -->
+    <div class="features fade-in">
+      <div class="feature">
+        <div class="feature-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h2m16 0h2M12 2v2m0 16v2m-7.07-2.93 1.41-1.41m11.32-11.32 1.41-1.41M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41"/><circle cx="12" cy="12" r="4"/></svg>
+        </div>
+        <span class="feature-label">LiDAR Floor Plans</span>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="8" x2="6" y2="16"/><line x1="8" y1="8" x2="8" y2="16"/><line x1="11" y1="8" x2="11" y2="16"/><line x1="14" y1="8" x2="14" y2="16"/><line x1="16" y1="8" x2="16" y2="16"/><line x1="18" y1="8" x2="18" y2="16"/></svg>
+        </div>
+        <span class="feature-label">Barcode Detection</span>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </div>
+        <span class="feature-label">Apple HealthKit</span>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2l3 5h4l3-5"/><path d="M12 7v10"/><path d="M7 22l3-5h4l3 5"/><circle cx="12" cy="12" r="2"/></svg>
+        </div>
+        <span class="feature-label">BLE Proximity</span>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4c0 2-2 3-2 5h-4c0-2-2-3-2-5a4 4 0 0 1 4-4z"/><line x1="10" y1="17" x2="14" y2="17"/><line x1="10" y1="20" x2="14" y2="20"/><line x1="11" y1="23" x2="13" y2="23"/></svg>
+        </div>
+        <span class="feature-label">On-Device ML</span>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+        </div>
+        <span class="feature-label">Camera + Vision</span>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        </div>
+        <span class="feature-label">Human-in-the-Loop Inbox</span>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </div>
+        <span class="feature-label">Push Notifications</span>
+      </div>
+    </div>
+
+    <!-- Links -->
+    <div class="links fade-in">
+      <a href="https://github.com/mattsilv/robo" class="link" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub
+      </a>
+      <a href="https://x.com/mattsilv" class="link" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        @mattsilv
+      </a>
+      <a href="https://silv.blog" class="link" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        silv.blog
+      </a>
+    </div>
+
+    <!-- Footer -->
+    <p class="footer fade-in">Vibe coded by <a href="https://silv.app" target="_blank" rel="noopener">Matt Silverman</a> with <a href="https://claude.ai/claude-code" target="_blank" rel="noopener">Claude Code</a></p>
+    <p class="footer fade-in" style="margin-top: 0.5rem;">$85 of Claude API usage. That's it. That's the whole app.</p>
+
+  </main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Robot Icon Options</title>
+<style>
+  body { background: #111; color: white; font-family: system-ui; display: flex; flex-direction: column; align-items: center; padding: 2rem; gap: 2rem; }
+  h1 { font-size: 1.5rem; opacity: 0.7; }
+  h2 { font-size: 1rem; opacity: 0.5; margin-top: 1rem; }
+  .grid { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .option { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+  .option img, .option object { width: 160px; height: 160px; border-radius: 28px; }
+  .option span { font-size: 0.85rem; opacity: 0.6; }
+</style></head><body>
+<h1>Robot Icon Comparison</h1>
+
+<h2>Current</h2>
+<div class="grid">
+  <div class="option">
+    <img src="1-geometric-robot-blue.png" alt="Current">
+    <span>Current (straight mouth)</span>
+  </div>
+</div>
+
+<h2>Gemini-Generated (via OpenRouter)</h2>
+<div class="grid">
+  <div class="option">
+    <img src="friendly-teeth-grin.png" alt="V1">
+    <span>V1: Teeth grin</span>
+  </div>
+  <div class="option">
+    <img src="happy-curve-smile.png" alt="V2">
+    <span>V2: Curved smile</span>
+  </div>
+  <div class="option">
+    <img src="playful-square-teeth.png" alt="V3">
+    <span>V3: Smile + square teeth</span>
+  </div>
+</div>
+
+<h2>SVG Versions (crisp at any size)</h2>
+<div class="grid">
+  <div class="option">
+    <object data="friendly-teeth-grin.svg" type="image/svg+xml" width="160" height="160"></object>
+    <span>V1 SVG: Teeth grin</span>
+  </div>
+  <div class="option">
+    <object data="happy-curve-smile.svg" type="image/svg+xml" width="160" height="160"></object>
+    <span>V2 SVG: Curved smile (thick)</span>
+  </div>
+  <div class="option">
+    <object data="playful-square-teeth.svg" type="image/svg+xml" width="160" height="160"></object>
+    <span>V3 SVG: Smile + square teeth</span>
+  </div>
+</div>
+
+</body></html>

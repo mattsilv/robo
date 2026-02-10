@@ -1,0 +1,13 @@
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <rect width="120" height="120" rx="28" fill="#2563EB"/>
+  <circle cx="42" cy="48" r="14" fill="white"/>
+  <circle cx="78" cy="48" r="14" fill="white"/>
+  <circle cx="42" cy="48" r="7" fill="#1a4fc0"/>
+  <circle cx="78" cy="48" r="7" fill="#1a4fc0"/>
+  <!-- Curved smile with square teeth -->
+  <path d="M 34 78 Q 60 104 86 78" fill="#1a4fc0" stroke="none"/>
+  <rect x="42" y="78" width="8" height="8" rx="1" fill="white"/>
+  <rect x="52" y="80" width="8" height="8" rx="1" fill="white"/>
+  <rect x="62" y="80" width="8" height="8" rx="1" fill="white"/>
+  <rect x="72" y="78" width="8" height="8" rx="1" fill="white"/>
+</svg>

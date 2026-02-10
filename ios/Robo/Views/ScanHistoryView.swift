@@ -215,6 +215,9 @@ private struct RoomScanRow: View {
                 HStack(spacing: 8) {
                     Label("\(room.wallCount) walls", systemImage: "square.split.2x1")
                     Text(String(format: "%.0f ft\u{00B2}", room.floorAreaSqM * 10.7639))
+                    if room.ceilingHeightM > 0 {
+                        Text(String(format: "%.1fft ceil", room.ceilingHeightM * 3.28084))
+                    }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)

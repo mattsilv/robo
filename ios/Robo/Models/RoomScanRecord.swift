@@ -7,6 +7,7 @@ final class RoomScanRecord {
     var capturedAt: Date
     var wallCount: Int
     var floorAreaSqM: Double
+    var ceilingHeightM: Double
     var objectCount: Int
     var summaryJSON: Data
     var fullRoomDataJSON: Data
@@ -15,6 +16,7 @@ final class RoomScanRecord {
         roomName: String,
         wallCount: Int,
         floorAreaSqM: Double,
+        ceilingHeightM: Double = 0,
         objectCount: Int,
         summaryJSON: Data,
         fullRoomDataJSON: Data
@@ -23,6 +25,7 @@ final class RoomScanRecord {
         self.capturedAt = Date()
         self.wallCount = wallCount
         self.floorAreaSqM = floorAreaSqM
+        self.ceilingHeightM = ceilingHeightM
         self.objectCount = objectCount
         self.summaryJSON = summaryJSON
         self.fullRoomDataJSON = fullRoomDataJSON

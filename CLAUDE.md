@@ -144,10 +144,20 @@ wrangler d1 migrations apply robo-db  # Run DB migrations
 wrangler deploy
 ```
 
-### iOS
-1. Archive in Xcode: Product → Archive
-2. Upload to App Store Connect
-3. Submit for TestFlight review
+### iOS (TestFlight)
+Auto-deploys to TestFlight on push to `main` when `ios/**` files change (via `.github/workflows/testflight.yml`). Can also trigger manually:
+```bash
+gh workflow run testflight.yml
+```
+Build number = `github.run_number + 100` (avoids collisions with local builds).
+
+**Required secrets** (all configured): `BUILD_CERTIFICATE_BASE64`, `P12_PASSWORD`, `KEYCHAIN_PASSWORD`, `APPSTORE_CONNECT_API_KEY_ID`, `APPSTORE_CONNECT_API_ISSUER_ID`, `APPSTORE_CONNECT_API_PRIVATE_KEY`
+
+### Landing Page
+```bash
+wrangler pages deploy site --project-name=robo-app --commit-dirty=true --branch=main
+```
+CI workflow (`deploy-site.yml`) removed for now — re-add with `CLOUDFLARE_API_TOKEN` secret when ready.
 
 ## Environment Variables
 

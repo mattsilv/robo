@@ -14,6 +14,9 @@ struct ScanHistoryView: View {
     @State private var showingClearConfirmation = false
     @State private var shareURL: URL?
     @State private var isExporting = false
+    @State private var showingBarcodeScanner = false
+    @State private var showingLiDARScanner = false
+    @State private var showingMotionCapture = false
 
     var body: some View {
         NavigationStack {
@@ -106,11 +109,18 @@ struct ScanHistoryView: View {
     @ViewBuilder
     private var barcodeList: some View {
         if scans.isEmpty {
-            ContentUnavailableView(
-                "No Scans Yet",
-                systemImage: "barcode.viewfinder",
-                description: Text("Tap \(AppStrings.Tabs.gather) to scan a barcode.")
-            )
+            ContentUnavailableView {
+                Label("No Scans Yet", systemImage: "barcode.viewfinder")
+            } description: {
+                Text("Scan barcodes and QR codes to see them here.")
+            } actions: {
+                Button("Scan Barcode") {
+                    showingBarcodeScanner = true
+                }
+            }
+            .fullScreenCover(isPresented: $showingBarcodeScanner) {
+                BarcodeScannerView()
+            }
         } else {
             List {
                 ForEach(scans) { scan in
@@ -119,6 +129,8 @@ struct ScanHistoryView: View {
                     }
                 }
                 .onDelete(perform: deleteBarcodeScans)
+
+                exportAllSection
             }
         }
     }
@@ -128,11 +140,18 @@ struct ScanHistoryView: View {
     @ViewBuilder
     private var roomList: some View {
         if roomScans.isEmpty {
-            ContentUnavailableView(
-                "No Room Scans Yet",
-                systemImage: "camera.metering.spot",
-                description: Text("Tap \(AppStrings.Tabs.gather) to scan a room with LiDAR.")
-            )
+            ContentUnavailableView {
+                Label("No Room Scans Yet", systemImage: "camera.metering.spot")
+            } description: {
+                Text("Scan rooms with LiDAR to see them here.")
+            } actions: {
+                Button("Scan Room") {
+                    showingLiDARScanner = true
+                }
+            }
+            .fullScreenCover(isPresented: $showingLiDARScanner) {
+                LiDARScanView()
+            }
         } else {
             List {
                 ForEach(roomScans) { room in
@@ -164,6 +183,8 @@ struct ScanHistoryView: View {
                     }
                 }
                 .onDelete(perform: deleteRoomScans)
+
+                exportAllSection
             }
         }
     }
@@ -173,11 +194,18 @@ struct ScanHistoryView: View {
     @ViewBuilder
     private var motionList: some View {
         if motionRecords.isEmpty {
-            ContentUnavailableView(
-                "No Motion Data Yet",
-                systemImage: "figure.walk.motion",
-                description: Text("Tap \(AppStrings.Tabs.gather) to capture motion & activity data.")
-            )
+            ContentUnavailableView {
+                Label("No Motion Data Yet", systemImage: "figure.walk.motion")
+            } description: {
+                Text("Capture motion & activity data to see it here.")
+            } actions: {
+                Button("Capture Motion") {
+                    showingMotionCapture = true
+                }
+            }
+            .fullScreenCover(isPresented: $showingMotionCapture) {
+                MotionCaptureView()
+            }
         } else {
             List {
                 ForEach(motionRecords) { motion in
@@ -194,7 +222,35 @@ struct ScanHistoryView: View {
                     }
                 }
                 .onDelete(perform: deleteMotionRecords)
+
+                exportAllSection
             }
+        }
+    }
+
+    // MARK: - Export All Section
+
+    private var totalItemCount: Int {
+        scans.count + roomScans.count + motionRecords.count
+    }
+
+    @ViewBuilder
+    private var exportAllSection: some View {
+        Section {
+            Button {
+                exportAll()
+            } label: {
+                HStack {
+                    Spacer()
+                    if isExporting {
+                        ProgressView()
+                            .padding(.trailing, 8)
+                    }
+                    Label("Export All Data (\(totalItemCount))", systemImage: "square.and.arrow.up")
+                    Spacer()
+                }
+            }
+            .disabled(isExporting)
         }
     }
 

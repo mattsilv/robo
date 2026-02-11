@@ -5,14 +5,15 @@ iOS app that exposes phone sensors (barcode, camera, LiDAR) as API endpoints for
 
 **Deadline:** Mon Feb 16, 3:00 PM EST
 
-## Elevator Pitch (Vibe Coders)
+## Elevator Pitch (Builders)
 
-You can build AI agents easily with Claude Projects or custom GPTs. But getting phone sensor data into those agents? That still requires building a native iOS app - months of Swift, Xcode, and App Store friction.
+The future of building is agentic — but there's an insane amount of friction getting phone sensor data into AI agents. LiDAR, camera, barcodes — all trapped on the device. Want that data? Build a native iOS app. Months of Swift, Xcode, and App Store review.
 
 **Robo is the missing bridge:** Open-source iOS app (robo.app) that turns your phone's sensors into APIs any AI agent can use.
 
-- **No iOS development required** - Skip the Swift learning curve
+- **No iOS development required** - Skip Swift, Xcode, and App Store review
 - **Provider-agnostic** - Works with Claude, ChatGPT, your custom backend, or just email
+- **Integration options** - Webhooks, REST API, MCP, or simple email/zip export
 - **Open source** - Fork it, extend it, audit the code
 - **Free tier** - Email/zip export works without any backend (privacy-first)
 

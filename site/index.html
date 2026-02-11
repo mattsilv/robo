@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ROBO.APP — The Native App Sidekick for AI Agents</title>
-  <meta name="description" content="Robo turns your iPhone's LiDAR, camera, and barcode scanner into API endpoints any AI agent can use. No iOS development required.">
+  <title>ROBO.APP — Native Mobile Context for AI Agents</title>
+  <meta name="description" content="LiDAR, camera, and barcode data are trapped on your phone — invisible to AI agents. Robo unlocks them via webhooks, REST API, MCP, or simple email export. Open source, no iOS dev required.">
 
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -15,18 +15,18 @@
   <!-- Open Graph / Facebook / Discord / iMessage -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://robo.app/">
-  <meta property="og:title" content="ROBO.APP — Phone Sensors as API Endpoints for AI Agents">
-  <meta property="og:description" content="Turn your iPhone's LiDAR, camera, and barcode scanner into endpoints any AI agent can use. Open source. No iOS development required.">
+  <meta property="og:title" content="ROBO.APP — Native Mobile Context for AI Agents">
+  <meta property="og:description" content="LiDAR, camera, and barcode data are trapped on your phone. Robo unlocks them for AI agents — webhooks, REST, MCP, or email. Open source.">
   <meta property="og:image" content="https://robo.app/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="ROBO.APP — The native app sidekick for AI agents. Features: LiDAR, Barcode, Camera, HealthKit.">
+  <meta property="og:image:alt" content="ROBO.APP — Native mobile context for AI agents. Features: LiDAR, Barcode, Camera, HealthKit.">
   <meta property="og:site_name" content="ROBO.APP">
 
   <!-- Twitter / X -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="ROBO.APP — Phone Sensors as API Endpoints for AI Agents">
-  <meta name="twitter:description" content="Turn your iPhone's LiDAR, camera, and barcode scanner into endpoints any AI agent can use. Open source. No iOS development required.">
+  <meta name="twitter:title" content="ROBO.APP — Native Mobile Context for AI Agents">
+  <meta name="twitter:description" content="LiDAR, camera, and barcode data are trapped on your phone. Robo unlocks them for AI agents — webhooks, REST, MCP, or email. Open source.">
   <meta name="twitter:image" content="https://robo.app/og-image.png">
   <meta name="twitter:creator" content="@mattsilv">
 
@@ -119,12 +119,15 @@
       animation: fadeUp 0.7s ease-out forwards;
     }
     .fade-in:nth-child(1) { animation-delay: 0.1s }
-    .fade-in:nth-child(2) { animation-delay: 0.25s }
-    .fade-in:nth-child(3) { animation-delay: 0.4s }
-    .fade-in:nth-child(4) { animation-delay: 0.55s }
-    .fade-in:nth-child(5) { animation-delay: 0.7s }
-    .fade-in:nth-child(6) { animation-delay: 0.85s }
-    .fade-in:nth-child(7) { animation-delay: 1.0s }
+    .fade-in:nth-child(2) { animation-delay: 0.2s }
+    .fade-in:nth-child(3) { animation-delay: 0.3s }
+    .fade-in:nth-child(4) { animation-delay: 0.4s }
+    .fade-in:nth-child(5) { animation-delay: 0.5s }
+    .fade-in:nth-child(6) { animation-delay: 0.6s }
+    .fade-in:nth-child(7) { animation-delay: 0.7s }
+    .fade-in:nth-child(8) { animation-delay: 0.8s }
+    .fade-in:nth-child(9) { animation-delay: 0.9s }
+    .fade-in:nth-child(10) { animation-delay: 1.0s }
 
     @keyframes fadeUp {
       to { opacity: 1; transform: translateY(0); }
@@ -221,8 +224,48 @@
       line-height: 1.7;
       color: var(--text-dim);
       text-align: center;
-      margin-bottom: 2.75rem;
+      margin-bottom: 2rem;
       max-width: 480px;
+    }
+
+    /* ── how it works ── */
+    .how-it-works {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      width: 100%;
+      max-width: 480px;
+      margin-bottom: 2.75rem;
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .step:last-child {
+      border-bottom: none;
+    }
+
+    .step-number {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      font-size: 0.85rem;
+      color: var(--blue-light);
+      min-width: 1.5rem;
+      text-align: center;
+    }
+
+    .step-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--text-dim);
+      letter-spacing: 0.01em;
+      line-height: 1.5;
     }
 
     /* ── features ── */
@@ -362,7 +405,7 @@
     <h1 class="wordmark fade-in">ROBO<span class="dot">.</span>APP</h1>
 
     <!-- Tagline -->
-    <p class="tagline fade-in">The native app sidekick for AI agents</p>
+    <p class="tagline fade-in">Native mobile context for AI agents</p>
 
     <!-- Badge -->
     <div class="badge-wrap fade-in">
@@ -371,8 +414,24 @@
 
     <!-- Teaser -->
     <p class="description fade-in">
-      LiDAR, HealthKit, Bluetooth beacons, GPS — locked inside your phone. Until now. Robo turns native iOS capabilities into endpoints any AI agent can use. No iOS development required.
+      Building an AI agent is easy. Getting it phone sensor data? That means months of Swift, Xcode, and App Store review. Robo is the missing bridge — an open-source iOS app that turns your phone's sensors into endpoints any AI agent can use via webhooks, REST API, MCP, or simple email export.
     </p>
+
+    <!-- How It Works -->
+    <div class="how-it-works fade-in">
+      <div class="step">
+        <span class="step-number">1</span>
+        <span class="step-text">Your agent needs phone data (LiDAR, camera, barcode...)</span>
+      </div>
+      <div class="step">
+        <span class="step-number">2</span>
+        <span class="step-text">Users download Robo, connect via webhook / REST / email</span>
+      </div>
+      <div class="step">
+        <span class="step-number">3</span>
+        <span class="step-text">Agent gets structured sensor data — no iOS dev, no App Store</span>
+      </div>
+    </div>
 
     <!-- Features -->
     <div class="features fade-in">

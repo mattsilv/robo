@@ -162,7 +162,7 @@ CLOUDFLARE_ACCOUNT_ID=<your-account-id>
 **D1 Database:** robo-db (`fb24f9a0-d52b-4a74-87ca-54069ec9471a`)
 **R2 Bucket:** robo-data
 **Workers API:** https://robo-api.silv.workers.dev
-**Landing Page:** https://robo-app.pages.dev (Cloudflare Pages, source: `site/`)
+**Landing Page:** https://robo.app (Cloudflare Pages, source: `site/`)
 **Deploy landing page:** `wrangler pages deploy site --project-name=robo-app --commit-dirty=true --branch=main`
 
 See `docs/cloudflare-resources.md` for complete resource inventory.

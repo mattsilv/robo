@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — ROBO.APP</title>
+  <meta name="description" content="Privacy policy for ROBO.APP">
+
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://robo.app/privacy">
+  <meta property="og:title" content="Privacy Policy — ROBO.APP">
+  <meta name="theme-color" content="#06060a">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+    :root {
+      --blue: #2563EB;
+      --blue-light: #3b82f6;
+      --blue-glow: rgba(37, 99, 235, 0.35);
+      --blue-dim: rgba(37, 99, 235, 0.12);
+      --bg: #06060a;
+      --surface: #0d0d14;
+      --border: rgba(255,255,255,0.06);
+      --text: #e2e2e8;
+      --text-dim: #6b6b7b;
+      --text-muted: #3d3d4d;
+    }
+
+    html { scroll-behavior: smooth }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 3rem 1.5rem;
+      max-width: 640px;
+      width: 100%;
+    }
+
+    .back {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      text-decoration: none;
+      margin-bottom: 2rem;
+      transition: color 0.2s ease;
+    }
+
+    .back:hover { color: var(--blue-light); }
+
+    h1 {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      font-size: 2rem;
+      color: #fff;
+      margin-bottom: 0.5rem;
+    }
+
+    .updated {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-bottom: 2.5rem;
+    }
+
+    h2 {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--blue-light);
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    p, li {
+      font-size: 0.95rem;
+      line-height: 1.7;
+      color: var(--text-dim);
+      margin-bottom: 0.75rem;
+    }
+
+    ul {
+      padding-left: 1.25rem;
+      margin-bottom: 0.75rem;
+    }
+
+    a { color: var(--blue-light); }
+
+    .footer {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+
+    @media (min-width: 640px) {
+      .container { padding: 4rem 2rem; }
+      h1 { font-size: 2.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a href="/" class="back">&larr; Back to robo.app</a>
+
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: February 10, 2026</p>
+
+    <h2>Overview</h2>
+    <p>ROBO.APP ("Robo") is an open-source iOS app that turns your phone's sensors into structured data for AI agents. We are committed to your privacy.</p>
+
+    <h2>Data Collection</h2>
+    <p>Robo processes sensor data (LiDAR scans, barcodes, motion data) <strong>on your device</strong>. We do not collect, transmit, or store your personal data on our servers unless you explicitly choose to export it.</p>
+
+    <h2>What Stays on Your Device</h2>
+    <ul>
+      <li>All sensor captures (LiDAR room scans, barcode data, motion readings)</li>
+      <li>Scan history and saved results</li>
+      <li>App preferences and settings</li>
+    </ul>
+
+    <h2>What You Control</h2>
+    <ul>
+      <li><strong>Export via email/ZIP:</strong> You choose when and where to send your data</li>
+      <li><strong>Cloud sync (optional):</strong> If enabled, data is sent to our Cloudflare Workers backend. You can delete your data at any time.</li>
+      <li><strong>Device permissions:</strong> Camera, LiDAR, and motion access are requested only when needed and can be revoked in iOS Settings</li>
+    </ul>
+
+    <h2>Third-Party Services</h2>
+    <p>Robo does not include any third-party analytics, advertising, or tracking SDKs. When cloud sync is enabled, data is processed via Cloudflare Workers and stored in Cloudflare D1.</p>
+
+    <h2>Data Security</h2>
+    <p>All network communication uses HTTPS. On-device data is stored using iOS SwiftData with standard iOS data protection.</p>
+
+    <h2>Children's Privacy</h2>
+    <p>Robo is not directed at children under 13. We do not knowingly collect data from children.</p>
+
+    <h2>Changes</h2>
+    <p>We may update this policy. Changes will be posted on this page with an updated date.</p>
+
+    <h2>Contact</h2>
+    <p>Questions? Email <a href="mailto:matt@argentlabs.xyz">matt@argentlabs.xyz</a></p>
+
+    <p class="footer">&copy; 2026 Matt Silverman. Robo is open source under the MIT license.</p>
+  </main>
+</body>
+</html>

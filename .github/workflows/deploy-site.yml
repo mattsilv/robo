@@ -1,0 +1,21 @@
+# Deploy Landing Page — uncomment when CLOUDFLARE_API_TOKEN secret is added to repo
+#
+# name: Deploy Landing Page
+#
+# on:
+#   push:
+#     branches: [main]
+#     paths: ['site/**']
+#
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+#     permissions:
+#       contents: read
+#       deployments: write
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: cloudflare/wrangler-action@v3
+#         with:
+#           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+#           command: pages deploy site --project-name=robo-app --commit-dirty=true --branch=main

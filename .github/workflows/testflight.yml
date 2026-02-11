@@ -1,0 +1,154 @@
+name: TestFlight
+
+on:
+  push:
+    branches: [main]
+    paths: ['ios/**']
+
+concurrency:
+  group: testflight-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-upload:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Select Xcode 16
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Validate build prerequisites
+        run: |
+          FAIL=0
+
+          # Encryption compliance
+          if grep -q "ITSAppUsesNonExemptEncryption: false" ios/project.yml; then
+            echo "PASS: Encryption compliance key present"
+          else
+            echo "FAIL: Missing ITSAppUsesNonExemptEncryption in project.yml"
+            FAIL=1
+          fi
+
+          # Explicit modelContext.save() in save locations
+          LIDAR_SAVE=$(grep -c "modelContext.save()" ios/Robo/Views/LiDARScanView.swift 2>/dev/null || true)
+          BARCODE_SAVE=$(grep -c "modelContext.save()" ios/Robo/Views/BarcodeScannerView.swift 2>/dev/null || true)
+          if [ "$LIDAR_SAVE" -gt 0 ] && [ "$BARCODE_SAVE" -gt 0 ]; then
+            echo "PASS: Explicit modelContext.save() in LiDAR and Barcode views"
+          else
+            echo "FAIL: Missing explicit modelContext.save() — data will not persist!"
+            FAIL=1
+          fi
+
+          # VersionedSchema exists
+          if grep -rq "VersionedSchema" ios/Robo/Models/RoboSchema.swift 2>/dev/null; then
+            echo "PASS: VersionedSchema defined in RoboSchema.swift"
+          else
+            echo "FAIL: Missing VersionedSchema — data migrations will fail silently"
+            FAIL=1
+          fi
+
+          # No bare @Model files outside schema
+          BARE_MODELS=$(grep -rl "^@Model" ios/Robo/Models/ 2>/dev/null | grep -v RoboSchema.swift || true)
+          if [ -z "$BARE_MODELS" ]; then
+            echo "PASS: No bare @Model files outside RoboSchema.swift"
+          else
+            echo "FAIL: Found bare @Model outside schema: $BARE_MODELS"
+            FAIL=1
+          fi
+
+          if [ $FAIL -ne 0 ]; then
+            echo "::error::Validation checks failed. See above."
+            exit 1
+          fi
+
+      - name: Install distribution certificate
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Write certificate to temp file
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERTIFICATE_PATH"
+
+          # Create and configure temp keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          # Add to search list
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+      - name: Write App Store Connect API key
+        env:
+          API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_API_KEY_ID }}
+          API_PRIVATE_KEY: ${{ secrets.APPSTORE_CONNECT_API_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/private_keys
+          echo "$API_PRIVATE_KEY" > ~/private_keys/AuthKey_${API_KEY_ID}.p8
+
+      - name: Archive
+        env:
+          API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_API_ISSUER_ID }}
+        working-directory: ios
+        run: |
+          BUILD_NUMBER=$(( ${{ github.run_number }} + 100 ))
+          echo "Build number: $BUILD_NUMBER"
+
+          xcodebuild archive \
+            -scheme Robo \
+            -archivePath /tmp/Robo.xcarchive \
+            -destination 'generic/platform=iOS' \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID" \
+            DEVELOPMENT_TEAM=R3Z5CY34Q5 \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            | xcpretty || true
+
+          # Verify archive was created
+          if [ ! -d /tmp/Robo.xcarchive ]; then
+            echo "::error::Archive failed — /tmp/Robo.xcarchive not found"
+            exit 1
+          fi
+
+      - name: Export and upload to TestFlight
+        env:
+          API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath /tmp/Robo.xcarchive \
+            -exportPath /tmp/RoboExport \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID"
+
+      - name: Cleanup
+        if: ${{ always() }}
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db 2>/dev/null || true
+          rm -f $RUNNER_TEMP/build_certificate.p12
+          rm -rf ~/private_keys

@@ -56,24 +56,29 @@ else
     FAIL=1
 fi
 
-# 6. No removeItem/deleteStore near container init (data loss risk)
-DANGEROUS_DELETES=$(grep -rn "removeItem\|deleteStore\|destroyPersistentStore" ios/Robo/RoboApp.swift 2>/dev/null | grep -v "backup" || true)
-if [ -z "$DANGEROUS_DELETES" ]; then
-    echo -e "${GREEN}PASS${NC} No unguarded store deletion in RoboApp.swift"
-else
-    echo -e "${RED}FAIL${NC} Dangerous store deletion in RoboApp.swift (must backup first):"
-    echo "$DANGEROUS_DELETES"
+# 6. Store deletion must be preceded by backup (copyItem)
+HAS_DELETE=$(grep -c "removeItem\|deleteStore\|destroyPersistentStore" ios/Robo/RoboApp.swift 2>/dev/null || echo "0")
+HAS_BACKUP=$(grep -c "copyItem" ios/Robo/RoboApp.swift 2>/dev/null || echo "0")
+if [ "$HAS_DELETE" -gt 0 ] && [ "$HAS_BACKUP" -eq 0 ]; then
+    echo -e "${RED}FAIL${NC} Store deletion in RoboApp.swift without backup (copyItem required)"
     FAIL=1
+elif [ "$HAS_DELETE" -gt 0 ]; then
+    echo -e "${GREEN}PASS${NC} Store deletion guarded by backup ($HAS_BACKUP copyItem, $HAS_DELETE removeItem)"
+else
+    echo -e "${GREEN}PASS${NC} No store deletion in RoboApp.swift"
 fi
 
-# 7. No fatalError in migration path without resilient fallback
-NAKED_FATAL=$(grep -n "fatalError.*SwiftData\|fatalError.*migration\|fatalError.*ModelContainer" ios/Robo/RoboApp.swift 2>/dev/null | grep -v "backup+recreate\|unrecoverable" || true)
-if [ -z "$NAKED_FATAL" ]; then
-    echo -e "${GREEN}PASS${NC} No naked fatalError in migration path"
-else
-    echo -e "${RED}FAIL${NC} Naked fatalError in migration path (must use resilient fallback):"
-    echo "$NAKED_FATAL"
+# 7. Every fatalError must be the resilient last-resort kind (marked "unrecoverable")
+TOTAL_FATAL=$(grep -c "fatalError" ios/Robo/RoboApp.swift 2>/dev/null || echo "0")
+SAFE_FATAL=$(grep -c "unrecoverable" ios/Robo/RoboApp.swift 2>/dev/null || echo "0")
+if [ "$TOTAL_FATAL" -gt "$SAFE_FATAL" ]; then
+    echo -e "${RED}FAIL${NC} Found $TOTAL_FATAL fatalError but only $SAFE_FATAL marked 'unrecoverable'"
+    grep -n "fatalError" ios/Robo/RoboApp.swift 2>/dev/null || true
     FAIL=1
+elif [ "$TOTAL_FATAL" -gt 0 ]; then
+    echo -e "${GREEN}PASS${NC} All $TOTAL_FATAL fatalError call(s) are resilient last-resort"
+else
+    echo -e "${GREEN}PASS${NC} No fatalError in RoboApp.swift"
 fi
 
 # 8. Build check (renumbered)

@@ -130,7 +130,7 @@ struct ScanHistoryView: View {
                 }
                 .onDelete(perform: deleteBarcodeScans)
 
-                exportAllSection(count: scans.count, label: "barcodes")
+                exportAllSection
             }
         }
     }
@@ -184,7 +184,7 @@ struct ScanHistoryView: View {
                 }
                 .onDelete(perform: deleteRoomScans)
 
-                exportAllSection(count: roomScans.count, label: "rooms")
+                exportAllSection
             }
         }
     }
@@ -223,15 +223,19 @@ struct ScanHistoryView: View {
                 }
                 .onDelete(perform: deleteMotionRecords)
 
-                exportAllSection(count: motionRecords.count, label: "records")
+                exportAllSection
             }
         }
     }
 
     // MARK: - Export All Section
 
+    private var totalItemCount: Int {
+        scans.count + roomScans.count + motionRecords.count
+    }
+
     @ViewBuilder
-    private func exportAllSection(count: Int, label: String) -> some View {
+    private var exportAllSection: some View {
         Section {
             Button {
                 exportAll()
@@ -242,7 +246,7 @@ struct ScanHistoryView: View {
                         ProgressView()
                             .padding(.trailing, 8)
                     }
-                    Label("Export All (\(count))", systemImage: "square.and.arrow.up")
+                    Label("Export All Data (\(totalItemCount))", systemImage: "square.and.arrow.up")
                     Spacer()
                 }
             }

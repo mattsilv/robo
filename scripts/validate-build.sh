@@ -19,7 +19,17 @@ else
     FAIL=1
 fi
 
-# 2. Check version was bumped (compare with main branch)
+# 2. Check iOS SDK version (April 2026 requirement)
+SDK_VERSION=$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || echo "0")
+SDK_MAJOR=$(echo "$SDK_VERSION" | cut -d. -f1)
+if [ "$SDK_MAJOR" -ge 26 ]; then
+    echo -e "${GREEN}PASS${NC} iOS SDK version: $SDK_VERSION (meets iOS 26+ requirement)"
+else
+    echo -e "${RED}FAIL${NC} iOS SDK $SDK_VERSION below required iOS 26. Update Xcode."
+    FAIL=1
+fi
+
+# 3. Check version was bumped (compare with main branch)
 CURRENT_VERSION=$(grep "CURRENT_PROJECT_VERSION:" ios/project.yml | head -1 | awk '{print $2}')
 MAIN_VERSION=$(git show main:ios/project.yml 2>/dev/null | grep "CURRENT_PROJECT_VERSION:" | head -1 | awk '{print $2}')
 if [ -n "$MAIN_VERSION" ] && [ "$CURRENT_VERSION" = "$MAIN_VERSION" ]; then
@@ -29,7 +39,7 @@ else
     echo -e "${GREEN}PASS${NC} Build version: $CURRENT_VERSION (main: ${MAIN_VERSION:-N/A})"
 fi
 
-# 3. Check explicit modelContext.save() exists in save locations
+# 4. Check explicit modelContext.save() exists in save locations
 LIDAR_SAVE=$(grep -c "modelContext.save()" ios/Robo/Views/LiDARScanView.swift 2>/dev/null || true)
 BARCODE_SAVE=$(grep -c "modelContext.save()" ios/Robo/Views/BarcodeScannerView.swift 2>/dev/null || true)
 if [ "$LIDAR_SAVE" -gt 0 ] && [ "$BARCODE_SAVE" -gt 0 ]; then
@@ -39,7 +49,7 @@ else
     FAIL=1
 fi
 
-# 4. Check VersionedSchema exists
+# 5. Check VersionedSchema exists
 if grep -rq "VersionedSchema" ios/Robo/Models/RoboSchema.swift 2>/dev/null; then
     echo -e "${GREEN}PASS${NC} VersionedSchema defined in RoboSchema.swift"
 else
@@ -47,7 +57,7 @@ else
     FAIL=1
 fi
 
-# 5. Check no bare @Model files outside schema (duplicate definitions)
+# 6. Check no bare @Model files outside schema (duplicate definitions)
 BARE_MODELS=$(grep -rl "^@Model" ios/Robo/Models/ 2>/dev/null | grep -v RoboSchema.swift || true)
 if [ -z "$BARE_MODELS" ]; then
     echo -e "${GREEN}PASS${NC} No bare @Model files outside RoboSchema.swift"
@@ -56,7 +66,7 @@ else
     FAIL=1
 fi
 
-# 6. Store deletion must be preceded by backup (copyItem)
+# 7. Store deletion must be preceded by backup (copyItem)
 HAS_DELETE=$(grep -c "removeItem\|deleteStore\|destroyPersistentStore" ios/Robo/RoboApp.swift 2>/dev/null || echo "0")
 HAS_BACKUP=$(grep -c "copyItem" ios/Robo/RoboApp.swift 2>/dev/null || echo "0")
 if [ "$HAS_DELETE" -gt 0 ] && [ "$HAS_BACKUP" -eq 0 ]; then
@@ -68,7 +78,7 @@ else
     echo -e "${GREEN}PASS${NC} No store deletion in RoboApp.swift"
 fi
 
-# 7. Every fatalError must be the resilient last-resort kind (marked "unrecoverable")
+# 8. Every fatalError must be the resilient last-resort kind (marked "unrecoverable")
 TOTAL_FATAL=$(grep -c "fatalError" ios/Robo/RoboApp.swift 2>/dev/null || echo "0")
 SAFE_FATAL=$(grep -c "unrecoverable" ios/Robo/RoboApp.swift 2>/dev/null || echo "0")
 if [ "$TOTAL_FATAL" -gt "$SAFE_FATAL" ]; then
@@ -81,7 +91,7 @@ else
     echo -e "${GREEN}PASS${NC} No fatalError in RoboApp.swift"
 fi
 
-# 8. Build check (renumbered)
+# 9. Build check
 echo ""
 echo "Building..."
 cd ios

@@ -118,6 +118,14 @@ xcrun devicectl device install app --device $DEVICE_ID "$APP_PATH"
 xcrun devicectl device process launch --device $DEVICE_ID com.silv.Robo
 ```
 
+### SDK Version Policy
+- **Minimum build SDK:** iOS 26 (enforced by App Store April 28, 2026)
+- **Minimum Xcode:** 26.0 (ships iOS 26 SDK)
+- **CI Xcode:** 26.2 (pinned in testflight.yml)
+- **Swift language mode:** 5.9 (not Swift 6 strict concurrency)
+- **Deployment target:** iOS 17.0 (SDK version ≠ deployment target)
+- `scripts/validate-build.sh` checks SDK version locally
+
 ### Workers
 ```bash
 cd workers

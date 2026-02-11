@@ -50,10 +50,15 @@ struct RoboApp: App {
         do {
             if FileManager.default.fileExists(atPath: storeURL.path) {
                 try FileManager.default.copyItem(at: storeURL, to: backupURL)
+                // Also backup WAL/SHM sidecars for complete recovery
+                for suffix in ["-wal", "-shm"] {
+                    let sidecar = URL(fileURLWithPath: storeURL.path + suffix)
+                    let sidecarBackup = URL(fileURLWithPath: backupURL.path + suffix)
+                    try? FileManager.default.copyItem(at: sidecar, to: sidecarBackup)
+                }
                 logger.warning("Backed up corrupt store to \(backupURL.lastPathComponent)")
-                // Remove original only AFTER successful backup
+                // Remove originals only AFTER successful backup
                 try FileManager.default.removeItem(at: storeURL)
-                // Also remove WAL/SHM if present
                 for suffix in ["-wal", "-shm"] {
                     let sidecar = URL(fileURLWithPath: storeURL.path + suffix)
                     try? FileManager.default.removeItem(at: sidecar)

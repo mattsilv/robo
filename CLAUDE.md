@@ -162,8 +162,13 @@ CLOUDFLARE_ACCOUNT_ID=<your-account-id>
 **D1 Database:** robo-db (`fb24f9a0-d52b-4a74-87ca-54069ec9471a`)
 **R2 Bucket:** robo-data
 **Workers API:** https://robo-api.silv.workers.dev
+**Landing Page:** https://robo-app.pages.dev/ (Cloudflare Pages, deployed from `site/index.html` in git history commit `cfc0d32`)
 
 See `docs/cloudflare-resources.md` for complete resource inventory.
+
+## App Icon
+
+The app icon is the **blue robot smiley face** (blue rounded square, white eyes with blue pupils, curved white smile) — matching the landing page at robo-app.pages.dev. Source: `demo/icon-options/happy-curve-smile.png` in git history. Installed at `ios/Robo/Resources/Assets.xcassets/AppIcon.appiconset/Icon-1024.png`.
 
 ## Critical Gotchas
 

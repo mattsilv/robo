@@ -33,6 +33,7 @@ struct BarcodeDetailView: View {
         }
         .navigationTitle(scan.foodName ?? "Barcode")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.visible, for: .tabBar)
         .overlay(alignment: .bottom) {
             if copiedToastVisible {
                 Text("Copied to clipboard")

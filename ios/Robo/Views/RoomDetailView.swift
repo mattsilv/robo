@@ -41,6 +41,7 @@ struct RoomDetailView: View {
         }
         .navigationTitle("Room Scan")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.visible, for: .tabBar)
         .sheet(isPresented: Binding(
             get: { shareURL != nil },
             set: { if !$0 { shareURL = nil } }
@@ -245,12 +246,16 @@ struct RoomDetailView: View {
     // MARK: - Actions
 
     private func exportRoom() {
+        // Extract @Model properties before crossing isolation boundary
+        let name = room.roomName
+        let summary = room.summaryJSON
+        let fullData = room.fullRoomDataJSON
         Task.detached {
             do {
                 let url = try ExportService.createRoomExportZipFromData(
-                    roomName: room.roomName,
-                    summaryJSON: room.summaryJSON,
-                    fullRoomDataJSON: room.fullRoomDataJSON
+                    roomName: name,
+                    summaryJSON: summary,
+                    fullRoomDataJSON: fullData
                 )
                 await MainActor.run {
                     shareURL = url

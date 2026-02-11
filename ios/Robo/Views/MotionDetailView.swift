@@ -75,6 +75,7 @@ struct MotionDetailView: View {
         }
         .navigationTitle("Motion Data")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.visible, for: .tabBar)
         .sheet(isPresented: Binding(
             get: { shareURL != nil },
             set: { if !$0 { shareURL = nil } }

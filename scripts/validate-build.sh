@@ -56,7 +56,27 @@ else
     FAIL=1
 fi
 
-# 6. Build check
+# 6. No removeItem/deleteStore near container init (data loss risk)
+DANGEROUS_DELETES=$(grep -rn "removeItem\|deleteStore\|destroyPersistentStore" ios/Robo/RoboApp.swift 2>/dev/null | grep -v "backup" || true)
+if [ -z "$DANGEROUS_DELETES" ]; then
+    echo -e "${GREEN}PASS${NC} No unguarded store deletion in RoboApp.swift"
+else
+    echo -e "${RED}FAIL${NC} Dangerous store deletion in RoboApp.swift (must backup first):"
+    echo "$DANGEROUS_DELETES"
+    FAIL=1
+fi
+
+# 7. No fatalError in migration path without resilient fallback
+NAKED_FATAL=$(grep -n "fatalError.*SwiftData\|fatalError.*migration\|fatalError.*ModelContainer" ios/Robo/RoboApp.swift 2>/dev/null | grep -v "backup+recreate\|unrecoverable" || true)
+if [ -z "$NAKED_FATAL" ]; then
+    echo -e "${GREEN}PASS${NC} No naked fatalError in migration path"
+else
+    echo -e "${RED}FAIL${NC} Naked fatalError in migration path (must use resilient fallback):"
+    echo "$NAKED_FATAL"
+    FAIL=1
+fi
+
+# 8. Build check (renumbered)
 echo ""
 echo "Building..."
 cd ios

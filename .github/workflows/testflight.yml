@@ -117,6 +117,7 @@ jobs:
 
           xcodebuild archive \
             -scheme Robo \
+            -sdk iphoneos \
             -archivePath /tmp/Robo.xcarchive \
             -destination 'generic/platform=iOS' \
             -allowProvisioningUpdates \

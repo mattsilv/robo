@@ -10,6 +10,7 @@ import { submitSensorData } from './routes/sensors';
 import { getInbox, pushCard, respondToCard } from './routes/inbox';
 import { analyzeWithOpus } from './routes/opus';
 import { debugSync, debugList, debugGet } from './routes/debug';
+import { lookupNutrition } from './routes/nutrition';
 import { deviceAuth } from './middleware/deviceAuth';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -35,6 +36,9 @@ app.post('/api/sensors/data', deviceAuth, submitSensorData);
 app.get('/api/inbox/:device_id', getInbox);
 app.post('/api/inbox/push', deviceAuth, pushCard);
 app.post('/api/inbox/:card_id/respond', deviceAuth, respondToCard);
+
+// Nutrition lookup (proxied Nutritionix API)
+app.get('/api/nutrition/lookup', deviceAuth, lookupNutrition);
 
 // Opus integration
 app.post('/api/opus/analyze', analyzeWithOpus);

@@ -5,6 +5,31 @@ export type Env = {
   DB: D1Database;
   BUCKET: R2Bucket;
   ENVIRONMENT: string;
+  NUTRITIONIX_APP_ID: string;
+  NUTRITIONIX_APP_KEY: string;
+};
+
+// Nutrition lookup
+export const NutritionLookupSchema = z.object({
+  upc: z.string().regex(/^\d{6,14}$/, 'UPC must be 6-14 digits'),
+});
+
+export type NutritionLookupResponse = {
+  found: boolean;
+  food_name: string | null;
+  brand_name: string | null;
+  calories: number | null;
+  protein: number | null;
+  fat: number | null;
+  carbs: number | null;
+  fiber: number | null;
+  sugars: number | null;
+  sodium: number | null;
+  serving_qty: number | null;
+  serving_unit: string | null;
+  serving_weight_grams: number | null;
+  photo_thumb: string | null;
+  photo_highres: string | null;
 };
 
 // Request schemas

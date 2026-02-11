@@ -32,6 +32,7 @@ struct RoboApp: App {
                 .environment(deviceService)
                 .environment(apiService)
                 .task {
+                    SummaryMigrationService.migrateIfNeeded(container: modelContainer)
                     await deviceService.bootstrap(apiService: apiService)
                 }
         }

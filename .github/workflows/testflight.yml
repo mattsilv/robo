@@ -13,7 +13,7 @@ concurrency:
 jobs:
   build-and-upload:
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -21,6 +21,9 @@ jobs:
 
       - name: Select Xcode 16
         run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+
+      - name: Install iOS simulator runtime
+        run: xcodebuild -downloadPlatform iOS -quiet || true
 
       - name: Install xcodegen
         run: brew install xcodegen

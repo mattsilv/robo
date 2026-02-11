@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Select Xcode 26
-        run: sudo xcode-select -s /Applications/Xcode_26.2.0.app/Contents/Developer
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
 
       - name: Install xcodegen
         run: brew install xcodegen
@@ -166,6 +166,59 @@ jobs:
             -authenticationKeyPath ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
             -authenticationKeyID "$API_KEY_ID" \
             -authenticationKeyIssuerID "$API_ISSUER_ID"
+
+      - name: Add build to external testers group
+        env:
+          API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          pip3 install --quiet PyJWT cryptography
+
+          # Generate JWT for App Store Connect API
+          TOKEN=$(python3 -c "
+          import jwt, time
+          with open('$HOME/private_keys/AuthKey_${API_KEY_ID}.p8') as f:
+              pk = f.read()
+          now = int(time.time())
+          print(jwt.encode({'iss': '${API_ISSUER_ID}', 'iat': now, 'exp': now + 1200, 'aud': 'appstoreconnect-v1'}, pk, algorithm='ES256', headers={'kid': '${API_KEY_ID}'}))
+          ")
+
+          APP_ID="6759011077"
+          BETA_GROUP_ID="fde90361-3c30-4cae-99a3-5450ccba5378"
+          BUILD_NUMBER=$(( ${{ github.run_number }} + 100 ))
+
+          echo "Waiting for build $BUILD_NUMBER to finish processing..."
+          for i in $(seq 1 30); do
+            RESPONSE=$(curl -s -H "Authorization: Bearer $TOKEN" \
+              "https://api.appstoreconnect.apple.com/v1/builds?filter[app]=$APP_ID&filter[version]=$BUILD_NUMBER&fields[builds]=processingState")
+            STATE=$(echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['data'][0]['attributes']['processingState'] if d['data'] else 'NOT_FOUND')" 2>/dev/null || echo "ERROR")
+
+            echo "  Attempt $i: $STATE"
+            if [ "$STATE" = "VALID" ]; then
+              BUILD_ID=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['data'][0]['id'])")
+              echo "Build ID: $BUILD_ID"
+              break
+            fi
+            sleep 30
+          done
+
+          if [ -z "$BUILD_ID" ]; then
+            echo "::warning::Could not find processed build $BUILD_NUMBER — testers won't get auto-notified"
+            exit 0
+          fi
+
+          # Add build to Alpha Squad external group
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"data\":[{\"type\":\"builds\",\"id\":\"$BUILD_ID\"}]}" \
+            "https://api.appstoreconnect.apple.com/v1/betaGroups/$BETA_GROUP_ID/relationships/builds")
+
+          if [ "$HTTP_CODE" = "204" ]; then
+            echo "Build $BUILD_NUMBER added to Alpha Squad external testers group"
+          else
+            echo "::warning::Failed to add build to Alpha Squad (HTTP $HTTP_CODE)"
+          fi
 
       - name: Cleanup
         if: ${{ always() }}

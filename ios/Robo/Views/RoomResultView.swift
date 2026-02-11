@@ -16,7 +16,7 @@ struct RoomResultView: View {
     }
 
     private var floorAreaSqFt: Double {
-        floorArea * 10.7639
+        floorArea * RoomDataProcessor.sqmToSqft
     }
 
     private var ceilingHeight: Double {
@@ -24,7 +24,7 @@ struct RoomResultView: View {
     }
 
     private var ceilingHeightFt: Double {
-        ceilingHeight * 3.28084
+        ceilingHeight * RoomDataProcessor.metersToFeet
     }
 
     private var totalWallArea: Double {
@@ -32,7 +32,7 @@ struct RoomResultView: View {
     }
 
     private var totalWallAreaSqFt: Double {
-        totalWallArea * 10.7639
+        totalWallArea * RoomDataProcessor.sqmToSqft
     }
 
     private var roomDims: (length: Double, width: Double)? {
@@ -58,7 +58,7 @@ struct RoomResultView: View {
                 // Room dimensions headline
                 if let dims = roomDims {
                     VStack(spacing: 4) {
-                        Text(String(format: "%.0fft × %.0fft", dims.length * 3.28084, dims.width * 3.28084))
+                        Text(String(format: "%.0fft × %.0fft", dims.length * RoomDataProcessor.metersToFeet, dims.width * RoomDataProcessor.metersToFeet))
                             .font(.title.bold())
                         Text(String(format: "%.1f sq ft · %.1fft ceiling",
                                     floorAreaSqFt, ceilingHeightFt))

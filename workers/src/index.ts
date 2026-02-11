@@ -9,6 +9,7 @@ import { registerDevice, getDevice } from './routes/devices';
 import { submitSensorData } from './routes/sensors';
 import { getInbox, pushCard, respondToCard } from './routes/inbox';
 import { analyzeWithOpus } from './routes/opus';
+import { debugSync, debugList, debugGet } from './routes/debug';
 import { deviceAuth } from './middleware/deviceAuth';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -37,6 +38,11 @@ app.post('/api/inbox/:card_id/respond', deviceAuth, respondToCard);
 
 // Opus integration
 app.post('/api/opus/analyze', analyzeWithOpus);
+
+// Debug sync (stores scan data in R2 for developer debugging)
+app.post('/api/debug/sync', debugSync);
+app.get('/api/debug/sync/:device_id', debugList);
+app.get('/api/debug/sync/:device_id/:key{.+}', debugGet);
 
 // Error handling
 app.onError((err, c) => {

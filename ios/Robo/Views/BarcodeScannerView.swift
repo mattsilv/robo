@@ -113,6 +113,10 @@ struct BarcodeScannerView: View {
             self.error = "Failed to save scan: \(error.localizedDescription)"
         }
 
+        #if DEBUG
+        DebugSyncService.syncBarcode(value: code, symbology: symbology)
+        #endif
+
         // Show toast (replaces previous)
         currentToast = ToastItem(code: code, symbology: symbology)
 

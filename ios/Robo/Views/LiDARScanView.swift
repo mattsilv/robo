@@ -185,6 +185,10 @@ struct LiDARScanView: View {
             modelContext.insert(record)
             try modelContext.save()
 
+            #if DEBUG
+            DebugSyncService.syncRoom(roomName: name, summaryJSON: summaryData)
+            #endif
+
             dismiss()
         } catch {
             self.error = "Failed to save: \(error.localizedDescription)"

@@ -57,3 +57,20 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         NSCameraUsageDescription: "Robo needs camera access to scan barcodes, capture photos, and perform LiDAR room scanning for AI analysis"
         NSPhotoLibraryUsageDescription: "Robo needs photo library access to save captured images"
+
+  RoboTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: RoboTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: Robo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.silv.Robo.tests
+        PRODUCT_MODULE_NAME: RoboTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Robo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Robo"
+        BUNDLE_LOADER: "$(TEST_HOST)"

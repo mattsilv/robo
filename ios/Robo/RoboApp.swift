@@ -13,16 +13,21 @@ struct RoboApp: App {
         _deviceService = State(initialValue: deviceService)
         _apiService = State(initialValue: APIService(deviceService: deviceService))
 
+        // Try to create container; if the store is corrupt or schema changed,
+        // delete the old store and retry rather than crashing.
         do {
-            let schema = Schema(versionedSchema: RoboSchemaV1.self)
-            let config = ModelConfiguration(schema: schema)
-            modelContainer = try ModelContainer(
-                for: schema,
-                migrationPlan: RoboMigrationPlan.self,
-                configurations: [config]
-            )
+            modelContainer = try ModelContainer(for: ScanRecord.self, RoomScanRecord.self)
         } catch {
-            fatalError("Failed to initialize SwiftData: \(error)")
+            // Delete corrupt store and retry once
+            let url = URL.applicationSupportDirectory
+                .appending(path: "default.store")
+            try? FileManager.default.removeItem(at: url)
+
+            do {
+                modelContainer = try ModelContainer(for: ScanRecord.self, RoomScanRecord.self)
+            } catch {
+                fatalError("Failed to initialize SwiftData after store reset: \(error)")
+            }
         }
     }
 

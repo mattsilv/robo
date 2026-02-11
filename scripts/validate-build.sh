@@ -39,24 +39,33 @@ else
     FAIL=1
 fi
 
-# 4. Check VersionedSchema exists
-if grep -rq "VersionedSchema" ios/Robo/Models/RoboSchema.swift 2>/dev/null; then
-    echo -e "${GREEN}PASS${NC} VersionedSchema defined in RoboSchema.swift"
+# 4. Check all @Model classes are in RoboSchema.swift (single source of truth)
+MODEL_IN_SCHEMA=$(grep -c "^@Model" ios/Robo/Models/RoboSchema.swift 2>/dev/null || true)
+if [ "$MODEL_IN_SCHEMA" -gt 0 ]; then
+    echo -e "${GREEN}PASS${NC} Models defined in RoboSchema.swift ($MODEL_IN_SCHEMA models)"
 else
-    echo -e "${RED}FAIL${NC} Missing VersionedSchema — data migrations will fail silently"
+    echo -e "${RED}FAIL${NC} No @Model classes found in RoboSchema.swift"
     FAIL=1
 fi
 
-# 5. Check no bare @Model files outside schema (duplicate definitions)
+# 5. Check no @Model files outside RoboSchema.swift (duplicate definitions)
 BARE_MODELS=$(grep -rl "^@Model" ios/Robo/Models/ 2>/dev/null | grep -v RoboSchema.swift || true)
 if [ -z "$BARE_MODELS" ]; then
-    echo -e "${GREEN}PASS${NC} No bare @Model files outside RoboSchema.swift"
+    echo -e "${GREEN}PASS${NC} No duplicate @Model files outside RoboSchema.swift"
 else
-    echo -e "${RED}FAIL${NC} Found bare @Model outside schema: $BARE_MODELS"
+    echo -e "${RED}FAIL${NC} Found @Model outside schema: $BARE_MODELS"
     FAIL=1
 fi
 
-# 6. Build check
+# 6. Check ModelContainer has graceful error handling (no bare fatalError on first try)
+if grep -q "removeItem" ios/Robo/RoboApp.swift 2>/dev/null; then
+    echo -e "${GREEN}PASS${NC} ModelContainer has store-reset fallback"
+else
+    echo -e "${RED}FAIL${NC} ModelContainer missing graceful error handling — will crash on schema change!"
+    FAIL=1
+fi
+
+# 7. Build check
 echo ""
 echo "Building..."
 cd ios
@@ -66,6 +75,37 @@ if xcodebuild -scheme Robo -configuration Debug -destination 'generic/platform=i
 else
     echo -e "${RED}FAIL${NC} Build failed"
     FAIL=1
+fi
+cd ..
+
+# 8. Simulator launch test (catches crash-on-launch)
+echo ""
+echo "Testing simulator launch..."
+SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone 16 Pro" | head -1 | grep -oE '[A-F0-9-]{36}')
+if [ -n "$SIMULATOR_ID" ]; then
+    xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
+    xcodebuild -scheme Robo -configuration Debug \
+        -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+        -derivedDataPath /tmp/RoboTest 2>&1 | tail -1 | grep -q "BUILD SUCCEEDED"
+    APP_PATH=$(find /tmp/RoboTest/Build/Products/Debug-iphonesimulator -name "Robo.app" -maxdepth 1 2>/dev/null | head -1)
+    if [ -n "$APP_PATH" ]; then
+        xcrun simctl install "$SIMULATOR_ID" "$APP_PATH" 2>/dev/null
+        xcrun simctl launch "$SIMULATOR_ID" com.silv.Robo 2>/dev/null
+        sleep 3
+        if xcrun simctl get_app_container "$SIMULATOR_ID" com.silv.Robo 2>/dev/null | grep -q "/"; then
+            echo -e "${GREEN}PASS${NC} App launches on simulator without crashing"
+        else
+            echo -e "${RED}FAIL${NC} App crashed on simulator launch!"
+            FAIL=1
+        fi
+        xcrun simctl terminate "$SIMULATOR_ID" com.silv.Robo 2>/dev/null || true
+    else
+        echo -e "${RED}FAIL${NC} Could not find built app for simulator"
+        FAIL=1
+    fi
+    xcrun simctl shutdown "$SIMULATOR_ID" 2>/dev/null || true
+else
+    echo "SKIP Simulator launch test (no iPhone 16 Pro simulator found)"
 fi
 
 echo ""

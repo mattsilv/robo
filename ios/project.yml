@@ -57,6 +57,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         NSCameraUsageDescription: "Robo needs camera access to scan barcodes, capture photos, and perform LiDAR room scanning for AI analysis"
         NSPhotoLibraryUsageDescription: "Robo needs photo library access to save captured images"
+        NSMotionUsageDescription: "Robo needs motion access to capture step count, distance, and activity data for AI analysis"
 
   RoboTests:
     type: bundle.unit-test

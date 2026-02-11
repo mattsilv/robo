@@ -24,6 +24,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Robo needs camera access to scan barcodes, capture photos, and perform LiDAR room scanning for AI analysis</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Robo needs motion access to capture step count, distance, and activity data for AI analysis</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Robo needs photo library access to save captured images</string>
 	<key>UIApplicationSceneManifest</key>

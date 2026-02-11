@@ -11,6 +11,7 @@ struct SensorData: Codable, Identifiable {
         case barcode
         case camera
         case lidar
+        case motion
     }
 
     enum CodingKeys: String, CodingKey {

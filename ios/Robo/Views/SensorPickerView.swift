@@ -6,6 +6,7 @@ struct SensorPickerView: View {
 
     @State private var showingBarcode = false
     @State private var showingLiDAR = false
+    @State private var showingMotion = false
 
     private var lidarSupported: Bool {
         RoomCaptureSession.isSupported
@@ -41,6 +42,15 @@ struct SensorPickerView: View {
                     ) {
                         showingLiDAR = true
                     }
+
+                    sensorButton(
+                        icon: "figure.walk.motion",
+                        title: "Motion & Activity",
+                        subtitle: "Steps, distance, and activity recognition",
+                        badge: nil
+                    ) {
+                        showingMotion = true
+                    }
                 }
                 .padding(.horizontal, 24)
 
@@ -60,6 +70,9 @@ struct SensorPickerView: View {
             }
             .fullScreenCover(isPresented: $showingLiDAR) {
                 LiDARScanView()
+            }
+            .fullScreenCover(isPresented: $showingMotion) {
+                MotionCaptureView()
             }
         }
     }

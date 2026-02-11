@@ -211,12 +211,56 @@ enum ExportService {
         return zipURL
     }
 
+    // MARK: - Motion Export
+
+    /// Creates a ZIP file containing motion_data.json.
+    static func createMotionExportZip(activityJSON: Data) throws -> URL {
+        let fm = FileManager.default
+        let exportDir = fm.temporaryDirectory
+            .appendingPathComponent("robo-motion-\(UUID().uuidString)")
+        try fm.createDirectory(at: exportDir, withIntermediateDirectories: true)
+
+        try activityJSON.write(to: exportDir.appendingPathComponent("motion_data.json"))
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        let zipName = "robo-motion-\(dateFormatter.string(from: Date())).zip"
+        let zipURL = fm.temporaryDirectory.appendingPathComponent(zipName)
+
+        if fm.fileExists(atPath: zipURL.path) {
+            try fm.removeItem(at: zipURL)
+        }
+
+        var coordinatorError: NSError?
+        var moveError: Error?
+
+        NSFileCoordinator().coordinate(
+            readingItemAt: exportDir,
+            options: [.forUploading],
+            error: &coordinatorError
+        ) { tempZipURL in
+            do {
+                try fm.copyItem(at: tempZipURL, to: zipURL)
+            } catch {
+                moveError = error
+            }
+        }
+
+        try? fm.removeItem(at: exportDir)
+
+        if let coordinatorError { throw coordinatorError }
+        if let moveError { throw moveError }
+
+        return zipURL
+    }
+
     // MARK: - Combined Export
 
-    /// Creates a ZIP containing all barcodes and rooms in subdirectories.
+    /// Creates a ZIP containing all barcodes, rooms, and motion data in subdirectories.
     static func createCombinedExportZip(
         scans: [ExportableScan],
-        rooms: [(name: String, summaryJSON: Data, fullRoomDataJSON: Data)]
+        rooms: [(name: String, summaryJSON: Data, fullRoomDataJSON: Data)],
+        motionRecords: [Data] = []
     ) throws -> URL {
         let fm = FileManager.default
         let exportDir = fm.temporaryDirectory
@@ -290,6 +334,19 @@ enum ExportService {
                         encoding: .utf8
                     )
                 }
+            }
+        }
+
+        // Motion subdirectory
+        if !motionRecords.isEmpty {
+            let motionDir = exportDir.appendingPathComponent("motion")
+            try fm.createDirectory(at: motionDir, withIntermediateDirectories: true)
+
+            for (index, json) in motionRecords.enumerated() {
+                let filename = motionRecords.count == 1
+                    ? "motion_data.json"
+                    : "motion_data_\(index + 1).json"
+                try json.write(to: motionDir.appendingPathComponent(filename))
             }
         }
 

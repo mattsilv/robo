@@ -6,6 +6,8 @@ struct ScanHistoryView: View {
     private var scans: [ScanRecord]
     @Query(sort: \RoomScanRecord.capturedAt, order: .reverse)
     private var roomScans: [RoomScanRecord]
+    @Query(sort: \MotionRecord.capturedAt, order: .reverse)
+    private var motionRecords: [MotionRecord]
     @Environment(\.modelContext) private var modelContext
 
     @State private var selectedSegment = 0
@@ -19,16 +21,18 @@ struct ScanHistoryView: View {
                 Picker("History", selection: $selectedSegment) {
                     Text("Barcodes").tag(0)
                     Text("Rooms").tag(1)
+                    Text("Motion").tag(2)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
                 .padding(.vertical, 8)
 
                 Group {
-                    if selectedSegment == 0 {
-                        barcodeList
-                    } else {
-                        roomList
+                    switch selectedSegment {
+                    case 0: barcodeList
+                    case 1: roomList
+                    case 2: motionList
+                    default: barcodeList
                     }
                 }
             }
@@ -38,6 +42,9 @@ struct ScanHistoryView: View {
             }
             .navigationDestination(for: RoomScanRecord.self) { room in
                 RoomDetailView(room: room)
+            }
+            .navigationDestination(for: MotionRecord.self) { motion in
+                MotionDetailView(motion: motion)
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -50,11 +57,12 @@ struct ScanHistoryView: View {
                             Label("Export All", systemImage: "square.and.arrow.up")
                         }
                     }
-                    .disabled(isExporting || (scans.isEmpty && roomScans.isEmpty))
+                    .disabled(isExporting || (scans.isEmpty && roomScans.isEmpty && motionRecords.isEmpty))
                 }
 
                 if (selectedSegment == 0 && !scans.isEmpty) ||
-                   (selectedSegment == 1 && !roomScans.isEmpty) {
+                   (selectedSegment == 1 && !roomScans.isEmpty) ||
+                   (selectedSegment == 2 && !motionRecords.isEmpty) {
                     ToolbarItem(placement: .destructiveAction) {
                         Button("Clear All", role: .destructive) {
                             showingClearConfirmation = true
@@ -71,10 +79,15 @@ struct ScanHistoryView: View {
                     clearAll()
                 }
             } message: {
-                if selectedSegment == 0 {
+                switch selectedSegment {
+                case 0:
                     Text("This will permanently delete \(scans.count) scan\(scans.count == 1 ? "" : "s").")
-                } else {
+                case 1:
                     Text("This will permanently delete \(roomScans.count) room scan\(roomScans.count == 1 ? "" : "s").")
+                case 2:
+                    Text("This will permanently delete \(motionRecords.count) motion record\(motionRecords.count == 1 ? "" : "s").")
+                default:
+                    Text("This will permanently delete all items.")
                 }
             }
             .sheet(isPresented: Binding(
@@ -155,6 +168,36 @@ struct ScanHistoryView: View {
         }
     }
 
+    // MARK: - Motion List
+
+    @ViewBuilder
+    private var motionList: some View {
+        if motionRecords.isEmpty {
+            ContentUnavailableView(
+                "No Motion Data Yet",
+                systemImage: "figure.walk.motion",
+                description: Text("Tap \(AppStrings.Tabs.gather) to capture motion & activity data.")
+            )
+        } else {
+            List {
+                ForEach(motionRecords) { motion in
+                    NavigationLink(value: motion) {
+                        MotionRow(motion: motion)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            modelContext.delete(motion)
+                            try? modelContext.save()
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                }
+                .onDelete(perform: deleteMotionRecords)
+            }
+        }
+    }
+
     // MARK: - Actions
 
     private func deleteBarcodeScans(at offsets: IndexSet) {
@@ -171,15 +214,23 @@ struct ScanHistoryView: View {
         try? modelContext.save()
     }
 
+    private func deleteMotionRecords(at offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(motionRecords[index])
+        }
+        try? modelContext.save()
+    }
+
     private func clearAll() {
-        if selectedSegment == 0 {
-            for scan in scans {
-                modelContext.delete(scan)
-            }
-        } else {
-            for room in roomScans {
-                modelContext.delete(room)
-            }
+        switch selectedSegment {
+        case 0:
+            for scan in scans { modelContext.delete(scan) }
+        case 1:
+            for room in roomScans { modelContext.delete(room) }
+        case 2:
+            for motion in motionRecords { modelContext.delete(motion) }
+        default:
+            break
         }
         try? modelContext.save()
     }
@@ -213,11 +264,13 @@ struct ScanHistoryView: View {
         let roomData = roomScans.map {
             (name: $0.roomName, summaryJSON: $0.summaryJSON, fullRoomDataJSON: $0.fullRoomDataJSON)
         }
+        let motionData = motionRecords.map { $0.activityJSON }
         Task.detached {
             do {
                 let url = try ExportService.createCombinedExportZip(
                     scans: barcodeData,
-                    rooms: roomData
+                    rooms: roomData,
+                    motionRecords: motionData
                 )
                 await MainActor.run {
                     shareURL = url
@@ -305,7 +358,46 @@ struct RoomScanRow: View {
     }
 }
 
+// MARK: - Motion Row
+
+struct MotionRow: View {
+    let motion: MotionRecord
+
+    private var distanceMiles: Double {
+        motion.distanceMeters * MotionService.metersToMiles
+    }
+
+    var body: some View {
+        HStack {
+            Image(systemName: "figure.walk.motion")
+                .font(.title3)
+                .foregroundColor(.accentColor)
+                .frame(width: 32)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(motion.stepCount) steps")
+                    .font(.subheadline)
+
+                HStack(spacing: 8) {
+                    Text(String(format: "%.1f mi", distanceMiles))
+                    if motion.floorsAscended > 0 {
+                        Label("\(motion.floorsAscended) floors", systemImage: "arrow.up")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Text(motion.capturedAt, style: .relative)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
 #Preview {
     ScanHistoryView()
-        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self], inMemory: true)
+        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self, MotionRecord.self], inMemory: true)
 }

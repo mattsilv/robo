@@ -192,6 +192,112 @@ enum ExportService {
         return zipURL
     }
 
+    // MARK: - Combined Export
+
+    /// Creates a ZIP containing all barcodes and rooms in subdirectories.
+    static func createCombinedExportZip(
+        scans: [ExportableScan],
+        rooms: [(name: String, summaryJSON: Data, fullRoomDataJSON: Data)]
+    ) throws -> URL {
+        let fm = FileManager.default
+        let exportDir = fm.temporaryDirectory
+            .appendingPathComponent("robo-combined-\(UUID().uuidString)")
+        try fm.createDirectory(at: exportDir, withIntermediateDirectories: true)
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+
+        // Barcodes subdirectory
+        if !scans.isEmpty {
+            let barcodesDir = exportDir.appendingPathComponent("barcodes")
+            try fm.createDirectory(at: barcodesDir, withIntermediateDirectories: true)
+
+            let jsonRecords = scans.map { scan in
+                [
+                    "value": scan.barcodeValue,
+                    "symbology": formatSymbology(scan.symbology),
+                    "scanned_at": formatter.string(from: scan.capturedAt)
+                ]
+            }
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let jsonData = try encoder.encode(jsonRecords)
+            try jsonData.write(to: barcodesDir.appendingPathComponent("scans.json"))
+
+            var csv = "value,symbology,scanned_at\n"
+            for scan in scans {
+                let value = scan.barcodeValue.contains(",")
+                    ? "\"\(scan.barcodeValue)\""
+                    : scan.barcodeValue
+                csv += "\(value),\(formatSymbology(scan.symbology)),\(formatter.string(from: scan.capturedAt))\n"
+            }
+            try csv.write(
+                to: barcodesDir.appendingPathComponent("scans.csv"),
+                atomically: true,
+                encoding: .utf8
+            )
+        }
+
+        // Rooms subdirectory
+        if !rooms.isEmpty {
+            let roomsDir = exportDir.appendingPathComponent("rooms")
+            try fm.createDirectory(at: roomsDir, withIntermediateDirectories: true)
+
+            var usedNames = Set<String>()
+            for room in rooms {
+                var safeName = room.name.isEmpty ? "room" : room.name
+                    .replacingOccurrences(of: " ", with: "-")
+                    .lowercased()
+
+                // Handle duplicate names
+                let baseName = safeName
+                var counter = 2
+                while usedNames.contains(safeName) {
+                    safeName = "\(baseName)-\(counter)"
+                    counter += 1
+                }
+                usedNames.insert(safeName)
+
+                let roomDir = roomsDir.appendingPathComponent(safeName)
+                try fm.createDirectory(at: roomDir, withIntermediateDirectories: true)
+                try room.summaryJSON.write(to: roomDir.appendingPathComponent("room_summary.json"))
+                try room.fullRoomDataJSON.write(to: roomDir.appendingPathComponent("room_full.json"))
+            }
+        }
+
+        // ZIP
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        let zipName = "robo-export-\(dateFormatter.string(from: Date())).zip"
+        let zipURL = fm.temporaryDirectory.appendingPathComponent(zipName)
+
+        if fm.fileExists(atPath: zipURL.path) {
+            try fm.removeItem(at: zipURL)
+        }
+
+        var coordinatorError: NSError?
+        var moveError: Error?
+
+        NSFileCoordinator().coordinate(
+            readingItemAt: exportDir,
+            options: [.forUploading],
+            error: &coordinatorError
+        ) { tempZipURL in
+            do {
+                try fm.copyItem(at: tempZipURL, to: zipURL)
+            } catch {
+                moveError = error
+            }
+        }
+
+        try? fm.removeItem(at: exportDir)
+
+        if let coordinatorError { throw coordinatorError }
+        if let moveError { throw moveError }
+
+        return zipURL
+    }
+
     private static func formatSymbology(_ raw: String) -> String {
         raw.replacingOccurrences(of: "VNBarcodeSymbology", with: "")
             .lowercased()

@@ -4,8 +4,8 @@ import simd
 
 enum RoomDataProcessor {
 
-    private static let metersToFeet = 3.28084
-    private static let sqmToSqft = 10.7639
+    static let metersToFeet = 3.28084
+    static let sqmToSqft = 10.7639
 
     // MARK: - Summary
 
@@ -117,27 +117,44 @@ enum RoomDataProcessor {
     static func estimateFloorArea(_ room: CapturedRoom) -> Double {
         // Best: use actual floor surfaces with polygon corners
         if !room.floors.isEmpty {
-            return room.floors.reduce(0.0) { total, floor in
+            let area = room.floors.reduce(0.0) { total, floor in
                 let corners = floor.polygonCorners
                 if corners.count >= 3 {
                     return total + polygonArea(corners)
                 }
-                // Rectangular floor fallback
-                return total + Double(floor.dimensions.x) * Double(floor.dimensions.z)
+                // Rectangular floor fallback: x=width, y=height (second planar extent), z=thickness
+                let w = Double(floor.dimensions.x)
+                let h = Double(floor.dimensions.y)
+                let d = Double(floor.dimensions.z)
+                // Use the two largest dimensions (avoids thickness axis ambiguity)
+                let sorted = [w, h, d].sorted().reversed()
+                let dim1 = sorted[sorted.startIndex]
+                let dim2 = sorted[sorted.index(after: sorted.startIndex)]
+                return total + dim1 * dim2
             }
+            #if DEBUG
+            print("[RoomDataProcessor] Floor area from floor surfaces: \(area) sqm (\(r2(area * sqmToSqft)) sqft)")
+            #endif
+            return area
         }
         // Fallback: bounding box from wall positions
         if let dims = estimateRoomDimensions(room.walls) {
-            return dims.length * dims.width
+            let area = dims.length * dims.width
+            #if DEBUG
+            print("[RoomDataProcessor] Floor area from wall bounding box: \(area) sqm (\(r2(area * sqmToSqft)) sqft)")
+            #endif
+            return area
         }
         // Last resort: assume square from perimeter
-        let perimeter = room.walls.reduce(0.0) { $0 + Double($1.dimensions.x) }
-        let side = perimeter / 4.0
-        return side * side
+        let area = perimeterSquareArea(room.walls.map { Double($0.dimensions.x) })
+        #if DEBUG
+        print("[RoomDataProcessor] Floor area from perimeter estimate: \(area) sqm (\(r2(area * sqmToSqft)) sqft)")
+        #endif
+        return area
     }
 
     /// Shoelace formula for polygon area from 3D corner points (uses X and Z).
-    private static func polygonArea(_ corners: [simd_float3]) -> Double {
+    static func polygonArea(_ corners: [simd_float3]) -> Double {
         var area = 0.0
         for i in 0..<corners.count {
             let j = (i + 1) % corners.count
@@ -145,6 +162,13 @@ enum RoomDataProcessor {
             area -= Double(corners[j].x) * Double(corners[i].z)
         }
         return abs(area) / 2.0
+    }
+
+    /// Estimate floor area assuming a square room from wall perimeter.
+    static func perimeterSquareArea(_ wallWidths: [Double]) -> Double {
+        let perimeter = wallWidths.reduce(0.0, +)
+        let side = perimeter / 4.0
+        return side * side
     }
 
     /// Sum of individual wall areas (width x height).
@@ -155,8 +179,15 @@ enum RoomDataProcessor {
     /// Bounding-box room dimensions (length x width) from wall center positions.
     static func estimateRoomDimensions(_ walls: [CapturedRoom.Surface]) -> (length: Double, width: Double)? {
         guard walls.count >= 3 else { return nil }
-        let xs = walls.map { Double($0.transform.columns.3.x) }
-        let zs = walls.map { Double($0.transform.columns.3.z) }
+        let positions = walls.map { (x: Double($0.transform.columns.3.x), z: Double($0.transform.columns.3.z)) }
+        return boundingBoxDimensions(positions)
+    }
+
+    /// Bounding-box dimensions from a set of (x, z) positions. Testable without CapturedRoom.
+    static func boundingBoxDimensions(_ positions: [(x: Double, z: Double)]) -> (length: Double, width: Double)? {
+        guard positions.count >= 3 else { return nil }
+        let xs = positions.map(\.x)
+        let zs = positions.map(\.z)
         guard let minX = xs.min(), let maxX = xs.max(),
               let minZ = zs.min(), let maxZ = zs.max() else { return nil }
         let dx = maxX - minX

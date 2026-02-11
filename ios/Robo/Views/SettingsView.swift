@@ -5,6 +5,9 @@ struct SettingsView: View {
     @AppStorage("scanQuality") private var scanQuality: String = "balanced"
     @State private var apiURL: String = ""
     @State private var showingSaveConfirmation = false
+    #if DEBUG
+    @AppStorage("dev.syncToCloud") private var debugSyncEnabled = false
+    #endif
 
     var body: some View {
         NavigationStack {
@@ -34,6 +37,17 @@ struct SettingsView: View {
                     }
                     .disabled(apiURL == deviceService.config.apiBaseURL)
                 }
+
+                #if DEBUG
+                Section("Developer") {
+                    Toggle("Sync to Cloud", isOn: $debugSyncEnabled)
+                    if debugSyncEnabled {
+                        Text("Scan data uploads to debug endpoint after each save")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                #endif
 
                 Section("About") {
                     LabeledContent("Version", value: "1.0 (M1)")

@@ -10,9 +10,8 @@ struct ScanHistoryView: View {
 
     @State private var selectedSegment = 0
     @State private var showingClearConfirmation = false
-    @State private var copiedToastVisible = false
     @State private var shareURL: URL?
-    @State private var exportingRoomID: PersistentIdentifier?
+    @State private var isExporting = false
 
     var body: some View {
         NavigationStack {
@@ -34,15 +33,28 @@ struct ScanHistoryView: View {
                 }
             }
             .navigationTitle("History")
+            .navigationDestination(for: ScanRecord.self) { scan in
+                BarcodeDetailView(scan: scan)
+            }
+            .navigationDestination(for: RoomScanRecord.self) { room in
+                RoomDetailView(room: room)
+            }
             .toolbar {
-                if selectedSegment == 0 && !scans.isEmpty {
-                    ToolbarItem(placement: .destructiveAction) {
-                        Button("Clear All", role: .destructive) {
-                            showingClearConfirmation = true
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        exportAll()
+                    } label: {
+                        if isExporting {
+                            ProgressView()
+                        } else {
+                            Label("Export All", systemImage: "square.and.arrow.up")
                         }
                     }
+                    .disabled(isExporting || (scans.isEmpty && roomScans.isEmpty))
                 }
-                if selectedSegment == 1 && !roomScans.isEmpty {
+
+                if (selectedSegment == 0 && !scans.isEmpty) ||
+                   (selectedSegment == 1 && !roomScans.isEmpty) {
                     ToolbarItem(placement: .destructiveAction) {
                         Button("Clear All", role: .destructive) {
                             showingClearConfirmation = true
@@ -65,19 +77,14 @@ struct ScanHistoryView: View {
                     Text("This will permanently delete \(roomScans.count) room scan\(roomScans.count == 1 ? "" : "s").")
                 }
             }
-            .overlay(alignment: .bottom) {
-                if copiedToastVisible {
-                    Text("Copied to clipboard")
-                        .font(.caption)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Capsule())
-                        .padding(.bottom, 8)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+            .sheet(isPresented: Binding(
+                get: { shareURL != nil },
+                set: { if !$0 { shareURL = nil } }
+            )) {
+                if let shareURL {
+                    ActivityView(activityItems: [shareURL])
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: copiedToastVisible)
         }
     }
 
@@ -94,11 +101,9 @@ struct ScanHistoryView: View {
         } else {
             List {
                 ForEach(scans) { scan in
-                    ScanRow(scan: scan)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            copyToClipboard(scan.barcodeValue)
-                        }
+                    NavigationLink(value: scan) {
+                        ScanRow(scan: scan)
+                    }
                 }
                 .onDelete(perform: deleteBarcodeScans)
             }
@@ -118,40 +123,34 @@ struct ScanHistoryView: View {
         } else {
             List {
                 ForEach(roomScans) { room in
-                    RoomScanRow(room: room)
-                        .swipeActions(edge: .trailing) {
-                            Button {
-                                exportRoom(room)
-                            } label: {
-                                Label("Share", systemImage: "square.and.arrow.up")
-                            }
-                            .tint(.blue)
+                    NavigationLink(value: room) {
+                        RoomScanRow(room: room)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button {
+                            exportRoom(room)
+                        } label: {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
+                        .tint(.blue)
 
-                            Button(role: .destructive) {
-                                modelContext.delete(room)
-                                try? modelContext.save()
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
+                        Button(role: .destructive) {
+                            modelContext.delete(room)
+                            try? modelContext.save()
+                        } label: {
+                            Label("Delete", systemImage: "trash")
                         }
-                        .swipeActions(edge: .leading) {
-                            Button {
-                                exportRoom(room)
-                            } label: {
-                                Label("Share", systemImage: "square.and.arrow.up")
-                            }
-                            .tint(.blue)
+                    }
+                    .swipeActions(edge: .leading) {
+                        Button {
+                            exportRoom(room)
+                        } label: {
+                            Label("Share", systemImage: "square.and.arrow.up")
                         }
+                        .tint(.blue)
+                    }
                 }
                 .onDelete(perform: deleteRoomScans)
-            }
-            .sheet(isPresented: Binding(
-                get: { shareURL != nil },
-                set: { if !$0 { shareURL = nil } }
-            )) {
-                if let shareURL {
-                    ActivityView(activityItems: [shareURL])
-                }
             }
         }
     }
@@ -186,7 +185,6 @@ struct ScanHistoryView: View {
     }
 
     private func exportRoom(_ room: RoomScanRecord) {
-        exportingRoomID = room.persistentModelID
         // Extract SwiftData model properties before crossing isolation boundary
         let name = room.roomName
         let summary = room.summaryJSON
@@ -200,29 +198,43 @@ struct ScanHistoryView: View {
                 )
                 await MainActor.run {
                     shareURL = url
-                    exportingRoomID = nil
                 }
             } catch {
-                await MainActor.run {
-                    exportingRoomID = nil
-                }
+                // Silently fail
             }
         }
     }
 
-    private func copyToClipboard(_ value: String) {
-        UIPasteboard.general.string = value
-        copiedToastVisible = true
-        Task {
-            try? await Task.sleep(for: .seconds(1.5))
-            copiedToastVisible = false
+    private func exportAll() {
+        isExporting = true
+        let barcodeData = scans.map {
+            ExportableScan(barcodeValue: $0.barcodeValue, symbology: $0.symbology, capturedAt: $0.capturedAt)
+        }
+        let roomData = roomScans.map {
+            (name: $0.roomName, summaryJSON: $0.summaryJSON, fullRoomDataJSON: $0.fullRoomDataJSON)
+        }
+        Task.detached {
+            do {
+                let url = try ExportService.createCombinedExportZip(
+                    scans: barcodeData,
+                    rooms: roomData
+                )
+                await MainActor.run {
+                    shareURL = url
+                    isExporting = false
+                }
+            } catch {
+                await MainActor.run {
+                    isExporting = false
+                }
+            }
         }
     }
 }
 
 // MARK: - Scan Row
 
-private struct ScanRow: View {
+struct ScanRow: View {
     let scan: ScanRecord
 
     var body: some View {
@@ -248,7 +260,7 @@ private struct ScanRow: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Barcode \(scan.barcodeValue), scanned \(scan.capturedAt, style: .relative) ago")
-        .accessibilityHint("Tap to copy to clipboard")
+        .accessibilityHint("Tap to view details")
     }
 
     private func formatSymbology(_ raw: String) -> String {
@@ -258,7 +270,7 @@ private struct ScanRow: View {
 
 // MARK: - Room Scan Row
 
-private struct RoomScanRow: View {
+struct RoomScanRow: View {
     let room: RoomScanRecord
 
     var body: some View {
@@ -275,9 +287,9 @@ private struct RoomScanRow: View {
 
                 HStack(spacing: 8) {
                     Label("\(room.wallCount) walls", systemImage: "square.split.2x1")
-                    Text(String(format: "%.0f ft\u{00B2}", room.floorAreaSqM * 10.7639))
+                    Text(String(format: "%.0f ft\u{00B2}", room.floorAreaSqM * RoomDataProcessor.sqmToSqft))
                     if room.ceilingHeightM > 0 {
-                        Text(String(format: "%.1fft ceil", room.ceilingHeightM * 3.28084))
+                        Text(String(format: "%.1fft ceil", room.ceilingHeightM * RoomDataProcessor.metersToFeet))
                     }
                 }
                 .font(.caption)

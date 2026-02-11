@@ -69,6 +69,13 @@ class APIService {
         return try await post(url: url, body: payload)
     }
 
+    // MARK: - Nutrition Lookup
+
+    func lookupNutrition(upc: String) async throws -> NutritionResponse {
+        let url = try makeURL(path: "/api/nutrition/lookup?upc=\(upc)")
+        return try await get(url: url)
+    }
+
     // MARK: - HTTP Methods
 
     private func get<T: Decodable>(url: URL) async throws -> T {

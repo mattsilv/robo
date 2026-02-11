@@ -289,30 +289,85 @@ struct ScanHistoryView: View {
 
 struct ScanRow: View {
     let scan: ScanRecord
+    @State private var thumbnail: UIImage?
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(scan.barcodeValue)
-                    .font(.subheadline.monospaced())
-                    .lineLimit(1)
+        HStack(spacing: 12) {
+            if scan.foodName != nil {
+                // Product thumbnail
+                if let thumbnail {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.secondary.opacity(0.15))
+                        .frame(width: 44, height: 44)
+                        .overlay {
+                            Image(systemName: "fork.knife")
+                                .foregroundStyle(.secondary)
+                        }
+                }
 
-                Text(scan.capturedAt, style: .relative)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(scan.foodName ?? "")
+                        .font(.subheadline)
+                        .lineLimit(1)
+
+                    if let brand = scan.brandName {
+                        Text(brand)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer()
+
+                if let cal = scan.calories {
+                    Text("\(Int(cal)) cal")
+                        .font(.caption.bold())
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.orange.opacity(0.15))
+                        .foregroundStyle(.orange)
+                        .clipShape(Capsule())
+                }
+            } else {
+                // Barcode-only fallback
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(scan.barcodeValue)
+                        .font(.subheadline.monospaced())
+                        .lineLimit(1)
+
+                    Text(scan.capturedAt, style: .relative)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text(formatSymbology(scan.symbology))
+                    .font(.caption2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.secondary.opacity(0.15))
+                    .clipShape(Capsule())
             }
-
-            Spacer()
-
-            Text(formatSymbology(scan.symbology))
-                .font(.caption2)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(.secondary.opacity(0.15))
-                .clipShape(Capsule())
+        }
+        .task {
+            if let urlStr = scan.photoThumbURL {
+                thumbnail = ImageCacheService.cachedImage(for: urlStr)
+                if thumbnail == nil {
+                    await ImageCacheService.prefetch(urlString: urlStr)
+                    thumbnail = ImageCacheService.cachedImage(for: urlStr)
+                }
+            }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Barcode \(scan.barcodeValue), scanned \(scan.capturedAt, style: .relative) ago")
+        .accessibilityLabel(scan.foodName ?? "Barcode \(scan.barcodeValue)")
         .accessibilityHint("Tap to view details")
     }
 

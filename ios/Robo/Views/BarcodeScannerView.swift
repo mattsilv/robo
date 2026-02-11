@@ -107,7 +107,11 @@ struct BarcodeScannerView: View {
         // Save to SwiftData (explicit save — autosave is unreliable during dismiss)
         let record = ScanRecord(barcodeValue: code, symbology: symbology)
         modelContext.insert(record)
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            self.error = "Failed to save scan: \(error.localizedDescription)"
+        }
 
         // Show toast (replaces previous)
         currentToast = ToastItem(code: code, symbology: symbology)

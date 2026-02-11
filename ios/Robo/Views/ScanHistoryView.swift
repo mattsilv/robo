@@ -129,6 +129,7 @@ struct ScanHistoryView: View {
 
                             Button(role: .destructive) {
                                 modelContext.delete(room)
+                                try? modelContext.save()
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -161,12 +162,14 @@ struct ScanHistoryView: View {
         for index in offsets {
             modelContext.delete(scans[index])
         }
+        try? modelContext.save()
     }
 
     private func deleteRoomScans(at offsets: IndexSet) {
         for index in offsets {
             modelContext.delete(roomScans[index])
         }
+        try? modelContext.save()
     }
 
     private func clearAll() {
@@ -179,16 +182,21 @@ struct ScanHistoryView: View {
                 modelContext.delete(room)
             }
         }
+        try? modelContext.save()
     }
 
     private func exportRoom(_ room: RoomScanRecord) {
         exportingRoomID = room.persistentModelID
+        // Extract SwiftData model properties before crossing isolation boundary
+        let name = room.roomName
+        let summary = room.summaryJSON
+        let fullData = room.fullRoomDataJSON
         Task.detached {
             do {
                 let url = try ExportService.createRoomExportZipFromData(
-                    roomName: room.roomName,
-                    summaryJSON: room.summaryJSON,
-                    fullRoomDataJSON: room.fullRoomDataJSON
+                    roomName: name,
+                    summaryJSON: summary,
+                    fullRoomDataJSON: fullData
                 )
                 await MainActor.run {
                     shareURL = url

@@ -1,9 +1,11 @@
 import SwiftUI
+import SceneKit
 
 struct RoomDetailView: View {
     let room: RoomScanRecord
 
     @State private var shareURL: URL?
+    @State private var show3D = false
 
     private var summary: [String: Any]? {
         try? JSONSerialization.jsonObject(with: room.summaryJSON) as? [String: Any]
@@ -53,53 +55,156 @@ struct RoomDetailView: View {
 
     @ViewBuilder
     private var floorPlanSection: some View {
-        if let summary,
-           let lengthM = summary["room_length_m"] as? Double,
-           let widthM = summary["room_width_m"] as? Double {
-            let lengthFt = lengthM * RoomDataProcessor.metersToFeet
-            let widthFt = widthM * RoomDataProcessor.metersToFeet
-
+        let hasPolygon = (floorPolygonPoints?.count ?? 0) >= 3
+        let hasRect = summary?["room_length_m"] as? Double != nil
+        if hasPolygon || hasRect {
             Section("Floor Plan") {
-                Canvas { context, size in
-                    let padding: CGFloat = 40
-                    let available = CGSize(
-                        width: size.width - padding * 2,
-                        height: size.height - padding * 2
-                    )
-                    let scale = min(
-                        available.width / CGFloat(lengthFt),
-                        available.height / CGFloat(widthFt)
-                    )
-                    let rectW = CGFloat(lengthFt) * scale
-                    let rectH = CGFloat(widthFt) * scale
-                    let origin = CGPoint(
-                        x: (size.width - rectW) / 2,
-                        y: (size.height - rectH) / 2
-                    )
-                    let rect = CGRect(origin: origin, size: CGSize(width: rectW, height: rectH))
-
-                    // Draw room rectangle
-                    let path = Path(roundedRect: rect, cornerRadius: 4)
-                    context.stroke(path, with: .color(.accentColor), lineWidth: 2)
-                    context.fill(path, with: .color(.accentColor.opacity(0.08)))
-
-                    // Length label (bottom)
-                    let lengthLabel = String(format: "%.1f ft", lengthFt)
-                    context.draw(
-                        Text(lengthLabel).font(.caption.bold()).foregroundColor(.primary),
-                        at: CGPoint(x: size.width / 2, y: rect.maxY + 16)
-                    )
-
-                    // Width label (right)
-                    let widthLabel = String(format: "%.1f ft", widthFt)
-                    context.draw(
-                        Text(widthLabel).font(.caption.bold()).foregroundColor(.primary),
-                        at: CGPoint(x: rect.maxX + 24, y: size.height / 2)
-                    )
+                Picker("View", selection: $show3D) {
+                    Text("2D").tag(false)
+                    Text("3D").tag(true)
                 }
-                .frame(height: 200)
+                .pickerStyle(.segmented)
+
+                if show3D {
+                    Room3DView(room: room)
+                        .frame(height: 300)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else if let points = floorPolygonPoints, points.count >= 3 {
+                    polygonCanvas(points: points)
+                        .frame(height: 240)
+                } else if let summary,
+                          let lengthM = summary["room_length_m"] as? Double,
+                          let widthM = summary["room_width_m"] as? Double {
+                    rectangleCanvas(
+                        lengthFt: lengthM * RoomDataProcessor.metersToFeet,
+                        widthFt: widthM * RoomDataProcessor.metersToFeet
+                    )
+                    .frame(height: 240)
+                }
             }
         }
+    }
+
+    private var floorPolygonPoints: [(x: Double, y: Double)]? {
+        guard let summary,
+              let polygonArray = summary["floor_polygon_2d_ft"] as? [[String: Double]],
+              polygonArray.count >= 3 else { return nil }
+        let pts = polygonArray.compactMap { dict -> (x: Double, y: Double)? in
+            guard let x = dict["x"], let y = dict["y"] else { return nil }
+            return (x: x, y: y)
+        }
+        return pts.count >= 3 ? pts : nil
+    }
+
+    private func polygonCanvas(points: [(x: Double, y: Double)]) -> some View {
+        Canvas { context, size in
+            let padding: CGFloat = 44
+            let xs = points.map(\.x)
+            let ys = points.map(\.y)
+            let minX = xs.min()!, maxX = xs.max()!
+            let minY = ys.min()!, maxY = ys.max()!
+            let roomW = maxX - minX
+            let roomH = maxY - minY
+
+            let available = CGSize(width: size.width - padding * 2, height: size.height - padding * 2)
+            let scale = min(
+                available.width / CGFloat(max(roomW, 0.1)),
+                available.height / CGFloat(max(roomH, 0.1))
+            )
+            let scaledW = CGFloat(roomW) * scale
+            let scaledH = CGFloat(roomH) * scale
+            let offsetX = (size.width - scaledW) / 2 - CGFloat(minX) * scale
+            let offsetY = (size.height - scaledH) / 2 - CGFloat(minY) * scale
+
+            func tx(_ x: Double) -> CGFloat { CGFloat(x) * scale + offsetX }
+            func ty(_ y: Double) -> CGFloat { CGFloat(y) * scale + offsetY }
+
+            // Draw polygon
+            var path = Path()
+            path.move(to: CGPoint(x: tx(points[0].x), y: ty(points[0].y)))
+            for i in 1..<points.count {
+                path.addLine(to: CGPoint(x: tx(points[i].x), y: ty(points[i].y)))
+            }
+            path.closeSubpath()
+
+            context.stroke(path, with: .color(.accentColor), lineWidth: 2)
+            context.fill(path, with: .color(.accentColor.opacity(0.08)))
+
+            // Edge dimension labels
+            let cx = points.reduce(0.0) { $0 + $1.x } / Double(points.count)
+            let cy = points.reduce(0.0) { $0 + $1.y } / Double(points.count)
+
+            for i in 0..<points.count {
+                let j = (i + 1) % points.count
+                let p1 = points[i], p2 = points[j]
+                let length = sqrt(pow(p2.x - p1.x, 2) + pow(p2.y - p1.y, 2))
+                guard length > 0.3 else { continue }
+
+                let midX = (tx(p1.x) + tx(p2.x)) / 2
+                let midY = (ty(p1.y) + ty(p2.y)) / 2
+
+                let edgeMidRealX = (p1.x + p2.x) / 2
+                let edgeMidRealY = (p1.y + p2.y) / 2
+                let dx = edgeMidRealX - cx
+                let dy = edgeMidRealY - cy
+                let dist = sqrt(dx * dx + dy * dy)
+                let offset: CGFloat = 18
+                let ox = dist > 0.01 ? CGFloat(dx / dist) * offset : 0
+                let oy = dist > 0.01 ? CGFloat(dy / dist) * offset : 0
+
+                let label = formatFeetInches(length)
+                context.draw(
+                    Text(label).font(.caption2.bold()).foregroundColor(.primary),
+                    at: CGPoint(x: midX + ox, y: midY + oy)
+                )
+            }
+        }
+    }
+
+    private func rectangleCanvas(lengthFt: Double, widthFt: Double) -> some View {
+        Canvas { context, size in
+            let padding: CGFloat = 40
+            let available = CGSize(
+                width: size.width - padding * 2,
+                height: size.height - padding * 2
+            )
+            let scale = min(
+                available.width / CGFloat(lengthFt),
+                available.height / CGFloat(widthFt)
+            )
+            let rectW = CGFloat(lengthFt) * scale
+            let rectH = CGFloat(widthFt) * scale
+            let origin = CGPoint(
+                x: (size.width - rectW) / 2,
+                y: (size.height - rectH) / 2
+            )
+            let rect = CGRect(origin: origin, size: CGSize(width: rectW, height: rectH))
+
+            let path = Path(roundedRect: rect, cornerRadius: 4)
+            context.stroke(path, with: .color(.accentColor), lineWidth: 2)
+            context.fill(path, with: .color(.accentColor.opacity(0.08)))
+
+            let lengthLabel = String(format: "%.1f ft", lengthFt)
+            context.draw(
+                Text(lengthLabel).font(.caption.bold()).foregroundColor(.primary),
+                at: CGPoint(x: size.width / 2, y: rect.maxY + 16)
+            )
+
+            let widthLabel = String(format: "%.1f ft", widthFt)
+            context.draw(
+                Text(widthLabel).font(.caption.bold()).foregroundColor(.primary),
+                at: CGPoint(x: rect.maxX + 24, y: size.height / 2)
+            )
+        }
+    }
+
+    private func formatFeetInches(_ feet: Double) -> String {
+        let wholeFeet = Int(feet)
+        let inches = Int((feet - Double(wholeFeet)) * 12.0 + 0.5)
+        if inches == 0 || inches == 12 {
+            return "\(inches == 12 ? wholeFeet + 1 : wholeFeet)\u{2032}"
+        }
+        return "\(wholeFeet)\u{2032}\(inches)\u{2033}"
     }
 
     // MARK: - Metrics

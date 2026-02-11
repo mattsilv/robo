@@ -106,6 +106,15 @@ enum ExportService {
         let fullData = try encoder.encode(room.fullRoom)
         try fullData.write(to: exportDir.appendingPathComponent("room_full.json"))
 
+        // Generate 2D floor plan SVG
+        if let svg = FloorPlanSVGGenerator.generateSVG(from: room.summary, roomName: "") {
+            try svg.write(
+                to: exportDir.appendingPathComponent("floor_plan.svg"),
+                atomically: true,
+                encoding: .utf8
+            )
+        }
+
         // ZIP
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd-HHmmss"
@@ -156,6 +165,16 @@ enum ExportService {
 
         try summaryJSON.write(to: exportDir.appendingPathComponent("room_summary.json"))
         try fullRoomDataJSON.write(to: exportDir.appendingPathComponent("room_full.json"))
+
+        // Generate 2D floor plan SVG if polygon data is available
+        if let summaryDict = try? JSONSerialization.jsonObject(with: summaryJSON) as? [String: Any],
+           let svg = FloorPlanSVGGenerator.generateSVG(from: summaryDict, roomName: roomName) {
+            try svg.write(
+                to: exportDir.appendingPathComponent("floor_plan.svg"),
+                atomically: true,
+                encoding: .utf8
+            )
+        }
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd-HHmmss"
@@ -262,6 +281,15 @@ enum ExportService {
                 try fm.createDirectory(at: roomDir, withIntermediateDirectories: true)
                 try room.summaryJSON.write(to: roomDir.appendingPathComponent("room_summary.json"))
                 try room.fullRoomDataJSON.write(to: roomDir.appendingPathComponent("room_full.json"))
+
+                if let summaryDict = try? JSONSerialization.jsonObject(with: room.summaryJSON) as? [String: Any],
+                   let svg = FloorPlanSVGGenerator.generateSVG(from: summaryDict, roomName: room.name) {
+                    try svg.write(
+                        to: roomDir.appendingPathComponent("floor_plan.svg"),
+                        atomically: true,
+                        encoding: .utf8
+                    )
+                }
             }
         }
 

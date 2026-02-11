@@ -101,6 +101,15 @@ jobs:
           # Add to search list
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
 
+      - name: Install provisioning profile
+        env:
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+        run: |
+          PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
+          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o "$PP_PATH"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles
+
       - name: Write App Store Connect API key
         env:
           API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_API_KEY_ID }}
@@ -157,3 +166,4 @@ jobs:
           security delete-keychain $RUNNER_TEMP/app-signing.keychain-db 2>/dev/null || true
           rm -f $RUNNER_TEMP/build_certificate.p12
           rm -rf ~/private_keys
+          rm -f ~/Library/MobileDevice/Provisioning\ Profiles/build_pp.mobileprovision

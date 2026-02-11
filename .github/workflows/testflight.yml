@@ -19,11 +19,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Select Xcode 16
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
-
-      - name: Install iOS simulator runtime
-        run: xcodebuild -downloadPlatform iOS -quiet || true
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.2.0.app/Contents/Developer
 
       - name: Install xcodegen
         run: brew install xcodegen
@@ -31,6 +28,16 @@ jobs:
       - name: Generate Xcode project
         working-directory: ios
         run: xcodegen generate
+
+      - name: Verify iOS SDK version
+        run: |
+          SDK_VERSION=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iOS SDK version: $SDK_VERSION"
+          MAJOR=$(echo "$SDK_VERSION" | cut -d. -f1)
+          if [ "$MAJOR" -lt 26 ]; then
+            echo "::error::iOS SDK $SDK_VERSION too old. Need iOS 26+."
+            exit 1
+          fi
 
       - name: Validate build prerequisites
         run: |

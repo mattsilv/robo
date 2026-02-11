@@ -199,24 +199,34 @@ struct RoomResultView: View {
 
     private func exportRoom() {
         isExporting = true
-        Task.detached {
-            do {
-                let summary = RoomDataProcessor.summarizeRoom(room)
-                let exportable = ExportableRoom(
-                    summary: summary,
-                    fullRoom: room
-                )
-                let url = try ExportService.createRoomExportZip(room: exportable)
-                await MainActor.run {
-                    shareURL = url
-                    isExporting = false
-                }
-            } catch {
-                await MainActor.run {
-                    exportError = error.localizedDescription
-                    isExporting = false
+        // Encode room data on the main actor before crossing isolation boundary
+        // (CapturedRoom is not Sendable)
+        do {
+            let summaryData = try RoomDataProcessor.encodeSummary(
+                RoomDataProcessor.summarizeRoom(room)
+            )
+            let fullData = try RoomDataProcessor.encodeFullRoom(room)
+            Task.detached {
+                do {
+                    let url = try ExportService.createRoomExportZipFromData(
+                        roomName: "",
+                        summaryJSON: summaryData,
+                        fullRoomDataJSON: fullData
+                    )
+                    await MainActor.run {
+                        shareURL = url
+                        isExporting = false
+                    }
+                } catch {
+                    await MainActor.run {
+                        exportError = error.localizedDescription
+                        isExporting = false
+                    }
                 }
             }
+        } catch {
+            exportError = error.localizedDescription
+            isExporting = false
         }
     }
 }

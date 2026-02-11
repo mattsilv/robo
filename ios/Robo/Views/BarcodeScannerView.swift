@@ -6,6 +6,7 @@ import SwiftData
 struct BarcodeScannerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(APIService.self) private var apiService
     @AppStorage("scanQuality") private var scanQuality: String = "balanced"
 
     @State private var lastScannedCode: String?
@@ -111,6 +112,16 @@ struct BarcodeScannerView: View {
             try modelContext.save()
         } catch {
             self.error = "Failed to save scan: \(error.localizedDescription)"
+        }
+
+        // Fire-and-forget nutrition lookup
+        let capturedApiService = apiService
+        let capturedContext = modelContext
+        Task {
+            await NutritionService.lookup(
+                upc: code, record: record,
+                apiService: capturedApiService, modelContext: capturedContext
+            )
         }
 
         #if DEBUG

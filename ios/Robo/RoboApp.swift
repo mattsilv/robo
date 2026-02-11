@@ -14,7 +14,7 @@ struct RoboApp: App {
         _apiService = State(initialValue: APIService(deviceService: deviceService))
 
         do {
-            let schema = Schema(versionedSchema: RoboSchemaV2.self)
+            let schema = Schema(versionedSchema: RoboSchemaV3.self)
             let config = ModelConfiguration(schema: schema)
             modelContainer = try ModelContainer(
                 for: schema,

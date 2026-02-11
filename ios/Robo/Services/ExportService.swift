@@ -5,6 +5,18 @@ struct ExportableScan: Sendable {
     let barcodeValue: String
     let symbology: String
     let capturedAt: Date
+    let foodName: String?
+    let brandName: String?
+    let calories: Double?
+    let protein: Double?
+    let totalFat: Double?
+    let totalCarbs: Double?
+    let dietaryFiber: Double?
+    let sugars: Double?
+    let sodium: Double?
+    let servingQty: Double?
+    let servingUnit: String?
+    let servingWeightGrams: Double?
 }
 
 enum ExportService {
@@ -19,25 +31,51 @@ enum ExportService {
         formatter.formatOptions = [.withInternetDateTime]
 
         // Write scans.json
-        let jsonRecords = scans.map { scan in
-            [
+        let jsonRecords: [[String: Any]] = scans.map { scan in
+            var record: [String: Any] = [
                 "value": scan.barcodeValue,
                 "symbology": formatSymbology(scan.symbology),
                 "scanned_at": formatter.string(from: scan.capturedAt)
             ]
+            if let name = scan.foodName { record["food_name"] = name }
+            if let brand = scan.brandName { record["brand_name"] = brand }
+            if let cal = scan.calories { record["calories"] = cal }
+            if let p = scan.protein { record["protein_g"] = p }
+            if let f = scan.totalFat { record["total_fat_g"] = f }
+            if let c = scan.totalCarbs { record["total_carbs_g"] = c }
+            if let fiber = scan.dietaryFiber { record["dietary_fiber_g"] = fiber }
+            if let s = scan.sugars { record["sugars_g"] = s }
+            if let na = scan.sodium { record["sodium_mg"] = na }
+            if let qty = scan.servingQty { record["serving_qty"] = qty }
+            if let unit = scan.servingUnit { record["serving_unit"] = unit }
+            if let wt = scan.servingWeightGrams { record["serving_weight_g"] = wt }
+            return record
         }
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let jsonData = try encoder.encode(jsonRecords)
+        let jsonData = try JSONSerialization.data(
+            withJSONObject: jsonRecords,
+            options: [.prettyPrinted, .sortedKeys]
+        )
         try jsonData.write(to: exportDir.appendingPathComponent("scans.json"))
 
         // Write scans.csv
-        var csv = "value,symbology,scanned_at\n"
+        var csv = "value,symbology,scanned_at,food_name,brand_name,calories,protein_g,total_fat_g,total_carbs_g,dietary_fiber_g,sugars_g,sodium_mg,serving_qty,serving_unit,serving_weight_g\n"
         for scan in scans {
             let value = scan.barcodeValue.contains(",")
                 ? "\"\(scan.barcodeValue)\""
                 : scan.barcodeValue
-            csv += "\(value),\(formatSymbology(scan.symbology)),\(formatter.string(from: scan.capturedAt))\n"
+            let name = csvField(scan.foodName)
+            let brand = csvField(scan.brandName)
+            let cal = scan.calories.map { String($0) } ?? ""
+            let pro = scan.protein.map { String($0) } ?? ""
+            let fat = scan.totalFat.map { String($0) } ?? ""
+            let carb = scan.totalCarbs.map { String($0) } ?? ""
+            let fiber = scan.dietaryFiber.map { String($0) } ?? ""
+            let sugar = scan.sugars.map { String($0) } ?? ""
+            let na = scan.sodium.map { String($0) } ?? ""
+            let sQty = scan.servingQty.map { String($0) } ?? ""
+            let sUnit = csvField(scan.servingUnit)
+            let sWt = scan.servingWeightGrams.map { String($0) } ?? ""
+            csv += "\(value),\(formatSymbology(scan.symbology)),\(formatter.string(from: scan.capturedAt)),\(name),\(brand),\(cal),\(pro),\(fat),\(carb),\(fiber),\(sugar),\(na),\(sQty),\(sUnit),\(sWt)\n"
         }
         try csv.write(
             to: exportDir.appendingPathComponent("scans.csv"),
@@ -275,24 +313,50 @@ enum ExportService {
             let barcodesDir = exportDir.appendingPathComponent("barcodes")
             try fm.createDirectory(at: barcodesDir, withIntermediateDirectories: true)
 
-            let jsonRecords = scans.map { scan in
-                [
+            let jsonRecords: [[String: Any]] = scans.map { scan in
+                var record: [String: Any] = [
                     "value": scan.barcodeValue,
                     "symbology": formatSymbology(scan.symbology),
                     "scanned_at": formatter.string(from: scan.capturedAt)
                 ]
+                if let name = scan.foodName { record["food_name"] = name }
+                if let brand = scan.brandName { record["brand_name"] = brand }
+                if let cal = scan.calories { record["calories"] = cal }
+                if let p = scan.protein { record["protein_g"] = p }
+                if let f = scan.totalFat { record["total_fat_g"] = f }
+                if let c = scan.totalCarbs { record["total_carbs_g"] = c }
+                if let fiber = scan.dietaryFiber { record["dietary_fiber_g"] = fiber }
+                if let s = scan.sugars { record["sugars_g"] = s }
+                if let na = scan.sodium { record["sodium_mg"] = na }
+                if let qty = scan.servingQty { record["serving_qty"] = qty }
+                if let unit = scan.servingUnit { record["serving_unit"] = unit }
+                if let wt = scan.servingWeightGrams { record["serving_weight_g"] = wt }
+                return record
             }
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let jsonData = try encoder.encode(jsonRecords)
+            let jsonData = try JSONSerialization.data(
+                withJSONObject: jsonRecords,
+                options: [.prettyPrinted, .sortedKeys]
+            )
             try jsonData.write(to: barcodesDir.appendingPathComponent("scans.json"))
 
-            var csv = "value,symbology,scanned_at\n"
+            var csv = "value,symbology,scanned_at,food_name,brand_name,calories,protein_g,total_fat_g,total_carbs_g,dietary_fiber_g,sugars_g,sodium_mg,serving_qty,serving_unit,serving_weight_g\n"
             for scan in scans {
                 let value = scan.barcodeValue.contains(",")
                     ? "\"\(scan.barcodeValue)\""
                     : scan.barcodeValue
-                csv += "\(value),\(formatSymbology(scan.symbology)),\(formatter.string(from: scan.capturedAt))\n"
+                let name = csvField(scan.foodName)
+                let brand = csvField(scan.brandName)
+                let cal = scan.calories.map { String($0) } ?? ""
+                let pro = scan.protein.map { String($0) } ?? ""
+                let fat = scan.totalFat.map { String($0) } ?? ""
+                let carb = scan.totalCarbs.map { String($0) } ?? ""
+                let fiber = scan.dietaryFiber.map { String($0) } ?? ""
+                let sugar = scan.sugars.map { String($0) } ?? ""
+                let na = scan.sodium.map { String($0) } ?? ""
+                let sQty = scan.servingQty.map { String($0) } ?? ""
+                let sUnit = csvField(scan.servingUnit)
+                let sWt = scan.servingWeightGrams.map { String($0) } ?? ""
+                csv += "\(value),\(formatSymbology(scan.symbology)),\(formatter.string(from: scan.capturedAt)),\(name),\(brand),\(cal),\(pro),\(fat),\(carb),\(fiber),\(sugar),\(na),\(sQty),\(sUnit),\(sWt)\n"
             }
             try csv.write(
                 to: barcodesDir.appendingPathComponent("scans.csv"),
@@ -386,6 +450,14 @@ enum ExportService {
     private static func formatSymbology(_ raw: String) -> String {
         raw.replacingOccurrences(of: "VNBarcodeSymbology", with: "")
             .lowercased()
+    }
+
+    private static func csvField(_ value: String?) -> String {
+        guard let value, !value.isEmpty else { return "" }
+        if value.contains(",") || value.contains("\"") {
+            return "\"\(value.replacingOccurrences(of: "\"", with: "\"\""))\""
+        }
+        return value
     }
 }
 

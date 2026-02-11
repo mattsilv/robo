@@ -1,8 +1,8 @@
 # Robo Use Cases
 
-## Target Audience: Vibe Coders
+## Target Audience: Builders
 
-You can build AI agents with Claude Projects, ChatGPT, or custom GPTs. But getting phone sensor data into those agents? That requires building a native iOS app - months of Xcode, Swift, and App Store bureaucracy.
+The future of building is agentic — but your phone's richest context (LiDAR, camera, barcodes) is trapped on the device, invisible to AI agents. Want that data? Build a native iOS app. Months of Swift, Xcode, and App Store review.
 
 Robo is the missing bridge: **open-source iOS app that turns your phone's sensors into APIs any AI agent can use.**
 
@@ -73,20 +73,21 @@ Robo is the missing bridge: **open-source iOS app that turns your phone's sensor
 
 ## Key Differentiators
 
-### For Vibe Coders
-- **No iOS development required** - Skip the Swift learning curve
+### For Builders
+- **No iOS development required** - Skip Swift, Xcode, and App Store review
 - **Provider-agnostic** - Works with Claude, ChatGPT, your custom backend, or just email
+- **Integration options** - Webhooks, REST API, MCP, or simple email/zip export
 - **Open source** - Fork it, extend it, audit the code
 - **Free tier** - Email/zip export works without any backend
 
 ### Technical Flow
 ```
 Phone Sensors → Robo App → [Your Choice:]
-                            ├─ Claude Project
-                            ├─ ChatGPT
-                            ├─ Custom agent endpoint
-                            ├─ Email (free, no backend)
-                            └─ Robo hosted backend (paid, optional)
+                            ├─ Webhooks (real-time push)
+                            ├─ REST API (pull on demand)
+                            ├─ MCP (Claude tool integration)
+                            ├─ Email / ZIP (free, no backend)
+                            └─ Custom endpoint (any HTTP)
 ```
 
 ---

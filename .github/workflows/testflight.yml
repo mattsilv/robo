@@ -125,11 +125,11 @@ jobs:
             -authenticationKeyIssuerID "$API_ISSUER_ID" \
             DEVELOPMENT_TEAM=R3Z5CY34Q5 \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            | xcpretty || true
+            2>&1 | tee /tmp/xcodebuild.log | tail -50
 
-          # Verify archive was created
           if [ ! -d /tmp/Robo.xcarchive ]; then
-            echo "::error::Archive failed — /tmp/Robo.xcarchive not found"
+            echo "::error::Archive failed. Last 200 lines:"
+            tail -200 /tmp/xcodebuild.log
             exit 1
           fi
 

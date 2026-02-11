@@ -21,13 +21,18 @@ enum RoomDataProcessor {
             let dims = surface.dimensions
             let w = Double(dims.x)
             let h = Double(dims.y)
+            let pos = surface.transform.columns.3
+            let rotDeg = rotationYDegrees(from: surface.transform)
             return [
                 "width_m": r2(w),
                 "height_m": r2(h),
                 "width_ft": r2(w * metersToFeet),
                 "height_ft": r2(h * metersToFeet),
                 "area_sqm": r2(w * h),
-                "area_sqft": r2(w * h * sqmToSqft)
+                "area_sqft": r2(w * h * sqmToSqft),
+                "center_x_ft": r2(Double(pos.x) * metersToFeet),
+                "center_y_ft": r2(Double(pos.z) * metersToFeet),
+                "rotation_deg": r2(rotDeg)
             ]
         }
 
@@ -56,12 +61,15 @@ enum RoomDataProcessor {
             let w = Double(dims.x)
             let d = Double(dims.y)
             let h = Double(dims.z)
+            let pos = object.transform.columns.3
             return [
                 "category": cleanCategory(object.category),
                 "width_m": r2(w), "depth_m": r2(d), "height_m": r2(h),
                 "width_ft": r2(w * metersToFeet),
                 "depth_ft": r2(d * metersToFeet),
-                "height_ft": r2(h * metersToFeet)
+                "height_ft": r2(h * metersToFeet),
+                "center_x_ft": r2(Double(pos.x) * metersToFeet),
+                "center_y_ft": r2(Double(pos.z) * metersToFeet)
             ]
         }
 
@@ -100,6 +108,19 @@ enum RoomDataProcessor {
             summary["room_width_m"] = r2(dims.width)
             summary["room_length_ft"] = r2(dims.length * metersToFeet)
             summary["room_width_ft"] = r2(dims.width * metersToFeet)
+        }
+
+        // Floor polygon in 2D world coordinates (for AI agents building floor plans)
+        if let firstFloor = room.floors.first {
+            let worldCorners = firstFloor.polygonCorners.map { corner -> simd_float3 in
+                transformCornerToWorld(corner, transform: firstFloor.transform)
+            }
+            summary["floor_polygon_2d_m"] = worldCorners.map { corner in
+                ["x": r2(Double(corner.x)), "y": r2(Double(corner.z))]
+            }
+            summary["floor_polygon_2d_ft"] = worldCorners.map { corner in
+                ["x": r2(Double(corner.x) * metersToFeet), "y": r2(Double(corner.z) * metersToFeet)]
+            }
         }
 
         return summary
@@ -153,13 +174,15 @@ enum RoomDataProcessor {
         return area
     }
 
-    /// Shoelace formula for polygon area from 3D corner points (uses X and Z).
+    /// Shoelace formula for polygon area from 3D corner points.
+    /// RoomPlan floor `polygonCorners` are in the surface's local coordinate system
+    /// where the floor lies in the X-Y plane (Z is always 0), so we use X and Y.
     static func polygonArea(_ corners: [simd_float3]) -> Double {
         var area = 0.0
         for i in 0..<corners.count {
             let j = (i + 1) % corners.count
-            area += Double(corners[i].x) * Double(corners[j].z)
-            area -= Double(corners[j].x) * Double(corners[i].z)
+            area += Double(corners[i].x) * Double(corners[j].y)
+            area -= Double(corners[j].x) * Double(corners[i].y)
         }
         return abs(area) / 2.0
     }
@@ -205,6 +228,22 @@ enum RoomDataProcessor {
         case 6: return "L-shaped or hexagonal"
         default: return "irregular (\(walls.count) walls)"
         }
+    }
+
+    // MARK: - Spatial Transforms
+
+    /// Transform a polygon corner from surface-local to world coordinates.
+    static func transformCornerToWorld(_ corner: simd_float3, transform: simd_float4x4) -> simd_float3 {
+        let local = SIMD4<Float>(corner.x, corner.y, corner.z, 1.0)
+        let world = transform * local
+        return simd_float3(world.x, world.y, world.z)
+    }
+
+    /// Extract Y-axis rotation (yaw) in degrees from a transform matrix.
+    private static func rotationYDegrees(from transform: simd_float4x4) -> Double {
+        let col0 = transform.columns.0
+        let angle = atan2(Double(col0.z), Double(col0.x))
+        return angle * 180.0 / .pi
     }
 
     // MARK: - Encoding

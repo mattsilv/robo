@@ -50,7 +50,9 @@ yarn-error.log*
 **/*.pem
 **/*.key
 **/*.p12
+**/*.p8
 **/*.mobileprovision
+private_keys/
 
 # IDE
 .vscode/

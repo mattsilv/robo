@@ -190,7 +190,10 @@ jobs:
           echo "Waiting for build $BUILD_NUMBER to finish processing..."
           for i in $(seq 1 30); do
             RESPONSE=$(curl -s -H "Authorization: Bearer $TOKEN" \
-              "https://api.appstoreconnect.apple.com/v1/builds?filter[app]=$APP_ID&filter[version]=$BUILD_NUMBER&fields[builds]=processingState")
+              --get --data-urlencode "filter[app]=$APP_ID" \
+              --data-urlencode "filter[version]=$BUILD_NUMBER" \
+              --data-urlencode "fields[builds]=processingState" \
+              "https://api.appstoreconnect.apple.com/v1/builds")
             STATE=$(echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['data'][0]['attributes']['processingState'] if d['data'] else 'NOT_FOUND')" 2>/dev/null || echo "ERROR")
 
             echo "  Attempt $i: $STATE"
@@ -216,6 +219,10 @@ jobs:
 
           if [ "$HTTP_CODE" = "204" ]; then
             echo "Build $BUILD_NUMBER added to Alpha Squad external testers group"
+          elif [ "$HTTP_CODE" = "409" ]; then
+            echo "Build $BUILD_NUMBER already in Alpha Squad"
+          elif [ "$HTTP_CODE" = "422" ]; then
+            echo "::warning::Build $BUILD_NUMBER not assignable to external group. Check ExportOptions.plist testFlightInternalTestingOnly is false."
           else
             echo "::warning::Failed to add build to Alpha Squad (HTTP $HTTP_CODE)"
           fi

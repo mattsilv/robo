@@ -65,6 +65,10 @@ targets:
       - path: RoboTests
         excludes:
           - "**/.DS_Store"
+          - "Fixtures/**"
+    resources:
+      - path: RoboTests/Fixtures
+        optional: true
     dependencies:
       - target: Robo
     settings:

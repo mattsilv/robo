@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct SettingsView: View {
     @Environment(DeviceService.self) private var deviceService
@@ -7,6 +8,8 @@ struct SettingsView: View {
     @State private var showingSaveConfirmation = false
     #if DEBUG
     @AppStorage("dev.syncToCloud") private var debugSyncEnabled = false
+    @Query(sort: \RoomScanRecord.capturedAt, order: .reverse) private var roomScans: [RoomScanRecord]
+    @State private var fixtureExportURL: URL?
     #endif
 
     var body: some View {
@@ -46,6 +49,22 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+
+                    if let latest = roomScans.first {
+                        Button("Export Test Fixture") {
+                            let tempURL = FileManager.default.temporaryDirectory
+                                .appendingPathComponent("captured_room_fixture.json")
+                            try? latest.fullRoomDataJSON.write(to: tempURL)
+                            fixtureExportURL = tempURL
+                        }
+                        Text("\(latest.roomName) — \(ByteCountFormatter.string(fromByteCount: Int64(latest.fullRoomDataJSON.count), countStyle: .file))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("No room scans to export")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 #endif
 
@@ -72,9 +91,30 @@ struct SettingsView: View {
             .onAppear {
                 apiURL = deviceService.config.apiBaseURL
             }
+            #if DEBUG
+            .sheet(item: $fixtureExportURL) { url in
+                ShareSheet(activityItems: [url])
+            }
+            #endif
         }
     }
 }
+
+#if DEBUG
+extension URL: @retroactive Identifiable {
+    public var id: String { absoluteString }
+}
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+#endif
 
 #Preview {
     SettingsView()

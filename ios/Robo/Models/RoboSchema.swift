@@ -382,15 +382,77 @@ enum RoboSchemaV5: VersionedSchema {
     }
 }
 
+// MARK: - Schema V6 (product capture with photos)
+
+enum RoboSchemaV6: VersionedSchema {
+    static var versionIdentifier = Schema.Version(6, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [ScanRecord.self, RoomScanRecord.self, MotionRecord.self,
+         AgentCompletionRecord.self, ProductCaptureRecord.self]
+    }
+
+    // Re-export V5 models unchanged
+    typealias ScanRecord = RoboSchemaV4.ScanRecord
+    typealias RoomScanRecord = RoboSchemaV4.RoomScanRecord
+    typealias MotionRecord = RoboSchemaV4.MotionRecord
+    typealias AgentCompletionRecord = RoboSchemaV5.AgentCompletionRecord
+
+    @Model
+    final class ProductCaptureRecord {
+        var id: UUID
+        var barcodeValue: String?
+        var symbology: String?
+        var photoFileNamesJSON: String
+        var photoCount: Int
+        var capturedAt: Date
+        var agentId: String?
+        var agentName: String?
+        var requestId: String?
+        var foodName: String?
+        var brandName: String?
+        var calories: Double?
+        var photoThumbURL: String?
+        var nutritionLookedUp: Bool
+
+        init(
+            barcodeValue: String? = nil,
+            symbology: String? = nil,
+            photoFileNames: [String],
+            agentId: String? = nil,
+            agentName: String? = nil,
+            requestId: String? = nil
+        ) {
+            self.id = UUID()
+            self.barcodeValue = barcodeValue
+            self.symbology = symbology
+            self.photoFileNamesJSON = (try? JSONEncoder().encode(photoFileNames))
+                .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+            self.photoCount = photoFileNames.count
+            self.capturedAt = Date()
+            self.agentId = agentId
+            self.agentName = agentName
+            self.requestId = requestId
+            self.nutritionLookedUp = false
+        }
+
+        var photoFileNames: [String] {
+            guard let data = photoFileNamesJSON.data(using: .utf8) else { return [] }
+            return (try? JSONDecoder().decode([String].self, from: data)) ?? []
+        }
+    }
+}
+
 // MARK: - Migration Plan
 
 enum RoboMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [RoboSchemaV1.self, RoboSchemaV2.self, RoboSchemaV3.self, RoboSchemaV4.self, RoboSchemaV5.self]
+        [RoboSchemaV1.self, RoboSchemaV2.self, RoboSchemaV3.self,
+         RoboSchemaV4.self, RoboSchemaV5.self, RoboSchemaV6.self]
     }
 
     static var stages: [MigrationStage] {
-        [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5]
+        [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6]
     }
 
     static let migrateV1toV2 = MigrationStage.lightweight(
@@ -412,11 +474,17 @@ enum RoboMigrationPlan: SchemaMigrationPlan {
         fromVersion: RoboSchemaV4.self,
         toVersion: RoboSchemaV5.self
     )
+
+    static let migrateV5toV6 = MigrationStage.lightweight(
+        fromVersion: RoboSchemaV5.self,
+        toVersion: RoboSchemaV6.self
+    )
 }
 
 // MARK: - Type Aliases (so the rest of the app uses simple names)
 
-typealias ScanRecord = RoboSchemaV5.ScanRecord
-typealias RoomScanRecord = RoboSchemaV5.RoomScanRecord
-typealias MotionRecord = RoboSchemaV5.MotionRecord
-typealias AgentCompletionRecord = RoboSchemaV5.AgentCompletionRecord
+typealias ScanRecord = RoboSchemaV6.ScanRecord
+typealias RoomScanRecord = RoboSchemaV6.RoomScanRecord
+typealias MotionRecord = RoboSchemaV6.MotionRecord
+typealias AgentCompletionRecord = RoboSchemaV6.AgentCompletionRecord
+typealias ProductCaptureRecord = RoboSchemaV6.ProductCaptureRecord

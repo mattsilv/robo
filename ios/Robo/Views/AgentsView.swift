@@ -6,16 +6,19 @@ struct AgentsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \RoomScanRecord.capturedAt, order: .reverse) private var roomScans: [RoomScanRecord]
     @Query(sort: \ScanRecord.capturedAt, order: .reverse) private var scans: [ScanRecord]
+    @Query(sort: \ProductCaptureRecord.capturedAt, order: .reverse) private var productCaptures: [ProductCaptureRecord]
 
     @State private var agents: [AgentConnection] = MockAgentService.loadAgents()
     @State private var showingLiDARScan = false
     @State private var showingPhotoCapture = false
     @State private var showingBarcode = false
+    @State private var showingProductScan = false
     @State private var syncingAgentId: UUID?
     @State private var initialRoomCount = 0
     @State private var activePhotoAgent: AgentConnection?
     @State private var photoCapturedCount = 0
     @State private var initialBarcodeCount = 0
+    @State private var initialProductCount = 0
 
     var body: some View {
         NavigationStack {
@@ -46,6 +49,9 @@ struct AgentsView: View {
         }
         .fullScreenCover(isPresented: $showingBarcode, onDismiss: handleBarcodeDismiss) {
             BarcodeScannerView(captureContext: activeCaptureContext)
+        }
+        .fullScreenCover(isPresented: $showingProductScan, onDismiss: handleProductScanDismiss) {
+            ProductScanFlowView(captureContext: activeCaptureContext)
         }
     }
 
@@ -124,8 +130,21 @@ struct AgentsView: View {
             initialBarcodeCount = scans.count
             syncingAgentId = agent.id
             showingBarcode = true
+        case .productScan:
+            initialProductCount = productCaptures.count
+            syncingAgentId = agent.id
+            showingProductScan = true
         case .motion:
             break
+        }
+    }
+
+    private func handleProductScanDismiss() {
+        guard let agentId = syncingAgentId else { return }
+        if productCaptures.count > initialProductCount {
+            triggerSyncAnimation(for: agentId)
+        } else {
+            syncingAgentId = nil
         }
     }
 
@@ -250,6 +269,7 @@ private struct AgentRequestCard: View {
         case .lidar: return "Scan Room"
         case .camera: return "Take Photos"
         case .barcode: return "Scan Barcode"
+        case .productScan: return "Scan Product"
         case .motion: return "Start Capture"
         }
     }
@@ -259,6 +279,7 @@ private struct AgentRequestCard: View {
         case .lidar: return "camera.metering.spot"
         case .camera: return "camera.fill"
         case .barcode: return "barcode.viewfinder"
+        case .productScan: return "barcode.viewfinder"
         case .motion: return "figure.walk"
         }
     }

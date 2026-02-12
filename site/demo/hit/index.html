@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hi James, — Matt wants you to test something</title>
+
+  <!-- OG / Social (must be in first 32KB for Slack) -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://robo.app/demo/hit/">
+  <meta property="og:title" content="Hi James, — Matt wants you to test something">
+  <meta property="og:description" content="Matt assigned you a HIT (Human Intelligence Task). Snap a photo of your fridge to help test the Simple Chef agent.">
+  <meta property="og:image" content="https://robo.app/demo/hit/og-hit-preview.png?v=3">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:site_name" content="ROBO.APP">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Hi James, — Matt wants you to test something">
+  <meta name="twitter:description" content="Matt assigned you a HIT (Human Intelligence Task). Snap a photo of your fridge to help test the Simple Chef agent.">
+  <meta name="twitter:image" content="https://robo.app/demo/hit/og-hit-preview.png?v=3">
+
+  <meta name="theme-color" content="#06060a">
+
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+    :root {
+      --blue: #2563EB;
+      --blue-light: #3b82f6;
+      --blue-glow: rgba(37, 99, 235, 0.35);
+      --blue-dim: rgba(37, 99, 235, 0.12);
+      --purple: #7c3aed;
+      --purple-dim: rgba(124, 58, 237, 0.12);
+      --bg: #06060a;
+      --surface: #0d0d14;
+      --surface-raised: #12121c;
+      --border: rgba(255,255,255,0.06);
+      --border-accent: rgba(37, 99, 235, 0.2);
+      --text: #e2e2e8;
+      --text-dim: #6b6b7b;
+      --text-muted: #3d3d4d;
+      --green: #22c55e;
+      --green-dim: rgba(34, 197, 94, 0.12);
+    }
+
+    html { scroll-behavior: smooth }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* dot grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* blue glow */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -30%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, var(--blue-glow) 0%, transparent 70%);
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+      animation: pulse 6s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.4; transform: translateX(-50%) scale(1); }
+      50% { opacity: 0.6; transform: translateX(-50%) scale(1.1); }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1.5rem 3rem;
+      max-width: 520px;
+      width: 100%;
+    }
+
+    /* staggered fade-in */
+    .fi {
+      opacity: 0;
+      transform: translateY(14px);
+      animation: fadeUp 0.6s ease-out forwards;
+    }
+    .fi:nth-child(1) { animation-delay: 0.05s }
+    .fi:nth-child(2) { animation-delay: 0.12s }
+    .fi:nth-child(3) { animation-delay: 0.19s }
+    .fi:nth-child(4) { animation-delay: 0.26s }
+    .fi:nth-child(5) { animation-delay: 0.33s }
+    .fi:nth-child(6) { animation-delay: 0.4s }
+    .fi:nth-child(7) { animation-delay: 0.47s }
+    .fi:nth-child(8) { animation-delay: 0.54s }
+    .fi:nth-child(9) { animation-delay: 0.61s }
+    .fi:nth-child(10) { animation-delay: 0.68s }
+
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* alpha badge */
+    .alpha-badge {
+      align-self: flex-start;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0.35rem 0.75rem;
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      border-radius: 100px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--green);
+      background: var(--green-dim);
+      margin-bottom: 1.75rem;
+    }
+
+    .alpha-badge::before {
+      content: '';
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* top bar */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      align-self: flex-start;
+      margin-bottom: 1rem;
+    }
+
+    .top-bar svg {
+      width: 40px;
+      height: 40px;
+      filter: drop-shadow(0 0 16px var(--blue-glow));
+    }
+
+    .top-bar .brand {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      font-size: 1.1rem;
+      color: #fff;
+      letter-spacing: 0.04em;
+    }
+
+    .top-bar .brand .dot { color: var(--blue-light); }
+
+    /* hero */
+    .hero {
+      align-self: flex-start;
+      margin-bottom: 1.75rem;
+      width: 100%;
+    }
+
+    .greeting {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 3rem;
+      font-weight: 600;
+      color: #fff;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.35rem;
+    }
+
+    .greeting .name { color: var(--blue-light); }
+
+    .subtitle {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 1.5rem;
+      font-weight: 500;
+      color: var(--text-dim);
+      line-height: 1.3;
+    }
+
+    .subtitle .sender { color: var(--text); }
+
+    /* task card */
+    .task-card {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border-accent);
+      border-radius: 16px;
+      padding: 1.25rem 1.35rem;
+      margin-bottom: 0.75rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .task-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--blue), transparent);
+      opacity: 0.4;
+    }
+
+    .task-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 0.85rem;
+    }
+
+    .task-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--blue-dim);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .task-icon:hover {
+      background: rgba(37, 99, 235, 0.2);
+    }
+
+    .task-icon svg {
+      width: 22px;
+      height: 22px;
+      stroke: var(--blue-light);
+    }
+
+    .task-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.01em;
+      line-height: 1.3;
+    }
+
+    .task-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .task-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--blue-light);
+      background: var(--blue-dim);
+      border: 1px solid rgba(37, 99, 235, 0.3);
+      border-radius: 100px;
+      padding: 3px 10px;
+    }
+
+    .task-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .task-desc {
+      font-size: 0.9rem;
+      color: var(--text-dim);
+      line-height: 1.55;
+    }
+
+    /* camera CTA */
+    .camera-cta {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: var(--blue);
+      border: 3px solid rgba(255,255,255,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 32px rgba(37, 99, 235, 0.35);
+      margin-top: 0.5rem;
+    }
+
+    .camera-cta svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    .camera-cta:hover {
+      background: var(--blue-light);
+      box-shadow: 0 0 48px rgba(37, 99, 235, 0.5);
+      transform: scale(1.06);
+    }
+
+    .camera-cta:active {
+      transform: scale(0.96);
+    }
+
+    .camera-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      margin-top: 0.6rem;
+      letter-spacing: 0.02em;
+      margin-bottom: 2rem;
+    }
+
+    /* toast */
+    .toast {
+      display: none;
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface-raised);
+      border: 1px solid var(--border-accent);
+      border-radius: 12px;
+      padding: 0.75rem 1.25rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--text);
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      text-align: center;
+      max-width: 320px;
+    }
+
+    .toast.is-visible {
+      display: block;
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* responsive */
+    @media (min-width: 640px) {
+      .container { padding: 3.5rem 2rem 4rem; }
+      .greeting { font-size: 3.5rem; }
+      .subtitle { font-size: 1.65rem; }
+      .top-bar svg { width: 48px; height: 48px; }
+      .top-bar .brand { font-size: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+
+    <!-- Top bar -->
+    <div class="top-bar fi">
+      <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="120" height="120" rx="28" fill="#2563EB"/>
+        <circle cx="42" cy="48" r="14" fill="white"/>
+        <circle cx="78" cy="48" r="14" fill="white"/>
+        <circle cx="42" cy="48" r="7" fill="#1a4fc0"/>
+        <circle cx="78" cy="48" r="7" fill="#1a4fc0"/>
+        <path d="M 34 80 Q 60 102 86 80" fill="none" stroke="white" stroke-width="8" stroke-linecap="round"/>
+      </svg>
+      <span class="brand">ROBO<span class="dot">.</span>APP</span>
+    </div>
+
+    <!-- Alpha badge -->
+    <div class="alpha-badge fi">Alpha Test Invite</div>
+
+    <!-- Hero greeting -->
+    <div class="hero fi">
+      <h1 class="greeting">Hi <span class="name">James</span>,</h1>
+      <p class="subtitle"><span class="sender">Matt</span> wants you to test something</p>
+    </div>
+
+    <!-- Task card -->
+    <div class="task-card fi">
+      <div class="task-header">
+        <div class="task-icon" id="camera-btn" role="button" tabindex="0" aria-label="Take a photo">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+        </div>
+        <div>
+          <div class="task-title">Photo the inside of your fridge</div>
+          <div class="task-meta">
+            <span class="task-pill">Camera</span>
+            <span class="task-time">~30 seconds</span>
+          </div>
+        </div>
+      </div>
+      <p class="task-desc">We're building a Simple Chef agent that suggests meals from what you already have. Help us test it by snapping a quick photo of your fridge.</p>
+    </div>
+
+    <!-- Camera CTA button -->
+    <button class="camera-cta fi" id="camera-btn-main" aria-label="Take a photo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+    </button>
+    <p class="camera-label fi">Tap to capture</p>
+
+  </main>
+
+  <!-- Toast for camera tap -->
+  <div class="toast" id="toast">This is just a test &mdash; in-app capture is coming soon!</div>
+
+  <script>
+  (function() {
+    var btns = [document.getElementById('camera-btn'), document.getElementById('camera-btn-main')];
+    var toast = document.getElementById('toast');
+    var timer;
+    if (!toast) return;
+    btns.forEach(function(btn) {
+      if (!btn) return;
+      btn.addEventListener('click', function() {
+        clearTimeout(timer);
+        toast.classList.add('is-visible');
+        timer = setTimeout(function() {
+          toast.classList.remove('is-visible');
+        }, 3000);
+      });
+    });
+  })();
+  </script>
+</body>
+</html>

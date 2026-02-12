@@ -17,6 +17,8 @@ struct ScanHistoryView: View {
     private var motionRecords: [MotionRecord]
     @Query(sort: \AgentCompletionRecord.completedAt, order: .reverse)
     private var completionRecords: [AgentCompletionRecord]
+    @Query(sort: \ProductCaptureRecord.capturedAt, order: .reverse)
+    private var productCaptures: [ProductCaptureRecord]
     @Environment(\.modelContext) private var modelContext
 
     @State private var browseMode: BrowseMode = .byAgent
@@ -75,6 +77,9 @@ struct ScanHistoryView: View {
             }
             .navigationDestination(for: MotionRecord.self) { motion in
                 MotionDetailView(motion: motion)
+            }
+            .navigationDestination(for: ProductCaptureRecord.self) { product in
+                ProductDetailView(product: product)
             }
             .toolbar {
                 if browseMode == .byType {
@@ -150,10 +155,12 @@ struct ScanHistoryView: View {
         let agentBarcodes = Dictionary(grouping: scans.filter { $0.agentId != nil }) { $0.agentId! }
         let agentMotion = Dictionary(grouping: motionRecords.filter { $0.agentId != nil }) { $0.agentId! }
         let agentCompletions = Dictionary(grouping: completionRecords) { $0.agentId }
+        let agentProducts = Dictionary(grouping: productCaptures.filter { $0.agentId != nil }) { $0.agentId! }
         let allAgentIds = Set(agentRooms.keys)
             .union(agentBarcodes.keys)
             .union(agentMotion.keys)
             .union(agentCompletions.keys)
+            .union(agentProducts.keys)
 
         let unlinkedRooms = roomScans.filter { $0.agentId == nil }
         let unlinkedBarcodes = scans.filter { $0.agentId == nil }
@@ -175,7 +182,8 @@ struct ScanHistoryView: View {
                     let name = AgentStore.name(for: agentId, fallback: agentRooms[agentId]?.first?.agentName
                         ?? agentBarcodes[agentId]?.first?.agentName
                         ?? agentMotion[agentId]?.first?.agentName
-                        ?? agentCompletions[agentId]?.first?.agentName)
+                        ?? agentCompletions[agentId]?.first?.agentName
+                        ?? agentProducts[agentId]?.first?.agentName)
 
                     Section {
                         // Room scans for this agent
@@ -199,6 +207,14 @@ struct ScanHistoryView: View {
                             ForEach(motion) { record in
                                 NavigationLink(value: record) {
                                     MotionRow(motion: record)
+                                }
+                            }
+                        }
+                        // Product captures for this agent
+                        if let products = agentProducts[agentId] {
+                            ForEach(products) { product in
+                                NavigationLink(value: product) {
+                                    ProductCaptureRow(product: product)
                                 }
                             }
                         }
@@ -671,7 +687,85 @@ struct MotionRow: View {
     }
 }
 
+// MARK: - Product Capture Row
+
+struct ProductCaptureRow: View {
+    let product: ProductCaptureRecord
+    @State private var thumbnail: UIImage?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Photo thumbnail
+            if let thumbnail {
+                Image(uiImage: thumbnail)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(.orange.opacity(0.15))
+                    .frame(width: 44, height: 44)
+                    .overlay {
+                        Image(systemName: "fork.knife")
+                            .foregroundStyle(.orange)
+                    }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(product.foodName ?? displayName)
+                    .font(.subheadline)
+                    .lineLimit(1)
+
+                HStack(spacing: 8) {
+                    if let barcode = product.barcodeValue {
+                        Text(barcode)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Label("\(product.photoCount) photos", systemImage: "photo.stack")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            if let cal = product.calories {
+                Text("\(Int(cal)) cal")
+                    .font(.caption.bold())
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.orange.opacity(0.15))
+                    .foregroundStyle(.orange)
+                    .clipShape(Capsule())
+            } else {
+                Text(product.capturedAt, style: .relative)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .task {
+            // Load first photo thumbnail
+            if let firstName = product.photoFileNames.first {
+                thumbnail = PhotoStorageService.loadThumbnail(firstName)
+            }
+        }
+    }
+
+    private var displayName: String {
+        if let brand = product.brandName {
+            return brand
+        }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return "Product \(formatter.string(from: product.capturedAt))"
+    }
+}
+
 #Preview {
     ScanHistoryView()
-        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self, MotionRecord.self, AgentCompletionRecord.self], inMemory: true)
+        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self, MotionRecord.self, AgentCompletionRecord.self, ProductCaptureRecord.self], inMemory: true)
 }

@@ -23,12 +23,21 @@ enum MockAgentService {
             AgentConnection(
                 id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
                 name: "Practical Chef",
-                description: "Recipe suggestions from what's in your kitchen",
+                description: "Analyzes ingredients and nutrition for meal planning",
                 iconSystemName: "fork.knife",
                 accentColor: .orange,
                 status: .connected,
-                lastSyncDate: Calendar.current.date(byAdding: .hour, value: -2, to: Date()),
-                pendingRequest: nil
+                lastSyncDate: nil,
+                pendingRequest: AgentRequest(
+                    id: UUID(uuidString: "00000000-0000-0000-0000-000000000020")!,
+                    title: "Scan a product from your kitchen",
+                    description: "Scan the barcode and snap a few photos of the package — I'll analyze the ingredients and nutrition.",
+                    skillType: .productScan,
+                    photoChecklist: [
+                        PhotoTask(id: UUID(), label: "Front of package", isCompleted: false),
+                        PhotoTask(id: UUID(), label: "Nutrition label", isCompleted: false)
+                    ]
+                )
             ),
             AgentConnection(
                 id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!,

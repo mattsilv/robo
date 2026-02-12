@@ -28,6 +28,23 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                 }
 
+                Section("Beacons") {
+                    NavigationLink {
+                        BeaconSettingsView()
+                    } label: {
+                        HStack {
+                            Label("Beacon Configuration", systemImage: "sensor.tag.radiowaves.forward")
+                            Spacer()
+                            let beaconCount = BeaconConfigStore.loadBeacons().count
+                            if beaconCount > 0 {
+                                Text("\(beaconCount)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
                 Section("API Configuration") {
                     TextField("API Base URL", text: $apiURL)
                         .textInputAutocapitalization(.never)

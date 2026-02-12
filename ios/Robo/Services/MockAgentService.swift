@@ -61,6 +61,21 @@ enum MockAgentService {
                 )
             ),
             AgentConnection(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000007")!,
+                name: "Home Aware",
+                description: "Room-aware automations triggered by your location",
+                iconSystemName: "sensor.tag.radiowaves.forward",
+                accentColor: .indigo,
+                status: .connected,
+                lastSyncDate: nil,
+                pendingRequest: AgentRequest(
+                    id: UUID(uuidString: "00000000-0000-0000-0000-000000000070")!,
+                    title: "Set up beacon monitoring",
+                    description: "Place beacons in your rooms and I'll track your movement patterns to automate reminders.",
+                    skillType: .beacon
+                )
+            ),
+            AgentConnection(
                 id: UUID(uuidString: "00000000-0000-0000-0000-000000000004")!,
                 name: "Contractor Bot",
                 description: "Send your contractor exactly what they need, first try",

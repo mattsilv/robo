@@ -39,7 +39,7 @@ export const RegisterDeviceSchema = z.object({
 
 export const SensorDataSchema = z.object({
   device_id: z.string().uuid(),
-  sensor_type: z.enum(['barcode', 'camera', 'lidar']),
+  sensor_type: z.enum(['barcode', 'camera', 'lidar', 'motion', 'beacon']),
   data: z.record(z.any()),
 });
 
@@ -70,7 +70,7 @@ export type Device = {
 export type SensorData = {
   id: number;
   device_id: string;
-  sensor_type: 'barcode' | 'camera' | 'lidar';
+  sensor_type: 'barcode' | 'camera' | 'lidar' | 'motion' | 'beacon';
   data: Record<string, any>;
   captured_at: string;
 };

@@ -443,16 +443,76 @@ enum RoboSchemaV6: VersionedSchema {
     }
 }
 
+// MARK: - Schema V7 (beacon events)
+
+enum RoboSchemaV7: VersionedSchema {
+    static var versionIdentifier = Schema.Version(7, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [ScanRecord.self, RoomScanRecord.self, MotionRecord.self,
+         AgentCompletionRecord.self, ProductCaptureRecord.self, BeaconEventRecord.self]
+    }
+
+    // Re-export V6 models unchanged
+    typealias ScanRecord = RoboSchemaV4.ScanRecord
+    typealias RoomScanRecord = RoboSchemaV4.RoomScanRecord
+    typealias MotionRecord = RoboSchemaV4.MotionRecord
+    typealias AgentCompletionRecord = RoboSchemaV5.AgentCompletionRecord
+    typealias ProductCaptureRecord = RoboSchemaV6.ProductCaptureRecord
+
+    @Model
+    final class BeaconEventRecord {
+        var eventType: String          // "enter" or "exit"
+        var beaconMinor: Int           // Minor value (room ID)
+        var roomName: String?          // User-assigned name
+        var proximity: String?         // "immediate", "near", "far"
+        var rssi: Int?                 // Raw signal strength
+        var distanceMeters: Double?    // Estimated distance
+        var durationSeconds: Int?      // Only on exit events
+        var source: String             // "background_monitor" or "foreground_ranging"
+        var webhookStatus: String      // "pending", "sent", "failed"
+        var webhookURL: String?        // Where it was sent
+        var capturedAt: Date
+        var agentId: String?
+        var agentName: String?
+
+        init(
+            eventType: String,
+            beaconMinor: Int,
+            roomName: String? = nil,
+            proximity: String? = nil,
+            rssi: Int? = nil,
+            distanceMeters: Double? = nil,
+            durationSeconds: Int? = nil,
+            source: String,
+            webhookStatus: String = "pending",
+            webhookURL: String? = nil
+        ) {
+            self.eventType = eventType
+            self.beaconMinor = beaconMinor
+            self.roomName = roomName
+            self.proximity = proximity
+            self.rssi = rssi
+            self.distanceMeters = distanceMeters
+            self.durationSeconds = durationSeconds
+            self.source = source
+            self.webhookStatus = webhookStatus
+            self.webhookURL = webhookURL
+            self.capturedAt = Date()
+        }
+    }
+}
+
 // MARK: - Migration Plan
 
 enum RoboMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
         [RoboSchemaV1.self, RoboSchemaV2.self, RoboSchemaV3.self,
-         RoboSchemaV4.self, RoboSchemaV5.self, RoboSchemaV6.self]
+         RoboSchemaV4.self, RoboSchemaV5.self, RoboSchemaV6.self, RoboSchemaV7.self]
     }
 
     static var stages: [MigrationStage] {
-        [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6]
+        [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7]
     }
 
     static let migrateV1toV2 = MigrationStage.lightweight(
@@ -479,12 +539,18 @@ enum RoboMigrationPlan: SchemaMigrationPlan {
         fromVersion: RoboSchemaV5.self,
         toVersion: RoboSchemaV6.self
     )
+
+    static let migrateV6toV7 = MigrationStage.lightweight(
+        fromVersion: RoboSchemaV6.self,
+        toVersion: RoboSchemaV7.self
+    )
 }
 
 // MARK: - Type Aliases (so the rest of the app uses simple names)
 
-typealias ScanRecord = RoboSchemaV6.ScanRecord
-typealias RoomScanRecord = RoboSchemaV6.RoomScanRecord
-typealias MotionRecord = RoboSchemaV6.MotionRecord
-typealias AgentCompletionRecord = RoboSchemaV6.AgentCompletionRecord
-typealias ProductCaptureRecord = RoboSchemaV6.ProductCaptureRecord
+typealias ScanRecord = RoboSchemaV7.ScanRecord
+typealias RoomScanRecord = RoboSchemaV7.RoomScanRecord
+typealias MotionRecord = RoboSchemaV7.MotionRecord
+typealias AgentCompletionRecord = RoboSchemaV7.AgentCompletionRecord
+typealias ProductCaptureRecord = RoboSchemaV7.ProductCaptureRecord
+typealias BeaconEventRecord = RoboSchemaV7.BeaconEventRecord

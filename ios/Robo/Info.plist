@@ -22,8 +22,14 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Robo uses Bluetooth to detect nearby iBeacon devices for room-aware automations.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Robo needs camera access to scan barcodes, capture photos, and perform LiDAR room scanning for AI analysis</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Robo needs background location access to detect beacons when the app is closed, triggering room-based automations.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Robo uses your location to detect nearby Bluetooth beacons for room-based automations.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Robo needs motion access to capture step count, distance, and activity data for AI analysis</string>
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -47,6 +53,11 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>bluetooth-central</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiresFullScreen</key>

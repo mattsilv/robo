@@ -4,6 +4,8 @@ import AudioToolbox
 import SwiftData
 
 struct BarcodeScannerView: View {
+    var captureContext: CaptureContext? = nil
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(APIService.self) private var apiService
@@ -107,6 +109,8 @@ struct BarcodeScannerView: View {
 
         // Save to SwiftData (explicit save — autosave is unreliable during dismiss)
         let record = ScanRecord(barcodeValue: code, symbology: symbology)
+        record.agentId = captureContext?.agentId
+        record.agentName = captureContext?.agentName
         modelContext.insert(record)
         do {
             try modelContext.save()

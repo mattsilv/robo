@@ -3,6 +3,9 @@ import RoomPlan
 import AudioToolbox
 
 struct LiDARScanView: View {
+    var captureContext: CaptureContext? = nil
+    var suggestedRoomName: String? = nil
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
@@ -59,6 +62,11 @@ struct LiDARScanView: View {
                         }
                     }
                     // No cancel button on results — user chooses Save or Discard
+                }
+            }
+            .onAppear {
+                if let suggested = suggestedRoomName, roomName.isEmpty {
+                    roomName = suggested
                 }
             }
             .alert("Scan Error", isPresented: .constant(error != nil)) {
@@ -182,6 +190,8 @@ struct LiDARScanView: View {
                 summaryJSON: summaryData,
                 fullRoomDataJSON: fullData
             )
+            record.agentId = captureContext?.agentId
+            record.agentName = captureContext?.agentName
             modelContext.insert(record)
             try modelContext.save()
 

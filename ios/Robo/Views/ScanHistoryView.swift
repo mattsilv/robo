@@ -1,6 +1,13 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - Browse Mode
+
+private enum BrowseMode: String, CaseIterable {
+    case byAgent = "By Agent"
+    case byType = "By Type"
+}
+
 struct ScanHistoryView: View {
     @Query(sort: \ScanRecord.capturedAt, order: .reverse)
     private var scans: [ScanRecord]
@@ -8,8 +15,11 @@ struct ScanHistoryView: View {
     private var roomScans: [RoomScanRecord]
     @Query(sort: \MotionRecord.capturedAt, order: .reverse)
     private var motionRecords: [MotionRecord]
+    @Query(sort: \AgentCompletionRecord.completedAt, order: .reverse)
+    private var completionRecords: [AgentCompletionRecord]
     @Environment(\.modelContext) private var modelContext
 
+    @State private var browseMode: BrowseMode = .byAgent
     @State private var selectedSegment = 0
     @State private var showingClearConfirmation = false
     @State private var shareURL: URL?
@@ -21,25 +31,42 @@ struct ScanHistoryView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                Picker("History", selection: $selectedSegment) {
-                    Text("Barcodes").tag(0)
-                    Text("Rooms").tag(1)
-                    Text("Motion").tag(2)
+                Picker("Browse", selection: $browseMode) {
+                    ForEach(BrowseMode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
-                .padding(.vertical, 8)
+                .padding(.top, 8)
 
-                Group {
-                    switch selectedSegment {
-                    case 0: barcodeList
-                    case 1: roomList
-                    case 2: motionList
-                    default: barcodeList
+                if browseMode == .byType {
+                    Picker("Type", selection: $selectedSegment) {
+                        Text("Barcodes").tag(0)
+                        Text("Rooms").tag(1)
+                        Text("Motion").tag(2)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    .padding(.top, 6)
+                }
+
+                Spacer().frame(height: 8)
+
+                if browseMode == .byAgent {
+                    agentDataList
+                } else {
+                    Group {
+                        switch selectedSegment {
+                        case 0: barcodeList
+                        case 1: roomList
+                        case 2: motionList
+                        default: barcodeList
+                        }
                     }
                 }
             }
-            .navigationTitle("History")
+            .navigationTitle("My Data")
             .navigationDestination(for: ScanRecord.self) { scan in
                 BarcodeDetailView(scan: scan)
             }
@@ -50,25 +77,27 @@ struct ScanHistoryView: View {
                 MotionDetailView(motion: motion)
             }
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        exportAll()
-                    } label: {
-                        if isExporting {
-                            ProgressView()
-                        } else {
-                            Label("Export All", systemImage: "square.and.arrow.up")
+                if browseMode == .byType {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            exportAll()
+                        } label: {
+                            if isExporting {
+                                ProgressView()
+                            } else {
+                                Label("Export All", systemImage: "square.and.arrow.up")
+                            }
                         }
+                        .disabled(isExporting || (scans.isEmpty && roomScans.isEmpty && motionRecords.isEmpty))
                     }
-                    .disabled(isExporting || (scans.isEmpty && roomScans.isEmpty && motionRecords.isEmpty))
-                }
 
-                if (selectedSegment == 0 && !scans.isEmpty) ||
-                   (selectedSegment == 1 && !roomScans.isEmpty) ||
-                   (selectedSegment == 2 && !motionRecords.isEmpty) {
-                    ToolbarItem(placement: .destructiveAction) {
-                        Button("Clear All", role: .destructive) {
-                            showingClearConfirmation = true
+                    if (selectedSegment == 0 && !scans.isEmpty) ||
+                       (selectedSegment == 1 && !roomScans.isEmpty) ||
+                       (selectedSegment == 2 && !motionRecords.isEmpty) {
+                        ToolbarItem(placement: .destructiveAction) {
+                            Button("Clear All", role: .destructive) {
+                                showingClearConfirmation = true
+                            }
                         }
                     }
                 }
@@ -101,6 +130,149 @@ struct ScanHistoryView: View {
                     ActivityView(activityItems: [shareURL])
                 }
             }
+            .fullScreenCover(isPresented: $showingBarcodeScanner) {
+                BarcodeScannerView()
+            }
+            .fullScreenCover(isPresented: $showingLiDARScanner) {
+                LiDARScanView()
+            }
+            .fullScreenCover(isPresented: $showingMotionCapture) {
+                MotionCaptureView()
+            }
+        }
+    }
+
+    // MARK: - By Agent View
+
+    @ViewBuilder
+    private var agentDataList: some View {
+        let agentRooms = Dictionary(grouping: roomScans.filter { $0.agentId != nil }) { $0.agentId! }
+        let agentBarcodes = Dictionary(grouping: scans.filter { $0.agentId != nil }) { $0.agentId! }
+        let agentMotion = Dictionary(grouping: motionRecords.filter { $0.agentId != nil }) { $0.agentId! }
+        let agentCompletions = Dictionary(grouping: completionRecords) { $0.agentId }
+        let allAgentIds = Set(agentRooms.keys)
+            .union(agentBarcodes.keys)
+            .union(agentMotion.keys)
+            .union(agentCompletions.keys)
+
+        let unlinkedRooms = roomScans.filter { $0.agentId == nil }
+        let unlinkedBarcodes = scans.filter { $0.agentId == nil }
+        let unlinkedMotion = motionRecords.filter { $0.agentId == nil }
+        let hasUnlinked = !unlinkedRooms.isEmpty || !unlinkedBarcodes.isEmpty || !unlinkedMotion.isEmpty
+
+        if allAgentIds.isEmpty && !hasUnlinked {
+            ContentUnavailableView {
+                Label("No Agent Data Yet", systemImage: "tray")
+            } description: {
+                Text("When you capture data for an agent, it appears here grouped by agent.")
+            } actions: {
+                Button("Scan Room") { showingLiDARScanner = true }
+                Button("Scan Barcode") { showingBarcodeScanner = true }
+            }
+        } else {
+            List {
+                ForEach(Array(allAgentIds).sorted(), id: \.self) { agentId in
+                    let name = AgentStore.name(for: agentId, fallback: agentRooms[agentId]?.first?.agentName
+                        ?? agentBarcodes[agentId]?.first?.agentName
+                        ?? agentMotion[agentId]?.first?.agentName
+                        ?? agentCompletions[agentId]?.first?.agentName)
+
+                    Section {
+                        // Room scans for this agent
+                        if let rooms = agentRooms[agentId] {
+                            ForEach(rooms) { room in
+                                NavigationLink(value: room) {
+                                    RoomScanRow(room: room)
+                                }
+                            }
+                        }
+                        // Barcode scans for this agent
+                        if let barcodes = agentBarcodes[agentId] {
+                            ForEach(barcodes) { scan in
+                                NavigationLink(value: scan) {
+                                    ScanRow(scan: scan)
+                                }
+                            }
+                        }
+                        // Motion records for this agent
+                        if let motion = agentMotion[agentId] {
+                            ForEach(motion) { record in
+                                NavigationLink(value: record) {
+                                    MotionRow(motion: record)
+                                }
+                            }
+                        }
+                        // Photo completion records (no data record, just completion event)
+                        if let completions = agentCompletions[agentId] {
+                            let photoCompletions = completions.filter { $0.skillType == "camera" }
+                            ForEach(photoCompletions) { completion in
+                                HStack {
+                                    Image(systemName: "camera.fill")
+                                        .font(.title3)
+                                        .foregroundColor(.accentColor)
+                                        .frame(width: 32)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("\(completion.itemCount) photo\(completion.itemCount == 1 ? "" : "s") captured")
+                                            .font(.subheadline)
+                                        Text(completion.completedAt, style: .relative)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                }
+                            }
+                        }
+                    } header: {
+                        HStack(spacing: 8) {
+                            Image(systemName: AgentStore.icon(for: agentId))
+                                .font(.caption)
+                                .foregroundStyle(AgentStore.color(for: agentId))
+                            Text(name)
+                        }
+                    }
+                }
+
+                // Unlinked scans section
+                if hasUnlinked {
+                    Section {
+                        ForEach(unlinkedRooms) { room in
+                            NavigationLink(value: room) {
+                                RoomScanRow(room: room)
+                            }
+                        }
+                        ForEach(unlinkedBarcodes) { scan in
+                            NavigationLink(value: scan) {
+                                ScanRow(scan: scan)
+                            }
+                        }
+                        ForEach(unlinkedMotion) { record in
+                            NavigationLink(value: record) {
+                                MotionRow(motion: record)
+                            }
+                        }
+                    } header: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "tray")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("Direct Captures")
+                        }
+                    }
+                }
+
+                // Quick capture section
+                Section("Quick Capture") {
+                    Button { showingLiDARScanner = true } label: {
+                        Label("Scan Room", systemImage: "camera.metering.spot")
+                    }
+                    Button { showingBarcodeScanner = true } label: {
+                        Label("Scan Barcode", systemImage: "barcode.viewfinder")
+                    }
+                    Button { showingMotionCapture = true } label: {
+                        Label("Capture Motion", systemImage: "figure.walk.motion")
+                    }
+                }
+            }
         }
     }
 
@@ -117,9 +289,6 @@ struct ScanHistoryView: View {
                 Button("Scan Barcode") {
                     showingBarcodeScanner = true
                 }
-            }
-            .fullScreenCover(isPresented: $showingBarcodeScanner) {
-                BarcodeScannerView()
             }
         } else {
             List {
@@ -148,9 +317,6 @@ struct ScanHistoryView: View {
                 Button("Scan Room") {
                     showingLiDARScanner = true
                 }
-            }
-            .fullScreenCover(isPresented: $showingLiDARScanner) {
-                LiDARScanView()
             }
         } else {
             List {
@@ -202,9 +368,6 @@ struct ScanHistoryView: View {
                 Button("Capture Motion") {
                     showingMotionCapture = true
                 }
-            }
-            .fullScreenCover(isPresented: $showingMotionCapture) {
-                MotionCaptureView()
             }
         } else {
             List {
@@ -510,5 +673,5 @@ struct MotionRow: View {
 
 #Preview {
     ScanHistoryView()
-        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self, MotionRecord.self], inMemory: true)
+        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self, MotionRecord.self, AgentCompletionRecord.self], inMemory: true)
 }

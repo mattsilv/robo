@@ -1,10 +1,10 @@
 # Robo Use Cases
 
-## Target Audience: Builders
+## The Agentic Inbox
 
-The future of building is agentic — but your phone's richest context (LiDAR, camera, barcodes) is trapped on the device, invisible to AI agents. Want that data? Build a native iOS app. Months of Swift, Xcode, and App Store review.
+Your AI agents need real-world data — floor plans, barcode scans, photos. Today that means building a native iOS app. Months of Swift, Xcode, and App Store review.
 
-Robo is the missing bridge: **open-source iOS app that turns your phone's sensors into APIs any AI agent can use.**
+Robo is the missing bridge: **the agentic inbox for your phone's sensors.** Agents request data, you capture it in one tap, it syncs automatically.
 
 ---
 
@@ -21,32 +21,36 @@ Robo is the missing bridge: **open-source iOS app that turns your phone's sensor
 5. ~3-6 months later: finally get room data to your agent
 
 **With Robo:**
-1. Download Robo from App Store (free, open source)
-2. Point phone at room, tap "Scan"
-3. LiDAR data automatically sent to your agent endpoint
-4. Agent analyzes dimensions, suggests furniture placement
-5. ~10 minutes to working prototype
+1. Interior Decorator agent sends a request: "I need the floor plan of your master bedroom"
+2. You see the request in Robo's Agents tab
+3. Tap "Scan Room" → LiDAR guided capture with AR guidance
+4. Save → "Syncing with Interior Decorator..." → done
+5. Agent analyzes dimensions, suggests furniture placement
 
-**Why it matters:** LiDAR data is impossible to get into Claude/ChatGPT today. Robo makes it trivial.
+**Why it matters:** LiDAR data is impossible to get into Claude/ChatGPT today. Robo makes it trivial — and the agent-driven flow means zero friction.
 
 ---
 
-## Use Case 2: Inventory Management (Barcode)
+## Use Case 2: Practical Chef (Barcode + Photo)
 
 **What you want to build:**
-"I want an AI agent that tracks my pantry by scanning barcodes and suggesting recipes."
+"I want an AI agent that sees what's in my kitchen and suggests recipes."
 
 **Today (without Robo):**
 - Manual: Type UPC codes into ChatGPT (tedious)
+- Or take photos, switch apps, upload, repeat
 - Or build native iOS barcode scanner (months of work)
 
 **With Robo:**
-1. Scan barcode with Robo
-2. UPC sent to your agent (Claude Project, custom GPT, etc.)
-3. Agent looks up product, updates inventory, suggests recipes
-4. Works with any AI backend you choose
+1. Practical Chef agent is connected in your Agents tab
+2. Open your fridge → batch-photo everything visible (multi-photo capture, no dismissing between shots)
+3. Scan specific barcodes for items you want tracked
+4. Agent gets photos + barcode data together, suggests recipes based on what you have
+5. Works with any AI backend — Claude, ChatGPT, your custom agent
 
-**Privacy win:** No backend required - Robo can email you the barcode data directly. Your data never touches our servers.
+**Two sensor types, one agent.** The Practical Chef shows how agents can use multiple Robo skills (camera + barcode) in a single workflow.
+
+**Privacy win:** No backend required - Robo can email you the data directly. Your data never touches our servers.
 
 ---
 
@@ -68,6 +72,23 @@ Robo is the missing bridge: **open-source iOS app that turns your phone's sensor
 3. No app-switching, no manual uploads
 
 **Why it matters:** Most AI apps support photo upload, but the workflow is onerous. Robo makes context capture seamless.
+
+---
+
+## Use Case 4: Home Task Reminder (BLE Proximity) — Future
+
+**What you want to build:**
+"I want an AI agent that reminds me of tasks when I'm near relevant locations in my home."
+
+**The vision:**
+1. USB-C Bluetooth beacons placed around your home (laundry room, garage, kitchen)
+2. When your phone detects a beacon, Robo triggers a location-aware task
+3. "You're near the laundry room — time to switch loads"
+4. Agent can push context-aware suggestions based on where you are
+
+**Why it matters:** BLE proximity turns passive reminders into context-aware, location-triggered tasks. Your agent knows not just *what* you need to do, but *where* you are when you need to do it.
+
+**Status:** Future skill — needs more baking on the use case and hardware requirements.
 
 ---
 
@@ -98,16 +119,16 @@ Phone Sensors → Robo App → [Your Choice:]
 - Download Robo from App Store
 - Configure endpoint URL (or use email)
 
-**Demo:** 3 minutes (guided capture ensures complete data on the first try)
-1. Tap Create → LiDAR Room Scanner
-2. Read 4 quick scanning tips (lighting, coverage, pacing, timing)
+**Demo:** 3 minutes (agent-driven flow with guided capture)
+1. Open Robo → Agents tab → Interior Decorator's request: "I need the floor plan of your master bedroom"
+2. Tap "Scan Room" → read 4 quick scanning tips
 3. Tap "Start Scanning" — Apple's RoomPlan shows real-time AR guidance
 4. Walk slowly around room perimeter — walls, doors, windows detected live
-5. Tap Done → review scan summary (wall count, floor area, detected objects)
-6. Share as ZIP → room_summary.json + room_full.json sent to your agent
+5. Tap Done → review scan summary → Save
+6. "Syncing with Interior Decorator..." animation → "Synced just now"
 7. Agent: "Your room is 12ft × 14ft with 2 windows. Here's where that couch would fit..."
 
-**Wow factor:** "Wait, you can get LiDAR data into Claude now? And it guided you through the whole scan?"
+**Wow factor:** "Wait, the agent *asked* for the scan? And it just synced automatically?"
 
 **Core UX principle: Guided capture.** Robo ensures users capture complete data on the first try. Before scanning, you see essential tips. During scanning, Apple's RoomPlan provides real-time AR guidance. No guessing, no re-scans, no frustration.
 

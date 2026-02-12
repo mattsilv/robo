@@ -1,5 +1,4 @@
 import type { Context } from 'hono';
-import { AwsClient } from 'aws4fetch';
 import { CreateHitSchema, type Env, type Hit, type HitPhoto } from '../types';
 
 // Default sender for CLI/API-created HITs
@@ -13,32 +12,6 @@ function generateShortId(): string {
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => chars[b % chars.length]).join('');
-}
-
-/**
- * Generate a presigned PUT URL for R2 direct upload
- */
-async function generatePresignedUrl(
-  env: Env,
-  r2Key: string,
-  expiresIn: number = 3600
-): Promise<string> {
-  const client = new AwsClient({
-    accessKeyId: env.R2_ACCESS_KEY_ID,
-    secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-  });
-
-  const url = new URL(
-    `https://${env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com/robo-data/${r2Key}`
-  );
-  url.searchParams.set('X-Amz-Expires', expiresIn.toString());
-
-  const signed = await client.sign(
-    new Request(url, { method: 'PUT' }),
-    { aws: { signQuery: true } }
-  );
-
-  return signed.url;
 }
 
 /**
@@ -121,13 +94,14 @@ export async function getHit(c: Context<{ Bindings: Env }>) {
 }
 
 /**
- * POST /api/hits/:id/upload — Request a presigned URL for photo upload
+ * POST /api/hits/:id/upload — Upload a photo directly to R2 via Workers binding
+ * Accepts binary body (image/jpeg) or multipart form data
  */
-export async function requestUploadUrl(c: Context<{ Bindings: Env }>) {
+export async function uploadHitPhoto(c: Context<{ Bindings: Env }>) {
   const hitId = c.req.param('id');
 
   try {
-    // Verify HIT exists and is in progress
+    // Verify HIT exists and is not completed/expired
     const hit = await c.env.DB.prepare('SELECT * FROM hits WHERE id = ?').bind(hitId).first<Hit>();
 
     if (!hit) {
@@ -138,18 +112,46 @@ export async function requestUploadUrl(c: Context<{ Bindings: Env }>) {
       return c.json({ error: `HIT is ${hit.status}` }, 400);
     }
 
+    // Get photo data from request body
+    const contentType = c.req.header('Content-Type') || '';
+    let photoBlob: ArrayBuffer;
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await c.req.formData();
+      const file = formData.get('photo') as File | null;
+      if (!file) {
+        return c.json({ error: 'No photo file in form data' }, 400);
+      }
+      photoBlob = await file.arrayBuffer();
+    } else {
+      // Accept raw binary body
+      photoBlob = await c.req.arrayBuffer();
+    }
+
+    if (!photoBlob || photoBlob.byteLength === 0) {
+      return c.json({ error: 'Empty photo data' }, 400);
+    }
+
+    // Limit to 10MB
+    if (photoBlob.byteLength > 10 * 1024 * 1024) {
+      return c.json({ error: 'Photo too large (max 10MB)' }, 400);
+    }
+
     const photoId = crypto.randomUUID();
     const r2Key = `hits/${hitId}/${photoId}.jpg`;
 
-    // Generate presigned URL
-    const uploadUrl = await generatePresignedUrl(c.env, r2Key);
+    // Upload to R2 via binding
+    await c.env.BUCKET.put(r2Key, photoBlob, {
+      httpMetadata: { contentType: 'image/jpeg' },
+      customMetadata: { hit_id: hitId, uploaded_by: 'web' },
+    });
 
-    // Record the photo in D1
+    // Record in D1
     const now = new Date().toISOString();
     await c.env.DB.prepare(
-      'INSERT INTO hit_photos (id, hit_id, r2_key, uploaded_at) VALUES (?, ?, ?, ?)'
+      'INSERT INTO hit_photos (id, hit_id, r2_key, file_size, uploaded_at) VALUES (?, ?, ?, ?, ?)'
     )
-      .bind(photoId, hitId, r2Key, now)
+      .bind(photoId, hitId, r2Key, photoBlob.byteLength, now)
       .run();
 
     // Increment photo count
@@ -160,14 +162,14 @@ export async function requestUploadUrl(c: Context<{ Bindings: Env }>) {
     return c.json(
       {
         photo_id: photoId,
-        upload_url: uploadUrl,
         r2_key: r2Key,
+        file_size: photoBlob.byteLength,
       },
-      200
+      201
     );
   } catch (error) {
-    console.error('Failed to generate upload URL:', error);
-    return c.json({ error: 'Failed to generate upload URL' }, 500);
+    console.error('Failed to upload photo:', error);
+    return c.json({ error: 'Failed to upload photo' }, 500);
   }
 }
 

@@ -39,7 +39,8 @@ export const onRequest: PagesFunction = async (context) => {
 
   // Determine first name for greeting
   const firstName = hit.recipient_name.split(' ')[0];
-  const senderFirst = hit.sender_name.split('.').pop()?.trim() || hit.sender_name;
+  // "M. Silverman" → "Matt", or use first word/name
+  const senderFirst = hit.sender_name === 'M. Silverman' ? 'Matt' : hit.sender_name.split(' ')[0];
 
   return new Response(renderHitPage(hit, firstName, senderFirst), {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -764,13 +765,9 @@ function renderHitPage(hit: HitData, firstName: string, senderFirst: string): st
       var uploaded = 0;
       for (var i = 0; i < photos.length; i++) {
         try {
-          // 1. Get presigned URL
-          var resp = await fetch(API + '/api/hits/' + HIT_ID + '/upload', { method: 'POST' });
-          var data = await resp.json();
-
-          // 2. Upload to R2
-          await fetch(data.upload_url, {
-            method: 'PUT',
+          // Upload photo directly to Workers (which stores in R2 via binding)
+          await fetch(API + '/api/hits/' + HIT_ID + '/upload', {
+            method: 'POST',
             body: photos[i].blob,
             headers: { 'Content-Type': 'image/jpeg' }
           });

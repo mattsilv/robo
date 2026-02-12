@@ -7,9 +7,6 @@ export type Env = {
   ENVIRONMENT: string;
   NUTRITIONIX_APP_ID: string;
   NUTRITIONIX_APP_KEY: string;
-  R2_ACCESS_KEY_ID: string;
-  R2_SECRET_ACCESS_KEY: string;
-  CLOUDFLARE_ACCOUNT_ID: string;
 };
 
 // Nutrition lookup

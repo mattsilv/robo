@@ -8,9 +8,11 @@ struct AgentsView: View {
     @Query(sort: \ScanRecord.capturedAt, order: .reverse) private var scans: [ScanRecord]
     @Query(sort: \ProductCaptureRecord.capturedAt, order: .reverse) private var productCaptures: [ProductCaptureRecord]
 
+    /// Skill types with verified, working capture flows.
+    private let enabledSkillTypes: Set<AgentRequest.SkillType> = [.lidar, .barcode, .camera, .productScan]
+
     @State private var agents: [AgentConnection] = MockAgentService.loadAgents()
     @State private var showingLiDARScan = false
-    @State private var showingPhotoCapture = false
     @State private var showingBarcode = false
     @State private var showingProductScan = false
     @State private var syncingAgentId: UUID?
@@ -19,6 +21,7 @@ struct AgentsView: View {
     @State private var photoCapturedCount = 0
     @State private var initialBarcodeCount = 0
     @State private var initialProductCount = 0
+    @State private var completedAgentName: String?
 
     var body: some View {
         NavigationStack {
@@ -30,6 +33,24 @@ struct AgentsView: View {
                 }
             }
             .navigationTitle("Agents")
+            .overlay(alignment: .top) {
+                if let name = completedAgentName {
+                    HStack(spacing: 12) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.title3)
+                        Text("Response sent to \(name)")
+                            .font(.subheadline.weight(.medium))
+                        Spacer()
+                    }
+                    .padding()
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                    .padding(.horizontal)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
         }
         .fullScreenCover(isPresented: $showingLiDARScan, onDismiss: handleLiDARDismiss) {
             LiDARScanView(
@@ -37,15 +58,13 @@ struct AgentsView: View {
                 suggestedRoomName: agents.first(where: { $0.id == syncingAgentId })?.pendingRequest?.roomNameHint
             )
         }
-        .fullScreenCover(isPresented: $showingPhotoCapture, onDismiss: handlePhotoDismiss) {
-            if let agent = activePhotoAgent, let request = agent.pendingRequest {
-                PhotoCaptureView(
-                    captureContext: activeCaptureContext,
-                    agentName: agent.name,
-                    checklist: request.photoChecklist ?? [],
-                    photoCapturedCount: $photoCapturedCount
-                )
-            }
+        .fullScreenCover(item: $activePhotoAgent, onDismiss: handlePhotoDismiss) { agent in
+            PhotoCaptureView(
+                captureContext: activeCaptureContext,
+                agentName: agent.name,
+                checklist: agent.pendingRequest?.photoChecklist ?? [],
+                photoCapturedCount: $photoCapturedCount
+            )
         }
         .fullScreenCover(isPresented: $showingBarcode, onDismiss: handleBarcodeDismiss) {
             BarcodeScannerView(captureContext: activeCaptureContext)
@@ -59,9 +78,13 @@ struct AgentsView: View {
 
     private var agentsList: some View {
         List {
-            let actionNeeded = agents.filter { $0.pendingRequest != nil && $0.status != .syncing }
-            let syncing = agents.filter { $0.status == .syncing }
-            let connected = agents.filter { $0.pendingRequest == nil && $0.status == .connected }
+            let visibleAgents = agents.filter { agent in
+                guard let request = agent.pendingRequest else { return true }
+                return enabledSkillTypes.contains(request.skillType)
+            }
+            let actionNeeded = visibleAgents.filter { $0.pendingRequest != nil && $0.status != .syncing }
+            let syncing = visibleAgents.filter { $0.status == .syncing }
+            let connected = visibleAgents.filter { $0.pendingRequest == nil && $0.status == .connected }
 
             if !actionNeeded.isEmpty {
                 Section("Action Needed") {
@@ -83,9 +106,13 @@ struct AgentsView: View {
             }
 
             if !connected.isEmpty {
-                Section("Connected") {
+                Section("Agents Ready") {
                     ForEach(connected) { agent in
-                        ConnectedAgentRow(agent: agent)
+                        NavigationLink {
+                            AgentDetailView(agent: agent)
+                        } label: {
+                            ConnectedAgentRow(agent: agent)
+                        }
                     }
                 }
             }
@@ -122,10 +149,9 @@ struct AgentsView: View {
             syncingAgentId = agent.id
             showingLiDARScan = true
         case .camera:
-            activePhotoAgent = agent
             syncingAgentId = agent.id
             photoCapturedCount = 0
-            showingPhotoCapture = true
+            activePhotoAgent = agent
         case .barcode:
             initialBarcodeCount = scans.count
             syncingAgentId = agent.id
@@ -189,6 +215,7 @@ struct AgentsView: View {
         Task {
             try? await Task.sleep(for: .seconds(2))
             guard let idx = agents.firstIndex(where: { $0.id == agentId }) else { return }
+            let agentName = agents[idx].name
             agents[idx].status = .connected
             agents[idx].pendingRequest = nil
             agents[idx].lastSyncDate = Date()
@@ -198,6 +225,15 @@ struct AgentsView: View {
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
             AudioServicesPlaySystemSound(1057)
+
+            // Completion toast
+            withAnimation(.spring(duration: 0.4)) {
+                completedAgentName = agentName
+            }
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation(.spring(duration: 0.3)) {
+                completedAgentName = nil
+            }
         }
     }
 }
@@ -346,7 +382,7 @@ private struct ConnectedAgentRow: View {
                     Circle()
                         .fill(.green)
                         .frame(width: 8, height: 8)
-                    Text("Connected")
+                    Text("Ready")
                         .font(.caption)
                         .foregroundStyle(.green)
                 }
@@ -358,6 +394,65 @@ private struct ConnectedAgentRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Agent Detail View
+
+private struct AgentDetailView: View {
+    let agent: AgentConnection
+
+    var body: some View {
+        List {
+            Section {
+                VStack(spacing: 16) {
+                    Image(systemName: agent.iconSystemName)
+                        .font(.system(size: 48))
+                        .foregroundStyle(agent.accentColor)
+                        .frame(width: 80, height: 80)
+                        .background(agent.accentColor.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+
+                    Text(agent.name)
+                        .font(.title2.bold())
+
+                    Text(agent.description)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .listRowBackground(Color.clear)
+            }
+
+            Section {
+                HStack {
+                    Label("Status", systemImage: "circle.fill")
+                        .foregroundStyle(.green)
+                    Spacer()
+                    Text("Ready")
+                        .foregroundStyle(.secondary)
+                }
+
+                if let lastSync = agent.lastSyncDate {
+                    HStack {
+                        Label("Last Synced", systemImage: "arrow.triangle.2.circlepath")
+                        Spacer()
+                        Text(lastSync, style: .relative)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Section {
+                Text("When \(agent.name) needs something, it'll appear in Action Needed.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle(agent.name)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

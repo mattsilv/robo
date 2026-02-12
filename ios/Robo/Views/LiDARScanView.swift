@@ -41,6 +41,7 @@ struct LiDARScanView: View {
                             RoomResultView(
                                 room: capturedRoom,
                                 roomName: $roomName,
+                                isAgentSuggestedName: suggestedRoomName.map { !$0.trimmingCharacters(in: .whitespaces).isEmpty } ?? false,
                                 onSave: saveRoom,
                                 onDiscard: { dismiss() }
                             )

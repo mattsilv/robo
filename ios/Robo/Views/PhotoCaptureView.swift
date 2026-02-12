@@ -306,8 +306,80 @@ class CameraSessionController: UIViewController, AVCapturePhotoCaptureDelegate {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        setupCamera()
-        setupUI()
+        checkCameraPermission()
+    }
+
+    private func checkCameraPermission() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            setupCamera()
+            setupUI()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        self?.setupCamera()
+                        self?.setupUI()
+                    } else {
+                        self?.showPermissionDenied()
+                    }
+                }
+            }
+        case .denied, .restricted:
+            showPermissionDenied()
+        @unknown default:
+            showPermissionDenied()
+        }
+    }
+
+    private func showPermissionDenied() {
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.alignment = .center
+        stack.spacing = 16
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stack)
+
+        let icon = UIImageView(image: UIImage(systemName: "camera.fill"))
+        icon.tintColor = .secondaryLabel
+        icon.contentMode = .scaleAspectFit
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        icon.widthAnchor.constraint(equalToConstant: 56).isActive = true
+        icon.heightAnchor.constraint(equalToConstant: 56).isActive = true
+
+        let title = UILabel()
+        title.text = "Camera Access Required"
+        title.font = .preferredFont(forTextStyle: .headline)
+        title.textAlignment = .center
+
+        let subtitle = UILabel()
+        subtitle.text = "Robo needs camera access to capture photos for your agent."
+        subtitle.font = .preferredFont(forTextStyle: .subheadline)
+        subtitle.textColor = .secondaryLabel
+        subtitle.textAlignment = .center
+        subtitle.numberOfLines = 0
+
+        let button = UIButton(type: .system)
+        button.setTitle("Open Settings", for: .normal)
+        button.titleLabel?.font = .preferredFont(forTextStyle: .headline)
+        button.addTarget(self, action: #selector(openSettings), for: .touchUpInside)
+
+        stack.addArrangedSubview(icon)
+        stack.addArrangedSubview(title)
+        stack.addArrangedSubview(subtitle)
+        stack.addArrangedSubview(button)
+
+        NSLayoutConstraint.activate([
+            stack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 40),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -40)
+        ])
+    }
+
+    @objc private func openSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
     }
 
     override func viewDidLayoutSubviews() {

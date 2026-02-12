@@ -342,15 +342,55 @@ enum RoboSchemaV4: VersionedSchema {
     }
 }
 
+// MARK: - Schema V5 (agent completion records)
+
+enum RoboSchemaV5: VersionedSchema {
+    static var versionIdentifier = Schema.Version(5, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [ScanRecord.self, RoomScanRecord.self, MotionRecord.self, AgentCompletionRecord.self]
+    }
+
+    // Re-export V4 models unchanged
+    typealias ScanRecord = RoboSchemaV4.ScanRecord
+    typealias RoomScanRecord = RoboSchemaV4.RoomScanRecord
+    typealias MotionRecord = RoboSchemaV4.MotionRecord
+
+    @Model
+    final class AgentCompletionRecord {
+        var agentId: String
+        var agentName: String
+        var requestId: String
+        var skillType: String
+        var itemCount: Int
+        var completedAt: Date
+
+        init(
+            agentId: String,
+            agentName: String,
+            requestId: String,
+            skillType: String,
+            itemCount: Int
+        ) {
+            self.agentId = agentId
+            self.agentName = agentName
+            self.requestId = requestId
+            self.skillType = skillType
+            self.itemCount = itemCount
+            self.completedAt = Date()
+        }
+    }
+}
+
 // MARK: - Migration Plan
 
 enum RoboMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [RoboSchemaV1.self, RoboSchemaV2.self, RoboSchemaV3.self, RoboSchemaV4.self]
+        [RoboSchemaV1.self, RoboSchemaV2.self, RoboSchemaV3.self, RoboSchemaV4.self, RoboSchemaV5.self]
     }
 
     static var stages: [MigrationStage] {
-        [migrateV1toV2, migrateV2toV3, migrateV3toV4]
+        [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5]
     }
 
     static let migrateV1toV2 = MigrationStage.lightweight(
@@ -367,10 +407,16 @@ enum RoboMigrationPlan: SchemaMigrationPlan {
         fromVersion: RoboSchemaV3.self,
         toVersion: RoboSchemaV4.self
     )
+
+    static let migrateV4toV5 = MigrationStage.lightweight(
+        fromVersion: RoboSchemaV4.self,
+        toVersion: RoboSchemaV5.self
+    )
 }
 
 // MARK: - Type Aliases (so the rest of the app uses simple names)
 
-typealias ScanRecord = RoboSchemaV4.ScanRecord
-typealias RoomScanRecord = RoboSchemaV4.RoomScanRecord
-typealias MotionRecord = RoboSchemaV4.MotionRecord
+typealias ScanRecord = RoboSchemaV5.ScanRecord
+typealias RoomScanRecord = RoboSchemaV5.RoomScanRecord
+typealias MotionRecord = RoboSchemaV5.MotionRecord
+typealias AgentCompletionRecord = RoboSchemaV5.AgentCompletionRecord

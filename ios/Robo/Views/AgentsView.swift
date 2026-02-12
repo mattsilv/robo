@@ -30,14 +30,14 @@ struct AgentsView: View {
         }
         .fullScreenCover(isPresented: $showingLiDARScan, onDismiss: handleLiDARDismiss) {
             LiDARScanView(
-                agentId: syncingAgentId?.uuidString,
-                agentName: agents.first(where: { $0.id == syncingAgentId })?.name,
+                captureContext: activeCaptureContext,
                 suggestedRoomName: agents.first(where: { $0.id == syncingAgentId })?.pendingRequest?.roomNameHint
             )
         }
         .fullScreenCover(isPresented: $showingPhotoCapture, onDismiss: handlePhotoDismiss) {
             if let agent = activePhotoAgent, let request = agent.pendingRequest {
                 PhotoCaptureView(
+                    captureContext: activeCaptureContext,
                     agentName: agent.name,
                     checklist: request.photoChecklist ?? [],
                     photoCapturedCount: $photoCapturedCount
@@ -45,7 +45,7 @@ struct AgentsView: View {
             }
         }
         .fullScreenCover(isPresented: $showingBarcode, onDismiss: handleBarcodeDismiss) {
-            BarcodeScannerView()
+            BarcodeScannerView(captureContext: activeCaptureContext)
         }
     }
 
@@ -94,6 +94,15 @@ struct AgentsView: View {
         } description: {
             Text("When AI agents need sensor data from your phone, their requests appear here.")
         }
+    }
+
+    // MARK: - Capture Context
+
+    private var activeCaptureContext: CaptureContext? {
+        guard let agentId = syncingAgentId,
+              let agent = agents.first(where: { $0.id == agentId }),
+              let request = agent.pendingRequest else { return nil }
+        return CaptureContext(agentId: agentId.uuidString, agentName: agent.name, requestId: request.id)
     }
 
     // MARK: - Actions

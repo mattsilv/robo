@@ -55,3 +55,10 @@ struct PhotoTask: Identifiable {
     let label: String
     var isCompleted: Bool
 }
+
+/// Shared context threaded through all capture views so records are tagged consistently.
+struct CaptureContext {
+    let agentId: String
+    let agentName: String
+    let requestId: UUID
+}

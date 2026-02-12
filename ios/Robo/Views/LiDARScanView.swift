@@ -3,8 +3,7 @@ import RoomPlan
 import AudioToolbox
 
 struct LiDARScanView: View {
-    var agentId: String? = nil
-    var agentName: String? = nil
+    var captureContext: CaptureContext? = nil
     var suggestedRoomName: String? = nil
 
     @Environment(\.modelContext) private var modelContext
@@ -191,8 +190,8 @@ struct LiDARScanView: View {
                 summaryJSON: summaryData,
                 fullRoomDataJSON: fullData
             )
-            record.agentId = agentId
-            record.agentName = agentName
+            record.agentId = captureContext?.agentId
+            record.agentName = captureContext?.agentName
             modelContext.insert(record)
             try modelContext.save()
 

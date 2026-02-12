@@ -8,21 +8,6 @@ private enum BrowseMode: String, CaseIterable {
     case byType = "By Type"
 }
 
-// MARK: - Agent Metadata Lookup
-
-private struct AgentMeta {
-    let icon: String
-    let color: Color
-}
-
-private let agentMetaLookup: [String: AgentMeta] = {
-    var lookup: [String: AgentMeta] = [:]
-    for agent in MockAgentService.loadAgents() {
-        lookup[agent.id.uuidString] = AgentMeta(icon: agent.iconSystemName, color: agent.accentColor)
-    }
-    return lookup
-}()
-
 struct ScanHistoryView: View {
     @Query(sort: \ScanRecord.capturedAt, order: .reverse)
     private var scans: [ScanRecord]
@@ -30,6 +15,8 @@ struct ScanHistoryView: View {
     private var roomScans: [RoomScanRecord]
     @Query(sort: \MotionRecord.capturedAt, order: .reverse)
     private var motionRecords: [MotionRecord]
+    @Query(sort: \AgentCompletionRecord.completedAt, order: .reverse)
+    private var completionRecords: [AgentCompletionRecord]
     @Environment(\.modelContext) private var modelContext
 
     @State private var browseMode: BrowseMode = .byAgent
@@ -162,7 +149,11 @@ struct ScanHistoryView: View {
         let agentRooms = Dictionary(grouping: roomScans.filter { $0.agentId != nil }) { $0.agentId! }
         let agentBarcodes = Dictionary(grouping: scans.filter { $0.agentId != nil }) { $0.agentId! }
         let agentMotion = Dictionary(grouping: motionRecords.filter { $0.agentId != nil }) { $0.agentId! }
-        let allAgentIds = Set(agentRooms.keys).union(agentBarcodes.keys).union(agentMotion.keys)
+        let agentCompletions = Dictionary(grouping: completionRecords) { $0.agentId }
+        let allAgentIds = Set(agentRooms.keys)
+            .union(agentBarcodes.keys)
+            .union(agentMotion.keys)
+            .union(agentCompletions.keys)
 
         let unlinkedRooms = roomScans.filter { $0.agentId == nil }
         let unlinkedBarcodes = scans.filter { $0.agentId == nil }
@@ -181,11 +172,10 @@ struct ScanHistoryView: View {
         } else {
             List {
                 ForEach(Array(allAgentIds).sorted(), id: \.self) { agentId in
-                    let meta = agentMetaLookup[agentId]
-                    let name = agentRooms[agentId]?.first?.agentName
+                    let name = AgentStore.name(for: agentId, fallback: agentRooms[agentId]?.first?.agentName
                         ?? agentBarcodes[agentId]?.first?.agentName
                         ?? agentMotion[agentId]?.first?.agentName
-                        ?? "Unknown Agent"
+                        ?? agentCompletions[agentId]?.first?.agentName)
 
                     Section {
                         // Room scans for this agent
@@ -212,11 +202,31 @@ struct ScanHistoryView: View {
                                 }
                             }
                         }
+                        // Photo completion records (no data record, just completion event)
+                        if let completions = agentCompletions[agentId] {
+                            let photoCompletions = completions.filter { $0.skillType == "camera" }
+                            ForEach(photoCompletions) { completion in
+                                HStack {
+                                    Image(systemName: "camera.fill")
+                                        .font(.title3)
+                                        .foregroundColor(.accentColor)
+                                        .frame(width: 32)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("\(completion.itemCount) photo\(completion.itemCount == 1 ? "" : "s") captured")
+                                            .font(.subheadline)
+                                        Text(completion.completedAt, style: .relative)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                }
+                            }
+                        }
                     } header: {
                         HStack(spacing: 8) {
-                            Image(systemName: meta?.icon ?? "questionmark.circle")
+                            Image(systemName: AgentStore.icon(for: agentId))
                                 .font(.caption)
-                                .foregroundStyle(meta?.color ?? .secondary)
+                                .foregroundStyle(AgentStore.color(for: agentId))
                             Text(name)
                         }
                     }
@@ -663,5 +673,5 @@ struct MotionRow: View {
 
 #Preview {
     ScanHistoryView()
-        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self, MotionRecord.self], inMemory: true)
+        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self, MotionRecord.self, AgentCompletionRecord.self], inMemory: true)
 }

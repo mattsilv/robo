@@ -4,7 +4,9 @@ import AudioToolbox
 
 struct PhotoCaptureView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
 
+    var captureContext: CaptureContext? = nil
     let agentName: String
     let checklist: [PhotoTask]
     @Binding var photoCapturedCount: Int
@@ -27,7 +29,8 @@ struct PhotoCaptureView: View {
         let capturedAt: Date
     }
 
-    init(agentName: String, checklist: [PhotoTask], photoCapturedCount: Binding<Int> = .constant(0)) {
+    init(captureContext: CaptureContext? = nil, agentName: String, checklist: [PhotoTask], photoCapturedCount: Binding<Int> = .constant(0)) {
+        self.captureContext = captureContext
         self.agentName = agentName
         self.checklist = checklist
         self._photoCapturedCount = photoCapturedCount
@@ -185,6 +188,21 @@ struct PhotoCaptureView: View {
         }
     }
 
+    // MARK: - Persistence
+
+    private func persistCompletion() {
+        guard let ctx = captureContext, !capturedPhotos.isEmpty else { return }
+        let record = AgentCompletionRecord(
+            agentId: ctx.agentId,
+            agentName: ctx.agentName,
+            requestId: ctx.requestId.uuidString,
+            skillType: "camera",
+            itemCount: capturedPhotos.count
+        )
+        modelContext.insert(record)
+        try? modelContext.save()
+    }
+
     // MARK: - Review
 
     private var reviewView: some View {
@@ -230,6 +248,7 @@ struct PhotoCaptureView: View {
                     .buttonStyle(.bordered)
 
                     Button {
+                        persistCompletion()
                         dismiss()
                     } label: {
                         Text("Done")

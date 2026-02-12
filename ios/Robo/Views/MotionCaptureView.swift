@@ -3,6 +3,8 @@ import SwiftData
 import AudioToolbox
 
 struct MotionCaptureView: View {
+    var captureContext: CaptureContext? = nil
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
@@ -151,6 +153,8 @@ struct MotionCaptureView: View {
                 floorsDescended: snapshot.floorsDescended,
                 activityJSON: activityJSON
             )
+            record.agentId = captureContext?.agentId
+            record.agentName = captureContext?.agentName
             modelContext.insert(record)
             try modelContext.save()
 

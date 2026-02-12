@@ -4,12 +4,15 @@
 - **Name:** robo-db
 - **ID:** `fb24f9a0-d52b-4a74-87ca-54069ec9471a`
 - **Binding:** `DB`
-- **Tables:** devices, sensor_data, inbox_cards
+- **Tables:** devices, sensor_data, inbox_cards, hits, hit_photos
 
 ## R2 Bucket
 - **Name:** robo-data
 - **Binding:** `BUCKET`
 - **Purpose:** Store uploaded images, LiDAR meshes, and other sensor data blobs
+- **Key prefixes:**
+  - `debug/` — Developer debug payloads
+  - `hits/` — HIT photo uploads (format: `hits/{hit_id}/{photo_id}.jpg`)
 
 ## Workers
 - **Name:** robo-api
@@ -30,6 +33,12 @@
 | POST | `/api/inbox/push` | Agent pushes card |
 | POST | `/api/inbox/:card_id/respond` | User responds |
 | POST | `/api/opus/analyze` | Trigger Opus analysis |
+| POST | `/api/hits` | Create a new HIT |
+| GET | `/api/hits` | List all HITs |
+| GET | `/api/hits/:id` | Get HIT details (public) |
+| POST | `/api/hits/:id/upload` | Upload photo to HIT (binary body) |
+| PATCH | `/api/hits/:id/complete` | Mark HIT as completed |
+| GET | `/api/hits/:id/photos` | List photos for a HIT |
 
 ## App Store Connect
 - **App Name:** ROBO.APP
@@ -38,6 +47,24 @@
 - **SKU:** `robo`
 - **Apple ID:** `matt@argentlabs.xyz`
 - **Dashboard:** https://appstoreconnect.apple.com/apps/6759011077/distribution/ios/version/inflight
+
+## Pages (Landing Page + HIT Pages)
+- **Project:** robo-app
+- **URL:** https://robo.app
+- **Source:** `site/` (static assets)
+- **Functions:** `functions/` (Pages Functions at project root)
+- **Deploy:** `wrangler pages deploy site --project-name=robo-app --commit-dirty=true --branch=main`
+
+### Pages Functions
+| Route | File | Purpose |
+|-------|------|---------|
+| `/hit/:id` | `functions/hit/[id].ts` | Dynamic HIT page with personalized OG tags + photo capture UI |
+
+### D1 Migrations
+| File | Tables | Purpose |
+|------|--------|---------|
+| `0001_initial_schema.sql` | devices, sensor_data, inbox_cards | Core tables |
+| `0002_hits.sql` | hits, hit_photos | HIT system tables |
 
 ## Wrangler Commands
 

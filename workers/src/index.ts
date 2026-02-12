@@ -11,6 +11,7 @@ import { getInbox, pushCard, respondToCard } from './routes/inbox';
 import { analyzeWithOpus } from './routes/opus';
 import { debugSync, debugList, debugGet } from './routes/debug';
 import { lookupNutrition } from './routes/nutrition';
+import { createHit, getHit, uploadHitPhoto, completeHit, listHits, listHitPhotos } from './routes/hits';
 import { deviceAuth } from './middleware/deviceAuth';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -42,6 +43,14 @@ app.get('/api/nutrition/lookup', deviceAuth, lookupNutrition);
 
 // Opus integration
 app.post('/api/opus/analyze', analyzeWithOpus);
+
+// HIT routes
+app.post('/api/hits', createHit);
+app.get('/api/hits', listHits);
+app.get('/api/hits/:id', getHit);
+app.post('/api/hits/:id/upload', uploadHitPhoto);
+app.patch('/api/hits/:id/complete', completeHit);
+app.get('/api/hits/:id/photos', listHitPhotos);
 
 // Debug sync (stores scan data in R2 for developer debugging)
 app.post('/api/debug/sync', debugSync);

@@ -86,3 +86,34 @@ export type InboxCard = {
   created_at: string;
   responded_at: string | null;
 };
+
+// HIT (Human Intelligence Task) schemas
+export const CreateHitSchema = z.object({
+  recipient_name: z.string().min(1).max(50),
+  task_description: z.string().min(1).max(500),
+  agent_name: z.string().max(100).optional(),
+});
+
+export type HitStatus = 'pending' | 'in_progress' | 'completed' | 'expired';
+
+export type Hit = {
+  id: string;
+  sender_name: string;
+  recipient_name: string;
+  task_description: string;
+  agent_name: string | null;
+  status: HitStatus;
+  photo_count: number;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  device_id: string | null;
+};
+
+export type HitPhoto = {
+  id: string;
+  hit_id: string;
+  r2_key: string;
+  file_size: number | null;
+  uploaded_at: string;
+};

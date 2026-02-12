@@ -4,6 +4,7 @@ import RoomPlan
 struct RoomResultView: View {
     let room: CapturedRoom
     @Binding var roomName: String
+    var isAgentSuggestedName: Bool = false
     let onSave: () -> Void
     let onDiscard: () -> Void
 
@@ -51,9 +52,16 @@ struct RoomResultView: View {
                     .font(.title.bold())
 
                 // Room name
-                TextField("Room name (optional)", text: $roomName)
-                    .textFieldStyle(.roundedBorder)
-                    .padding(.horizontal, 24)
+                if isAgentSuggestedName && !roomName.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Text(roomName)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 24)
+                } else {
+                    TextField("Room name (optional)", text: $roomName)
+                        .textFieldStyle(.roundedBorder)
+                        .padding(.horizontal, 24)
+                }
 
                 // Room dimensions headline
                 if let dims = roomDims {

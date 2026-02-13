@@ -1,0 +1,64 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#2563EB" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#06060a" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" patternUnits="userSpaceOnUse" width="24" height="24">
+      <circle cx="12" cy="12" r="1" fill="white" opacity="0.03"/>
+    </pattern>
+    <clipPath id="iconClip">
+      <rect x="880" y="80" width="220" height="220" rx="52"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#06060a"/>
+  <rect width="1200" height="630" fill="url(#dots)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- === LEFT SIDE: Personalized text block === -->
+
+  <!-- Greeting — Tier 1 ideal: 62px bold -->
+  <text x="90" y="170" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="700" font-size="62" fill="white" letter-spacing="-1">Hi <tspan fill="#3b82f6">James</tspan>,</text>
+
+  <!-- Subtitle — 40px -->
+  <text x="90" y="240" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="500" font-size="40" fill="#6b6b7b" letter-spacing="0"><tspan fill="#a0a0b0">Matt</tspan> assigned you a task</text>
+
+  <!-- Task pill / description card -->
+  <rect x="90" y="290" width="700" height="72" rx="16" fill="#0d0d14" stroke="rgba(37,99,235,0.2)" stroke-width="1"/>
+  <!-- Top glow line on card -->
+  <line x1="106" y1="290" x2="774" y2="290" stroke="#2563EB" stroke-width="1" opacity="0.3"/>
+  <!-- Camera icon in card -->
+  <circle cx="136" cy="326" r="18" fill="rgba(37,99,235,0.12)"/>
+  <g transform="translate(125, 315)" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M15.5 3h-8L5 6H3a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 3 16h16a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 19 6h-2l-1.5-3z"/>
+    <circle cx="11" cy="11" r="2.5"/>
+  </g>
+  <!-- Task text -->
+  <text x="168" y="332" font-family="ui-monospace, 'Cascadia Code', 'Fira Code', monospace" font-weight="700" font-size="22" fill="#e2e2e8" letter-spacing="0.3">Photo the inside of your fridge</text>
+
+  <!-- === RIGHT SIDE: Robot icon === -->
+  <!-- Card shadow -->
+  <rect x="886" y="86" width="220" height="220" rx="52" fill="#000" opacity="0.4"/>
+  <!-- Card background -->
+  <rect x="880" y="80" width="220" height="220" rx="52" fill="#2563EB"/>
+  <!-- Card border glow -->
+  <rect x="880" y="80" width="220" height="220" rx="52" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0.4"/>
+  <!-- Eyes -->
+  <circle cx="953" cy="170" r="26" fill="white"/>
+  <circle cx="1027" cy="170" r="26" fill="white"/>
+  <circle cx="953" cy="170" r="13" fill="#1a4fc0"/>
+  <circle cx="1027" cy="170" r="13" fill="#1a4fc0"/>
+  <!-- Smile -->
+  <path d="M 938 228 Q 990 268 1042 228" fill="none" stroke="white" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- === BOTTOM BAR === -->
+  <!-- robo.app wordmark -->
+  <text x="90" y="556" font-family="ui-monospace, 'Cascadia Code', 'Fira Code', monospace" font-weight="800" font-size="28" letter-spacing="2" fill="white">ROBO<tspan fill="#3b82f6">.</tspan>APP</text>
+
+  <!-- Alpha test invite badge -->
+  <rect x="880" y="530" width="230" height="40" rx="20" fill="#2563EB" fill-opacity="0.1" stroke="#2563EB" stroke-width="1" stroke-opacity="0.3"/>
+  <circle cx="905" cy="550" r="5" fill="#22c55e"/>
+  <text x="920" y="556" font-family="ui-monospace, 'Cascadia Code', 'Fira Code', monospace" font-size="13" fill="#3b82f6" font-weight="700" letter-spacing="1.5">ALPHA TEST INVITE</text>
+</svg>

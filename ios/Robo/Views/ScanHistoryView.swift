@@ -158,11 +158,11 @@ struct ScanHistoryView: View {
 
     @ViewBuilder
     private var agentDataList: some View {
-        let agentRooms = Dictionary(grouping: roomScans.filter { $0.agentId != nil }) { $0.agentId! }
-        let agentBarcodes = Dictionary(grouping: scans.filter { $0.agentId != nil }) { $0.agentId! }
-        let agentMotion = Dictionary(grouping: motionRecords.filter { $0.agentId != nil }) { $0.agentId! }
+        let agentRooms = Dictionary(grouping: roomScans.compactMap { $0.agentId != nil ? $0 : nil }) { $0.agentId ?? "" }
+        let agentBarcodes = Dictionary(grouping: scans.compactMap { $0.agentId != nil ? $0 : nil }) { $0.agentId ?? "" }
+        let agentMotion = Dictionary(grouping: motionRecords.compactMap { $0.agentId != nil ? $0 : nil }) { $0.agentId ?? "" }
         let agentCompletions = Dictionary(grouping: completionRecords) { $0.agentId }
-        let agentProducts = Dictionary(grouping: productCaptures.filter { $0.agentId != nil }) { $0.agentId! }
+        let agentProducts = Dictionary(grouping: productCaptures.compactMap { $0.agentId != nil ? $0 : nil }) { $0.agentId ?? "" }
         let allAgentIds = Set(agentRooms.keys)
             .union(agentBarcodes.keys)
             .union(agentMotion.keys)

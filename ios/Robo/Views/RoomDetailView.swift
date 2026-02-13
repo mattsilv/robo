@@ -137,8 +137,8 @@ struct RoomDetailView: View {
             let padding: CGFloat = 44
             let xs = points.map(\.x)
             let ys = points.map(\.y)
-            let minX = xs.min()!, maxX = xs.max()!
-            let minY = ys.min()!, maxY = ys.max()!
+            guard let minX = xs.min(), let maxX = xs.max(),
+                  let minY = ys.min(), let maxY = ys.max() else { return }
             let roomW = maxX - minX
             let roomH = maxY - minY
 

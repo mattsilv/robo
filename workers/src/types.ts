@@ -47,11 +47,11 @@ export const PushCardSchema = z.object({
   device_id: z.string().uuid(),
   card_type: z.enum(['decision', 'task', 'info']),
   title: z.string().min(1).max(200),
-  body: z.string().optional(),
+  body: z.string().max(500).optional(),
 });
 
 export const RespondCardSchema = z.object({
-  response: z.string().min(1),
+  response: z.string().min(1).max(2000),
 });
 
 export const AnalyzeRequestSchema = z.object({

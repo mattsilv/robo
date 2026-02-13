@@ -1,12 +1,15 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <radialGradient id="glow" cx="50%" cy="30%" r="60%">
-      <stop offset="0%" stop-color="#2563EB" stop-opacity="0.35"/>
+    <radialGradient id="glow" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#2563EB" stop-opacity="0.3"/>
       <stop offset="100%" stop-color="#06060a" stop-opacity="0"/>
     </radialGradient>
     <pattern id="dots" patternUnits="userSpaceOnUse" width="24" height="24">
       <circle cx="12" cy="12" r="1" fill="white" opacity="0.03"/>
     </pattern>
+    <clipPath id="iconClip">
+      <rect x="880" y="100" width="220" height="220" rx="52"/>
+    </clipPath>
   </defs>
 
   <!-- Background -->
@@ -14,38 +17,39 @@
   <rect width="1200" height="630" fill="url(#dots)"/>
   <rect width="1200" height="630" fill="url(#glow)"/>
 
-  <!-- Robot icon -->
-  <rect x="100" y="165" width="180" height="180" rx="42" fill="#2563EB"/>
-  <circle cx="163" cy="237" r="21" fill="white"/>
-  <circle cx="217" cy="237" r="21" fill="white"/>
-  <circle cx="163" cy="237" r="10.5" fill="#1a4fc0"/>
-  <circle cx="217" cy="237" r="10.5" fill="#1a4fc0"/>
-  <path d="M 151 289 Q 190 321 229 289" fill="none" stroke="white" stroke-width="12" stroke-linecap="round"/>
+  <!-- === LEFT SIDE: Text block (top 60%) === -->
 
-  <!-- Wordmark -->
-  <text x="340" y="255" font-family="ui-monospace, 'Cascadia Code', 'Fira Code', monospace" font-weight="800" font-size="100" letter-spacing="4" fill="white">ROBO<tspan fill="#3b82f6">.</tspan>APP</text>
+  <!-- Wordmark - large and bold -->
+  <text x="90" y="155" font-family="ui-monospace, 'Cascadia Code', 'Fira Code', monospace" font-weight="800" font-size="120" letter-spacing="5" fill="white">ROBO<tspan fill="#3b82f6">.</tspan>APP</text>
 
-  <!-- Tagline -->
-  <text x="340" y="310" font-family="ui-monospace, 'Cascadia Code', 'Fira Code', monospace" font-size="28" fill="#6b6b7b" letter-spacing="1">Native mobile context for AI agents</text>
+  <!-- Main tagline - big, commanding -->
+  <text x="90" y="260" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="700" font-size="62" fill="white" letter-spacing="-1">Control your</text>
+  <text x="90" y="330" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="700" font-size="62" fill="#3b82f6" letter-spacing="-1">AI Context</text>
 
-  <!-- Feature pills -->
-  <rect x="340" y="370" width="130" height="36" rx="18" fill="#2563EB" opacity="0.12" stroke="#2563EB" stroke-width="1"/>
-  <text x="405" y="394" font-family="ui-monospace, monospace" font-size="14" fill="#3b82f6" text-anchor="middle" font-weight="700" letter-spacing="1">LIDAR</text>
+  <!-- Sub-tagline -->
+  <text x="90" y="395" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="400" font-size="28" fill="#6b6b7b" letter-spacing="0.5">Your phone's sensors, exposed as APIs.</text>
+  <text x="90" y="432" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="400" font-size="28" fill="#6b6b7b" letter-spacing="0.5">Any AI agent. One tap.</text>
 
-  <rect x="490" y="370" width="150" height="36" rx="18" fill="#2563EB" opacity="0.12" stroke="#2563EB" stroke-width="1"/>
-  <text x="565" y="394" font-family="ui-monospace, monospace" font-size="14" fill="#3b82f6" text-anchor="middle" font-weight="700" letter-spacing="1">BARCODE</text>
+  <!-- === RIGHT SIDE: Robot icon as card === -->
+  <!-- Card shadow -->
+  <rect x="886" y="106" width="220" height="220" rx="52" fill="#000" opacity="0.4"/>
+  <!-- Card background -->
+  <rect x="880" y="100" width="220" height="220" rx="52" fill="#2563EB"/>
+  <!-- Card border glow -->
+  <rect x="880" y="100" width="220" height="220" rx="52" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0.4"/>
+  <!-- Eyes -->
+  <circle cx="953" cy="190" r="26" fill="white"/>
+  <circle cx="1027" cy="190" r="26" fill="white"/>
+  <circle cx="953" cy="190" r="13" fill="#1a4fc0"/>
+  <circle cx="1027" cy="190" r="13" fill="#1a4fc0"/>
+  <!-- Smile -->
+  <path d="M 938 248 Q 990 288 1042 248" fill="none" stroke="white" stroke-width="10" stroke-linecap="round"/>
 
-  <rect x="660" y="370" width="140" height="36" rx="18" fill="#2563EB" opacity="0.12" stroke="#2563EB" stroke-width="1"/>
-  <text x="730" y="394" font-family="ui-monospace, monospace" font-size="14" fill="#3b82f6" text-anchor="middle" font-weight="700" letter-spacing="1">CAMERA</text>
+  <!-- === BOTTOM: Claude Code badge === -->
+  <rect x="90" y="530" width="330" height="40" rx="20" fill="#2563EB" fill-opacity="0.1" stroke="#2563EB" stroke-width="1" stroke-opacity="0.3"/>
+  <circle cx="115" cy="550" r="5" fill="#3b82f6"/>
+  <text x="132" y="556" font-family="ui-monospace, 'Cascadia Code', 'Fira Code', monospace" font-size="15" fill="#3b82f6" font-weight="700" letter-spacing="1.5">CLAUDE CODE 2026 HACKATHON</text>
 
-  <rect x="820" y="370" width="170" height="36" rx="18" fill="#2563EB" opacity="0.12" stroke="#2563EB" stroke-width="1"/>
-  <text x="905" y="394" font-family="ui-monospace, monospace" font-size="14" fill="#3b82f6" text-anchor="middle" font-weight="700" letter-spacing="1">HEALTHKIT</text>
-
-  <!-- Hackathon badge -->
-  <rect x="340" y="440" width="320" height="32" rx="16" fill="#2563EB" opacity="0.12" stroke="#2563EB" stroke-width="1"/>
-  <circle cx="360" cy="456" r="4" fill="#3b82f6"/>
-  <text x="375" y="462" font-family="ui-monospace, monospace" font-size="13" fill="#3b82f6" font-weight="700" letter-spacing="1.5">CLAUDE CODE 2026 HACKATHON</text>
-
-  <!-- URL -->
-  <text x="100" y="570" font-family="ui-monospace, monospace" font-size="20" fill="#3d3d4d" letter-spacing="2">github.com/mattsilv/robo</text>
+  <!-- Open source note -->
+  <text x="460" y="557" font-family="ui-monospace, monospace" font-size="15" fill="#3d3d4d" letter-spacing="1">Open source</text>
 </svg>

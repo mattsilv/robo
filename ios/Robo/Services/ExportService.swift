@@ -201,7 +201,14 @@ enum ExportService {
             .appendingPathComponent("robo-room-\(UUID().uuidString)")
         try fm.createDirectory(at: exportDir, withIntermediateDirectories: true)
 
-        try summaryJSON.write(to: exportDir.appendingPathComponent("room_summary.json"))
+        // Enrich summary JSON with room_name for AI agent context
+        if var summaryDict = try? JSONSerialization.jsonObject(with: summaryJSON) as? [String: Any] {
+            summaryDict["room_name"] = roomName
+            let enriched = try JSONSerialization.data(withJSONObject: summaryDict, options: [.prettyPrinted, .sortedKeys])
+            try enriched.write(to: exportDir.appendingPathComponent("room_summary.json"))
+        } else {
+            try summaryJSON.write(to: exportDir.appendingPathComponent("room_summary.json"))
+        }
         try fullRoomDataJSON.write(to: exportDir.appendingPathComponent("room_full.json"))
 
         // Generate 2D floor plan SVG if polygon data is available
@@ -216,9 +223,7 @@ enum ExportService {
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd-HHmmss"
-        let safeName = roomName.isEmpty ? "room" : roomName
-            .replacingOccurrences(of: " ", with: "-")
-            .lowercased()
+        let safeName = roomName.isEmpty ? "room" : sanitizeFilename(roomName)
         let zipName = "robo-\(safeName)-\(dateFormatter.string(from: Date())).zip"
         let zipURL = fm.temporaryDirectory.appendingPathComponent(zipName)
 
@@ -373,9 +378,7 @@ enum ExportService {
 
             var usedNames = Set<String>()
             for room in rooms {
-                var safeName = room.name.isEmpty ? "room" : room.name
-                    .replacingOccurrences(of: " ", with: "-")
-                    .lowercased()
+                var safeName = room.name.isEmpty ? "room" : sanitizeFilename(room.name)
 
                 // Handle duplicate names
                 let baseName = safeName
@@ -388,7 +391,15 @@ enum ExportService {
 
                 let roomDir = roomsDir.appendingPathComponent(safeName)
                 try fm.createDirectory(at: roomDir, withIntermediateDirectories: true)
-                try room.summaryJSON.write(to: roomDir.appendingPathComponent("room_summary.json"))
+
+                // Enrich summary JSON with room_name
+                if var summaryDict = try? JSONSerialization.jsonObject(with: room.summaryJSON) as? [String: Any] {
+                    summaryDict["room_name"] = room.name
+                    let enriched = try JSONSerialization.data(withJSONObject: summaryDict, options: [.prettyPrinted, .sortedKeys])
+                    try enriched.write(to: roomDir.appendingPathComponent("room_summary.json"))
+                } else {
+                    try room.summaryJSON.write(to: roomDir.appendingPathComponent("room_summary.json"))
+                }
                 try room.fullRoomDataJSON.write(to: roomDir.appendingPathComponent("room_full.json"))
 
                 if let summaryDict = try? JSONSerialization.jsonObject(with: room.summaryJSON) as? [String: Any],
@@ -488,6 +499,31 @@ enum ExportService {
         if let moveError { throw moveError }
 
         return zipURL
+    }
+
+    /// Sanitize a name for use in file/directory paths.
+    /// Strips path traversal sequences, filesystem-hostile characters, and limits length.
+    static func sanitizeFilename(_ name: String) -> String {
+        var safe = name
+            .replacingOccurrences(of: " ", with: "-")
+            .lowercased()
+        safe = safe.replacingOccurrences(of: "/", with: "-")
+        safe = safe.replacingOccurrences(of: "\\", with: "-")
+        safe = safe.replacingOccurrences(of: "\0", with: "")
+        safe = safe.replacingOccurrences(of: ":", with: "-")
+        safe = safe.replacingOccurrences(of: "*", with: "")
+        safe = safe.replacingOccurrences(of: "?", with: "")
+        safe = safe.replacingOccurrences(of: "\"", with: "")
+        safe = safe.replacingOccurrences(of: "<", with: "")
+        safe = safe.replacingOccurrences(of: ">", with: "")
+        safe = safe.replacingOccurrences(of: "|", with: "")
+        while safe.hasPrefix(".") { safe = String(safe.dropFirst()) }
+        while safe.contains("--") {
+            safe = safe.replacingOccurrences(of: "--", with: "-")
+        }
+        if safe.count > 60 { safe = String(safe.prefix(60)) }
+        if safe.trimmingCharacters(in: .punctuationCharacters).isEmpty { safe = "room" }
+        return safe
     }
 
     private static func formatSymbology(_ raw: String) -> String {

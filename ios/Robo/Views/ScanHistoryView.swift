@@ -31,6 +31,7 @@ struct ScanHistoryView: View {
     @State private var showingBarcodeScanner = false
     @State private var showingLiDARScanner = false
     @State private var showingMotionCapture = false
+    @State private var showingBeaconMonitor = false
 
     var body: some View {
         NavigationStack {
@@ -151,30 +152,85 @@ struct ScanHistoryView: View {
             .fullScreenCover(isPresented: $showingMotionCapture) {
                 MotionCaptureView()
             }
+            .fullScreenCover(isPresented: $showingBeaconMonitor) {
+                BeaconMonitorView()
+            }
         }
+    }
+
+    // MARK: - Agent Data Grouping (extracted to help Swift type-checker)
+
+    private struct AgentGrouping {
+        let agentRooms: [String: [RoomScanRecord]]
+        let agentBarcodes: [String: [ScanRecord]]
+        let agentMotion: [String: [MotionRecord]]
+        let agentCompletions: [String: [AgentCompletionRecord]]
+        let agentProducts: [String: [ProductCaptureRecord]]
+        let agentBeacons: [String: [BeaconEventRecord]]
+        let allAgentIds: [String]
+        let unlinkedRooms: [RoomScanRecord]
+        let unlinkedBarcodes: [ScanRecord]
+        let unlinkedMotion: [MotionRecord]
+        let unlinkedBeacons: [BeaconEventRecord]
+        let hasUnlinked: Bool
+    }
+
+    private var agentGrouping: AgentGrouping {
+        let agentRooms = Dictionary(grouping: roomScans.filter { $0.agentId != nil }) { $0.agentId ?? "" }
+        let agentBarcodes = Dictionary(grouping: scans.filter { $0.agentId != nil }) { $0.agentId ?? "" }
+        let agentMotion = Dictionary(grouping: motionRecords.filter { $0.agentId != nil }) { $0.agentId ?? "" }
+        let agentCompletions = Dictionary(grouping: completionRecords) { $0.agentId }
+        let agentProducts = Dictionary(grouping: productCaptures.filter { $0.agentId != nil }) { $0.agentId ?? "" }
+        let agentBeacons = Dictionary(grouping: beaconEvents.filter { $0.agentId != nil }) { $0.agentId ?? "" }
+
+        var ids = Set<String>(agentRooms.keys)
+        ids.formUnion(agentBarcodes.keys)
+        ids.formUnion(agentMotion.keys)
+        ids.formUnion(agentCompletions.keys)
+        ids.formUnion(agentProducts.keys)
+        ids.formUnion(agentBeacons.keys)
+
+        let unlinkedRooms = roomScans.filter { $0.agentId == nil }
+        let unlinkedBarcodes = scans.filter { $0.agentId == nil }
+        let unlinkedMotion = motionRecords.filter { $0.agentId == nil }
+        let unlinkedBeacons = beaconEvents.filter { $0.agentId == nil }
+
+        return AgentGrouping(
+            agentRooms: agentRooms,
+            agentBarcodes: agentBarcodes,
+            agentMotion: agentMotion,
+            agentCompletions: agentCompletions,
+            agentProducts: agentProducts,
+            agentBeacons: agentBeacons,
+            allAgentIds: ids.sorted(),
+            unlinkedRooms: unlinkedRooms,
+            unlinkedBarcodes: unlinkedBarcodes,
+            unlinkedMotion: unlinkedMotion,
+            unlinkedBeacons: unlinkedBeacons,
+            hasUnlinked: !unlinkedRooms.isEmpty || !unlinkedBarcodes.isEmpty || !unlinkedMotion.isEmpty || !unlinkedBeacons.isEmpty
+        )
+    }
+
+    private func agentName(for agentId: String, grouping g: AgentGrouping) -> String {
+        let candidates: [String?] = [
+            g.agentRooms[agentId]?.first?.agentName,
+            g.agentBarcodes[agentId]?.first?.agentName,
+            g.agentMotion[agentId]?.first?.agentName,
+            g.agentCompletions[agentId]?.first?.agentName,
+            g.agentProducts[agentId]?.first?.agentName,
+            g.agentBeacons[agentId]?.first?.agentName
+        ]
+        let fallback: String? = candidates.compactMap { $0 }.first
+        return AgentStore.name(for: agentId, fallback: fallback)
     }
 
     // MARK: - By Agent View
 
     @ViewBuilder
     private var agentDataList: some View {
-        let agentRooms = Dictionary(grouping: roomScans.compactMap { $0.agentId != nil ? $0 : nil }) { $0.agentId ?? "" }
-        let agentBarcodes = Dictionary(grouping: scans.compactMap { $0.agentId != nil ? $0 : nil }) { $0.agentId ?? "" }
-        let agentMotion = Dictionary(grouping: motionRecords.compactMap { $0.agentId != nil ? $0 : nil }) { $0.agentId ?? "" }
-        let agentCompletions = Dictionary(grouping: completionRecords) { $0.agentId }
-        let agentProducts = Dictionary(grouping: productCaptures.compactMap { $0.agentId != nil ? $0 : nil }) { $0.agentId ?? "" }
-        let allAgentIds = Set(agentRooms.keys)
-            .union(agentBarcodes.keys)
-            .union(agentMotion.keys)
-            .union(agentCompletions.keys)
-            .union(agentProducts.keys)
+        let g = agentGrouping
 
-        let unlinkedRooms = roomScans.filter { $0.agentId == nil }
-        let unlinkedBarcodes = scans.filter { $0.agentId == nil }
-        let unlinkedMotion = motionRecords.filter { $0.agentId == nil }
-        let hasUnlinked = !unlinkedRooms.isEmpty || !unlinkedBarcodes.isEmpty || !unlinkedMotion.isEmpty
-
-        if allAgentIds.isEmpty && !hasUnlinked {
+        if g.allAgentIds.isEmpty && !g.hasUnlinked {
             ContentUnavailableView {
                 Label("No Agent Data Yet", systemImage: "tray")
             } description: {
@@ -185,94 +241,23 @@ struct ScanHistoryView: View {
             }
         } else {
             List {
-                ForEach(Array(allAgentIds).sorted(), id: \.self) { agentId in
-                    let name = AgentStore.name(for: agentId, fallback: agentRooms[agentId]?.first?.agentName
-                        ?? agentBarcodes[agentId]?.first?.agentName
-                        ?? agentMotion[agentId]?.first?.agentName
-                        ?? agentCompletions[agentId]?.first?.agentName
-                        ?? agentProducts[agentId]?.first?.agentName)
-
+                ForEach(g.allAgentIds, id: \.self) { agentId in
                     Section {
-                        // Room scans for this agent
-                        if let rooms = agentRooms[agentId] {
-                            ForEach(rooms) { room in
-                                NavigationLink(value: room) {
-                                    RoomScanRow(room: room)
-                                }
-                            }
-                        }
-                        // Barcode scans for this agent
-                        if let barcodes = agentBarcodes[agentId] {
-                            ForEach(barcodes) { scan in
-                                NavigationLink(value: scan) {
-                                    ScanRow(scan: scan)
-                                }
-                            }
-                        }
-                        // Motion records for this agent
-                        if let motion = agentMotion[agentId] {
-                            ForEach(motion) { record in
-                                NavigationLink(value: record) {
-                                    MotionRow(motion: record)
-                                }
-                            }
-                        }
-                        // Product captures for this agent
-                        if let products = agentProducts[agentId] {
-                            ForEach(products) { product in
-                                NavigationLink(value: product) {
-                                    ProductCaptureRow(product: product)
-                                }
-                            }
-                        }
-                        // Photo completion records (no data record, just completion event)
-                        if let completions = agentCompletions[agentId] {
-                            let photoCompletions = completions.filter { $0.skillType == "camera" }
-                            ForEach(photoCompletions) { completion in
-                                HStack {
-                                    Image(systemName: "camera.fill")
-                                        .font(.title3)
-                                        .foregroundColor(.accentColor)
-                                        .frame(width: 32)
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("\(completion.itemCount) photo\(completion.itemCount == 1 ? "" : "s") captured")
-                                            .font(.subheadline)
-                                        Text(completion.completedAt, style: .relative)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                }
-                            }
-                        }
+                        agentSectionContent(agentId: agentId, grouping: g)
                     } header: {
                         HStack(spacing: 8) {
                             Image(systemName: AgentStore.icon(for: agentId))
                                 .font(.caption)
                                 .foregroundStyle(AgentStore.color(for: agentId))
-                            Text(name)
+                            Text(agentName(for: agentId, grouping: g))
                         }
                     }
                 }
 
                 // Unlinked scans section
-                if hasUnlinked {
+                if g.hasUnlinked {
                     Section {
-                        ForEach(unlinkedRooms) { room in
-                            NavigationLink(value: room) {
-                                RoomScanRow(room: room)
-                            }
-                        }
-                        ForEach(unlinkedBarcodes) { scan in
-                            NavigationLink(value: scan) {
-                                ScanRow(scan: scan)
-                            }
-                        }
-                        ForEach(unlinkedMotion) { record in
-                            NavigationLink(value: record) {
-                                MotionRow(motion: record)
-                            }
-                        }
+                        unlinkedSectionContent(grouping: g)
                     } header: {
                         HStack(spacing: 8) {
                             Image(systemName: "tray")
@@ -294,8 +279,89 @@ struct ScanHistoryView: View {
                     Button { showingMotionCapture = true } label: {
                         Label("Capture Motion", systemImage: "figure.walk.motion")
                     }
+                    Button { showingBeaconMonitor = true } label: {
+                        Label("Monitor Beacons", systemImage: "sensor.tag.radiowaves.forward")
+                    }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func agentSectionContent(agentId: String, grouping g: AgentGrouping) -> some View {
+        if let rooms = g.agentRooms[agentId] {
+            ForEach(rooms) { room in
+                NavigationLink(value: room) {
+                    RoomScanRow(room: room)
+                }
+            }
+        }
+        if let barcodes = g.agentBarcodes[agentId] {
+            ForEach(barcodes) { scan in
+                NavigationLink(value: scan) {
+                    ScanRow(scan: scan)
+                }
+            }
+        }
+        if let motion = g.agentMotion[agentId] {
+            ForEach(motion) { record in
+                NavigationLink(value: record) {
+                    MotionRow(motion: record)
+                }
+            }
+        }
+        if let products = g.agentProducts[agentId] {
+            ForEach(products) { product in
+                NavigationLink(value: product) {
+                    ProductCaptureRow(product: product)
+                }
+            }
+        }
+        if let beacons = g.agentBeacons[agentId] {
+            ForEach(beacons) { event in
+                BeaconEventRow(event: event)
+            }
+        }
+        if let completions = g.agentCompletions[agentId] {
+            let photoCompletions = completions.filter { $0.skillType == "camera" }
+            ForEach(photoCompletions) { completion in
+                HStack {
+                    Image(systemName: "camera.fill")
+                        .font(.title3)
+                        .foregroundColor(.accentColor)
+                        .frame(width: 32)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(completion.itemCount) photo\(completion.itemCount == 1 ? "" : "s") captured")
+                            .font(.subheadline)
+                        Text(completion.completedAt, style: .relative)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func unlinkedSectionContent(grouping g: AgentGrouping) -> some View {
+        ForEach(g.unlinkedRooms) { room in
+            NavigationLink(value: room) {
+                RoomScanRow(room: room)
+            }
+        }
+        ForEach(g.unlinkedBarcodes) { scan in
+            NavigationLink(value: scan) {
+                ScanRow(scan: scan)
+            }
+        }
+        ForEach(g.unlinkedMotion) { record in
+            NavigationLink(value: record) {
+                MotionRow(motion: record)
+            }
+        }
+        ForEach(g.unlinkedBeacons) { event in
+            BeaconEventRow(event: event)
         }
     }
 
@@ -423,13 +489,30 @@ struct ScanHistoryView: View {
                 Label("No Beacon Events Yet", systemImage: "sensor.tag.radiowaves.forward")
             } description: {
                 Text("Start beacon monitoring to see enter/exit events here.")
+            } actions: {
+                Button("Monitor Beacons") {
+                    showingBeaconMonitor = true
+                }
             }
         } else {
             List {
-                ForEach(beaconEvents) { event in
-                    BeaconEventRow(event: event)
+                // Summary visualization
+                Section {
+                    BeaconSummaryCard(events: beaconEvents)
                 }
-                .onDelete(perform: deleteBeaconEvents)
+
+                // Timeline
+                Section("Event Timeline") {
+                    BeaconTimelineView(events: beaconEvents)
+                }
+
+                // Event list
+                Section("All Events (\(beaconEvents.count))") {
+                    ForEach(beaconEvents) { event in
+                        BeaconEventRow(event: event)
+                    }
+                    .onDelete(perform: deleteBeaconEvents)
+                }
             }
         }
     }
@@ -883,6 +966,166 @@ struct BeaconEventRow: View {
         default:
             EmptyView()
         }
+    }
+}
+
+// MARK: - Beacon Summary Card
+
+struct BeaconSummaryCard: View {
+    let events: [BeaconEventRecord]
+
+    private var enterCount: Int { events.filter { $0.eventType == "enter" }.count }
+    private var exitCount: Int { events.filter { $0.eventType == "exit" }.count }
+
+    private var roomVisits: [(name: String, count: Int)] {
+        let enters = events.filter { $0.eventType == "enter" }
+        let grouped = Dictionary(grouping: enters) { $0.roomName ?? "Beacon \($0.beaconMinor)" }
+        return grouped.map { (name: $0.key, count: $0.value.count) }
+            .sorted { $0.count > $1.count }
+    }
+
+    private var avgDuration: Int? {
+        let durations = events.compactMap { $0.durationSeconds }
+        guard !durations.isEmpty else { return nil }
+        return durations.reduce(0, +) / durations.count
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            // Stats row
+            HStack(spacing: 0) {
+                statCell(value: "\(enterCount)", label: "Enters", color: .green)
+                Divider().frame(height: 32)
+                statCell(value: "\(exitCount)", label: "Exits", color: .orange)
+                Divider().frame(height: 32)
+                if let avg = avgDuration {
+                    statCell(value: formatDuration(avg), label: "Avg Stay", color: .blue)
+                } else {
+                    statCell(value: "\(roomVisits.count)", label: "Zones", color: .blue)
+                }
+            }
+
+            // Room breakdown bars
+            if !roomVisits.isEmpty {
+                let maxCount = roomVisits.first?.count ?? 1
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(roomVisits.prefix(4), id: \.name) { room in
+                        HStack(spacing: 8) {
+                            Text(room.name)
+                                .font(.caption)
+                                .frame(width: 80, alignment: .trailing)
+                                .lineLimit(1)
+
+                            GeometryReader { geo in
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(.indigo.opacity(0.7))
+                                    .frame(width: max(4, geo.size.width * CGFloat(room.count) / CGFloat(maxCount)))
+                            }
+                            .frame(height: 16)
+
+                            Text("\(room.count)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .frame(width: 24, alignment: .leading)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func statCell(value: String, label: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.title2.bold().monospacedDigit())
+                .foregroundStyle(color)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        if seconds < 60 { return "\(seconds)s" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes)m" }
+        let hours = minutes / 60
+        let remainMins = minutes % 60
+        return "\(hours)h\(remainMins)m"
+    }
+}
+
+// MARK: - Beacon Timeline View
+
+struct BeaconTimelineView: View {
+    let events: [BeaconEventRecord]
+
+    private var recentEvents: [BeaconEventRecord] {
+        Array(events.prefix(10))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(recentEvents.enumerated()), id: \.element.id) { index, event in
+                HStack(alignment: .top, spacing: 12) {
+                    // Timeline dot + line
+                    VStack(spacing: 0) {
+                        Circle()
+                            .fill(event.eventType == "enter" ? Color.green : Color.orange)
+                            .frame(width: 10, height: 10)
+
+                        if index < recentEvents.count - 1 {
+                            Rectangle()
+                                .fill(.quaternary)
+                                .frame(width: 2)
+                                .frame(minHeight: 28)
+                        }
+                    }
+
+                    // Event info
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text(event.eventType == "enter" ? "Entered" : "Exited")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(event.eventType == "enter" ? .green : .orange)
+                            Text(event.roomName ?? "Beacon \(event.beaconMinor)")
+                                .font(.caption.weight(.medium))
+                        }
+
+                        HStack(spacing: 6) {
+                            Text(event.capturedAt, style: .relative)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                            if let duration = event.durationSeconds, duration > 0 {
+                                Text("(\(formatDuration(duration)))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.bottom, 6)
+                }
+            }
+
+            if events.count > 10 {
+                Text("+\(events.count - 10) more events")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .padding(.leading, 22)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        if seconds < 60 { return "\(seconds)s" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes)m" }
+        let hours = minutes / 60
+        let remainMins = minutes % 60
+        return "\(hours)h\(remainMins)m"
     }
 }
 

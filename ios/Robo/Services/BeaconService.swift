@@ -9,8 +9,8 @@ class BeaconService: NSObject, CLLocationManagerDelegate {
 
     // MARK: - Constants
 
-    /// Well-known iBeacon UUID used by Robo-compatible beacons.
-    static let beaconUUID = UUID(uuidString: "FDA50693-A4E2-4FB1-AFCF-C0A36F4E4339")!
+    /// iBeacon UUID — configurable via Settings → Beacons.
+    static var beaconUUID: UUID { BeaconConfigStore.loadUUID() }
     static let beaconMajor: CLBeaconMajorValue = 1
 
     // MARK: - Published State

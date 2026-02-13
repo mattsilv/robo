@@ -380,11 +380,13 @@ enum ExportService {
             for room in rooms {
                 var safeName = room.name.isEmpty ? "room" : sanitizeFilename(room.name)
 
-                // Handle duplicate names
+                // Handle duplicate names (keep within 60-char limit)
                 let baseName = safeName
                 var counter = 2
                 while usedNames.contains(safeName) {
-                    safeName = "\(baseName)-\(counter)"
+                    let suffix = "-\(counter)"
+                    let maxBase = 60 - suffix.count
+                    safeName = "\(String(baseName.prefix(maxBase)))\(suffix)"
                     counter += 1
                 }
                 usedNames.insert(safeName)
@@ -504,12 +506,13 @@ enum ExportService {
     /// Sanitize a name for use in file/directory paths.
     /// Strips path traversal sequences, filesystem-hostile characters, and limits length.
     static func sanitizeFilename(_ name: String) -> String {
-        var safe = name
+        // Strip control characters (NUL, tabs, newlines, DEL, etc.)
+        var safe = String(name.unicodeScalars.filter { $0.value >= 0x20 && $0.value != 0x7F })
+        safe = safe
             .replacingOccurrences(of: " ", with: "-")
             .lowercased()
         safe = safe.replacingOccurrences(of: "/", with: "-")
         safe = safe.replacingOccurrences(of: "\\", with: "-")
-        safe = safe.replacingOccurrences(of: "\0", with: "")
         safe = safe.replacingOccurrences(of: ":", with: "-")
         safe = safe.replacingOccurrences(of: "*", with: "")
         safe = safe.replacingOccurrences(of: "?", with: "")

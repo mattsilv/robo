@@ -5,15 +5,46 @@ struct BeaconSettingsView: View {
     @State private var beacons: [BeaconConfigStore.BeaconConfig] = BeaconConfigStore.loadBeacons()
     @State private var webhookURL: String = UserDefaults.standard.string(forKey: "beaconWebhookURL") ?? ""
     @State private var webhookSecret: String = UserDefaults.standard.string(forKey: "beaconWebhookSecret") ?? ""
+    @State private var beaconUUIDText: String = BeaconConfigStore.loadUUIDString()
     @State private var showingAddBeacon = false
     @State private var showingDeviceInfo = false
     @State private var testWebhookResult: String?
     @State private var isTesting = false
+    @State private var uuidValidationError: String?
 
     @Environment(DeviceService.self) private var deviceService
 
     var body: some View {
         Form {
+            // Beacon UUID
+            Section {
+                TextField("Beacon UUID", text: $beaconUUIDText)
+                    .font(.caption.monospaced())
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onChange(of: beaconUUIDText) { _, newValue in
+                        let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+                        if trimmed.isEmpty {
+                            uuidValidationError = nil
+                        } else if UUID(uuidString: trimmed) != nil {
+                            BeaconConfigStore.saveUUID(trimmed)
+                            uuidValidationError = nil
+                        } else {
+                            uuidValidationError = "Invalid UUID format"
+                        }
+                    }
+
+                if let error = uuidValidationError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            } header: {
+                Text("Beacon UUID")
+            } footer: {
+                Text("All your beacons must share this UUID. Tap to edit if your beacons use a different UUID.")
+            }
+
             // Configured Beacons
             Section {
                 if beacons.isEmpty {
@@ -62,7 +93,7 @@ struct BeaconSettingsView: View {
             } header: {
                 Text("Beacons")
             } footer: {
-                Text("Assign room names to beacon Minor values. Beacons use iBeacon UUID: FDA50693-...")
+                Text("Assign room names to beacon Minor values. Up to 6 beacons per location.")
             }
 
             // Webhook Configuration

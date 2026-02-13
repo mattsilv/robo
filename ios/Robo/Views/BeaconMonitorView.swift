@@ -304,36 +304,68 @@ private struct BeaconRow: View {
     let roomName: String?
 
     var body: some View {
-        HStack(spacing: 12) {
-            proximityIndicator
-                .frame(width: 32, height: 32)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                proximityIndicator
+                    .frame(width: 36, height: 36)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(roomName ?? "Beacon \(beacon.minor)")
-                    .font(.subheadline.weight(.medium))
-
-                HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(roomName ?? "Beacon \(beacon.minor)")
+                        .font(.subheadline.weight(.medium))
                     Text("Minor: \(beacon.minor)")
                         .font(.caption.monospaced())
-                    if beacon.accuracy > 0 {
-                        Text(String(format: "%.1fm", beacon.accuracy))
-                            .font(.caption)
-                    }
-                    Text("RSSI: \(beacon.rssi)")
-                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text(proximityLabel)
+                    .font(.caption.weight(.medium))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(proximityColor.opacity(0.15))
+                    .foregroundStyle(proximityColor)
+                    .clipShape(Capsule())
             }
 
-            Spacer()
+            // Sensor data grid
+            HStack(spacing: 16) {
+                sensorItem(label: "RSSI", value: "\(beacon.rssi) dBm", icon: "antenna.radiowaves.left.and.right")
+                if beacon.accuracy > 0 {
+                    sensorItem(label: "Distance", value: String(format: "%.1f ft", beacon.accuracy * 3.281), icon: "ruler")
+                }
+                sensorItem(label: "Signal", value: signalQuality, icon: "wifi")
+            }
+            .padding(.leading, 48)
 
-            Text(proximityLabel)
-                .font(.caption.weight(.medium))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(proximityColor.opacity(0.15))
-                .foregroundStyle(proximityColor)
-                .clipShape(Capsule())
+            // Signal strength bar
+            HStack(spacing: 0) {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color(.systemGray5))
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(signalColor)
+                            .frame(width: geo.size.width * signalFraction)
+                    }
+                }
+                .frame(height: 4)
+            }
+            .padding(.leading, 48)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func sensorItem(label: String, value: String, icon: String) -> some View {
+        VStack(spacing: 2) {
+            Image(systemName: icon)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .font(.caption2.weight(.medium).monospaced())
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
     }
 
@@ -367,6 +399,29 @@ private struct BeaconRow: View {
         @unknown default: return .gray
         }
     }
+
+    /// Signal fraction 0.0–1.0 based on RSSI (-100 worst to -30 best).
+    /// RSSI of 0 means "unavailable" in CoreLocation — treat as no signal.
+    private var signalFraction: CGFloat {
+        let rssi = beacon.rssi
+        guard rssi < 0 else { return 0 }
+        let clamped = min(max(Double(rssi), -100), -30)
+        return CGFloat((clamped + 100) / 70)
+    }
+
+    private var signalColor: Color {
+        let fraction = signalFraction
+        if fraction > 0.7 { return .green }
+        if fraction > 0.4 { return .orange }
+        return .red
+    }
+
+    private var signalQuality: String {
+        let fraction = signalFraction
+        if fraction > 0.7 { return "Strong" }
+        if fraction > 0.4 { return "Medium" }
+        return "Weak"
+    }
 }
 
 // MARK: - Supported Devices Sheet
@@ -396,7 +451,12 @@ struct SupportedDevicesSheet: View {
 
                 Section("Beacon Configuration") {
                     LabeledContent("Protocol", value: "Apple iBeacon")
-                    LabeledContent("UUID", value: "FDA50693-...")
+                    LabeledContent("UUID") {
+                        let uuid = BeaconConfigStore.loadUUIDString()
+                        Text(uuid.prefix(8) + "...")
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
                     LabeledContent("Major", value: "1")
                     LabeledContent("Minor", value: "1-65535 (room ID)")
                 }
@@ -416,6 +476,21 @@ struct SupportedDevicesSheet: View {
 
 enum BeaconConfigStore {
     private static let key = "configuredBeacons"
+    private static let uuidKey = "beaconUUID"
+    static let defaultUUID = "12345678-9ABC-DEF0-1234-56789ABCDEF0"
+
+    static func loadUUID() -> UUID {
+        let stored = UserDefaults.standard.string(forKey: uuidKey) ?? defaultUUID
+        return UUID(uuidString: stored) ?? UUID(uuidString: defaultUUID)!
+    }
+
+    static func loadUUIDString() -> String {
+        UserDefaults.standard.string(forKey: uuidKey) ?? defaultUUID
+    }
+
+    static func saveUUID(_ uuidString: String) {
+        UserDefaults.standard.set(uuidString, forKey: uuidKey)
+    }
 
     struct BeaconConfig: Codable, Identifiable {
         let id: UUID

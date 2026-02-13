@@ -125,6 +125,26 @@ enum MockAgentService {
                         PhotoTask(id: UUID(), label: "Locked safe area", isCompleted: false)
                     ]
                 )
+            ),
+            AgentConnection(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000008")!,
+                name: "Color Analyst",
+                description: "Personalized makeup color palette from your selfie",
+                iconSystemName: "paintpalette.fill",
+                accentColor: .pink,
+                status: .connected,
+                lastSyncDate: nil,
+                pendingRequest: nil
+            ),
+            AgentConnection(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000009")!,
+                name: "Florist",
+                description: "Seasonal flower arrangement guide from your photos",
+                iconSystemName: "leaf.fill",
+                accentColor: .green,
+                status: .connected,
+                lastSyncDate: nil,
+                pendingRequest: nil
             )
         ]
     }

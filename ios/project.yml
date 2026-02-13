@@ -25,6 +25,11 @@ targets:
       - path: Robo
         excludes:
           - "**/.DS_Store"
+    entitlements:
+      path: Robo/Robo.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
     settings:
       base:
         INFOPLIST_FILE: Robo/Info.plist
@@ -61,6 +66,7 @@ targets:
         NSLocationWhenInUseUsageDescription: "Robo uses your location to detect nearby Bluetooth beacons for room-based automations."
         NSLocationAlwaysAndWhenInUseUsageDescription: "Robo needs background location access to detect beacons when the app is closed, triggering room-based automations."
         NSBluetoothAlwaysUsageDescription: "Robo uses Bluetooth to detect nearby iBeacon devices for room-aware automations."
+        NSHealthShareUsageDescription: "Robo reads your sleep, workout, and activity data to share with your AI agents."
         UIBackgroundModes:
           - location
           - bluetooth-central

@@ -6,9 +6,9 @@ struct ContentView: View {
 
     var body: some View {
         TabView {
-            AgentsView()
+            CaptureHomeView()
                 .tabItem {
-                    Label(AppStrings.Tabs.agents, systemImage: "tray.fill")
+                    Label(AppStrings.Tabs.capture, systemImage: "sensor.fill")
                 }
 
             ScanHistoryView()

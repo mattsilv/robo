@@ -21,15 +21,18 @@ enum MotionService {
 
     // MARK: - Capture
 
-    static func captureToday() async throws -> MotionSnapshot {
+    /// Captures motion data for the specified number of days back (default: 7).
+    /// CoreMotion pedometer is limited to ~7 days on most devices.
+    static func capture(daysBack: Int = 7) async throws -> MotionSnapshot {
         let pedometer = CMPedometer()
         let activityManager = CMMotionActivityManager()
 
         let calendar = Calendar.current
         let now = Date()
-        guard let midnight = calendar.date(bySettingHour: 0, minute: 0, second: 0, of: now) else {
+        guard let startDate = calendar.date(byAdding: .day, value: -daysBack, to: calendar.startOfDay(for: now)) else {
             throw MotionError.invalidDateRange
         }
+        let midnight = startDate
 
         let pedometerData = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<CMPedometerData, Error>) in
             pedometer.queryPedometerData(from: midnight, to: now) { data, error in
@@ -90,7 +93,7 @@ enum MotionService {
 
         let dict: [String: Any] = [
             "captured_at": formatter.string(from: Date()),
-            "period": "today (midnight to now)",
+            "period": "last 7 days",
             "pedometer": [
                 "steps": snapshot.stepCount,
                 "distance_meters": round(snapshot.distanceMeters * 100) / 100,

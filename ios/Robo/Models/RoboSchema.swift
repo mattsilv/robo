@@ -503,16 +503,71 @@ enum RoboSchemaV7: VersionedSchema {
     }
 }
 
+// MARK: - Schema V8 (health records)
+
+enum RoboSchemaV8: VersionedSchema {
+    static var versionIdentifier = Schema.Version(8, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [ScanRecord.self, RoomScanRecord.self, MotionRecord.self,
+         AgentCompletionRecord.self, ProductCaptureRecord.self,
+         BeaconEventRecord.self, HealthRecord.self]
+    }
+
+    // Re-export V7 models unchanged
+    typealias ScanRecord = RoboSchemaV4.ScanRecord
+    typealias RoomScanRecord = RoboSchemaV4.RoomScanRecord
+    typealias MotionRecord = RoboSchemaV4.MotionRecord
+    typealias AgentCompletionRecord = RoboSchemaV5.AgentCompletionRecord
+    typealias ProductCaptureRecord = RoboSchemaV6.ProductCaptureRecord
+    typealias BeaconEventRecord = RoboSchemaV7.BeaconEventRecord
+
+    @Model
+    final class HealthRecord {
+        var capturedAt: Date
+        var dataType: String               // "sleep", "workout", "activity", or "combined"
+        var dateRangeStart: Date
+        var dateRangeEnd: Date
+        var summaryJSON: Data              // Encoded HealthSummaryExport
+        var sleepEntryCount: Int
+        var workoutCount: Int
+        var totalSteps: Int
+        var agentId: String?
+        var agentName: String?
+
+        init(
+            dataType: String,
+            dateRangeStart: Date,
+            dateRangeEnd: Date,
+            summaryJSON: Data,
+            sleepEntryCount: Int = 0,
+            workoutCount: Int = 0,
+            totalSteps: Int = 0
+        ) {
+            self.capturedAt = Date()
+            self.dataType = dataType
+            self.dateRangeStart = dateRangeStart
+            self.dateRangeEnd = dateRangeEnd
+            self.summaryJSON = summaryJSON
+            self.sleepEntryCount = sleepEntryCount
+            self.workoutCount = workoutCount
+            self.totalSteps = totalSteps
+        }
+    }
+}
+
 // MARK: - Migration Plan
 
 enum RoboMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
         [RoboSchemaV1.self, RoboSchemaV2.self, RoboSchemaV3.self,
-         RoboSchemaV4.self, RoboSchemaV5.self, RoboSchemaV6.self, RoboSchemaV7.self]
+         RoboSchemaV4.self, RoboSchemaV5.self, RoboSchemaV6.self,
+         RoboSchemaV7.self, RoboSchemaV8.self]
     }
 
     static var stages: [MigrationStage] {
-        [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7]
+        [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5,
+         migrateV5toV6, migrateV6toV7, migrateV7toV8]
     }
 
     static let migrateV1toV2 = MigrationStage.lightweight(
@@ -544,13 +599,19 @@ enum RoboMigrationPlan: SchemaMigrationPlan {
         fromVersion: RoboSchemaV6.self,
         toVersion: RoboSchemaV7.self
     )
+
+    static let migrateV7toV8 = MigrationStage.lightweight(
+        fromVersion: RoboSchemaV7.self,
+        toVersion: RoboSchemaV8.self
+    )
 }
 
 // MARK: - Type Aliases (so the rest of the app uses simple names)
 
-typealias ScanRecord = RoboSchemaV7.ScanRecord
-typealias RoomScanRecord = RoboSchemaV7.RoomScanRecord
-typealias MotionRecord = RoboSchemaV7.MotionRecord
-typealias AgentCompletionRecord = RoboSchemaV7.AgentCompletionRecord
-typealias ProductCaptureRecord = RoboSchemaV7.ProductCaptureRecord
-typealias BeaconEventRecord = RoboSchemaV7.BeaconEventRecord
+typealias ScanRecord = RoboSchemaV8.ScanRecord
+typealias RoomScanRecord = RoboSchemaV8.RoomScanRecord
+typealias MotionRecord = RoboSchemaV8.MotionRecord
+typealias AgentCompletionRecord = RoboSchemaV8.AgentCompletionRecord
+typealias ProductCaptureRecord = RoboSchemaV8.ProductCaptureRecord
+typealias BeaconEventRecord = RoboSchemaV8.BeaconEventRecord
+typealias HealthRecord = RoboSchemaV8.HealthRecord

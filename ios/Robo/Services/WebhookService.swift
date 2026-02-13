@@ -45,7 +45,7 @@ enum WebhookService {
     private static let pendingQueueKey = "webhookPendingQueue"
     private static let retryDelays: [TimeInterval] = [5, 15, 45]
 
-    /// Send a webhook payload to the given URL. Retries up to 3 times on failure.
+    /// Send a webhook payload to the given URL. Initial attempt + retries with backoff delays [5s, 15s, 45s].
     static func send(payload: BeaconWebhookPayload, to url: URL, secret: String? = nil) async -> WebhookResult {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
@@ -56,8 +56,14 @@ enum WebhookService {
         }
 
         var lastError: Error = WebhookError.unknown
+        let maxAttempts = retryDelays.count + 1 // 1 initial + 3 retries
 
-        for (attempt, delay) in retryDelays.enumerated() {
+        for attempt in 0..<maxAttempts {
+            // Backoff before retries (not before first attempt)
+            if attempt > 0 {
+                try? await Task.sleep(for: .seconds(retryDelays[attempt - 1]))
+            }
+
             do {
                 var request = URLRequest(url: url)
                 request.httpMethod = "POST"
@@ -86,14 +92,10 @@ enum WebhookService {
             } catch {
                 lastError = error
                 logger.warning("Webhook attempt \(attempt + 1) failed: \(error.localizedDescription)")
-
-                if attempt < retryDelays.count - 1 {
-                    try? await Task.sleep(for: .seconds(delay))
-                }
             }
         }
 
-        logger.error("Webhook failed after \(retryDelays.count) attempts")
+        logger.error("Webhook failed after \(maxAttempts) attempts")
         return .failure(lastError)
     }
 

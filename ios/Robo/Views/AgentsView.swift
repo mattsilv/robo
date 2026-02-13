@@ -7,6 +7,7 @@ struct AgentsView: View {
     @Query(sort: \RoomScanRecord.capturedAt, order: .reverse) private var roomScans: [RoomScanRecord]
     @Query(sort: \ScanRecord.capturedAt, order: .reverse) private var scans: [ScanRecord]
     @Query(sort: \ProductCaptureRecord.capturedAt, order: .reverse) private var productCaptures: [ProductCaptureRecord]
+    @Query(sort: \BeaconEventRecord.capturedAt, order: .reverse) private var beaconEvents: [BeaconEventRecord]
 
     /// Skill types with verified, working capture flows.
     private let enabledSkillTypes: Set<AgentRequest.SkillType> = [.lidar, .barcode, .camera, .productScan, .beacon]
@@ -22,6 +23,7 @@ struct AgentsView: View {
     @State private var photoCapturedCount = 0
     @State private var initialBarcodeCount = 0
     @State private var initialProductCount = 0
+    @State private var initialBeaconCount = 0
     @State private var completedAgentName: String?
 
     var body: some View {
@@ -165,6 +167,7 @@ struct AgentsView: View {
             syncingAgentId = agent.id
             showingProductScan = true
         case .beacon:
+            initialBeaconCount = beaconEvents.count
             syncingAgentId = agent.id
             showingBeaconMonitor = true
         case .motion:
@@ -214,8 +217,11 @@ struct AgentsView: View {
 
     private func handleBeaconDismiss() {
         guard let agentId = syncingAgentId else { return }
-        // Beacon monitoring was started — consider it a successful interaction
-        triggerSyncAnimation(for: agentId)
+        if beaconEvents.count > initialBeaconCount {
+            triggerSyncAnimation(for: agentId)
+        } else {
+            syncingAgentId = nil
+        }
     }
 
     private func triggerSyncAnimation(for agentId: UUID) {

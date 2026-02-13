@@ -97,7 +97,7 @@ struct ScanHistoryView: View {
                                 Label("Export All", systemImage: "square.and.arrow.up")
                             }
                         }
-                        .disabled(isExporting || (scans.isEmpty && roomScans.isEmpty && motionRecords.isEmpty))
+                        .disabled(isExporting || (scans.isEmpty && roomScans.isEmpty && motionRecords.isEmpty && beaconEvents.isEmpty))
                     }
 
                     if (selectedSegment == 0 && !scans.isEmpty) ||
@@ -536,12 +536,16 @@ struct ScanHistoryView: View {
             (name: $0.roomName, summaryJSON: $0.summaryJSON, fullRoomDataJSON: $0.fullRoomDataJSON)
         }
         let motionData = motionRecords.map { $0.activityJSON }
+        let beaconData = beaconEvents.map {
+            ExportableBeaconEvent(eventType: $0.eventType, beaconMinor: $0.beaconMinor, roomName: $0.roomName, proximity: $0.proximity, rssi: $0.rssi, distanceMeters: $0.distanceMeters, durationSeconds: $0.durationSeconds, source: $0.source, webhookStatus: $0.webhookStatus, capturedAt: $0.capturedAt)
+        }
         Task.detached {
             do {
                 let url = try ExportService.createCombinedExportZip(
                     scans: barcodeData,
                     rooms: roomData,
-                    motionRecords: motionData
+                    motionRecords: motionData,
+                    beaconEvents: beaconData
                 )
                 await MainActor.run {
                     shareURL = url

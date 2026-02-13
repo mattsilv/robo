@@ -220,6 +220,12 @@ struct BeaconMonitorView: View {
         generator.impactOccurred()
 
         phase = .monitoring
+
+        // Drain any previously failed webhooks
+        let secret = UserDefaults.standard.string(forKey: "beaconWebhookSecret")
+        Task {
+            await WebhookService.retryPending(secret: secret)
+        }
     }
 
     private func handleBeaconEvent(_ event: BeaconService.BeaconEvent) {
@@ -238,6 +244,7 @@ struct BeaconMonitorView: View {
             proximity: event.proximity,
             rssi: event.rssi,
             distanceMeters: event.distance,
+            durationSeconds: event.durationSeconds,
             source: event.source
         )
         record.agentId = captureContext?.agentId
@@ -258,7 +265,7 @@ struct BeaconMonitorView: View {
                 proximity: event.proximity,
                 rssi: event.rssi,
                 distanceMeters: event.distance,
-                durationSeconds: nil,
+                durationSeconds: event.durationSeconds,
                 timestamp: formatter.string(from: event.timestamp),
                 deviceId: deviceService.config.id,
                 source: event.source

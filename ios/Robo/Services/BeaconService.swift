@@ -26,6 +26,7 @@ class BeaconService: NSObject, CLLocationManagerDelegate {
         let proximity: String?
         let rssi: Int?
         let distance: Double?
+        let durationSeconds: Int? // Only on exit events
         let source: String
         let timestamp: Date
     }
@@ -146,21 +147,12 @@ class BeaconService: NSObject, CLLocationManagerDelegate {
                 proximity: nil,
                 rssi: nil,
                 distance: nil,
+                durationSeconds: duration,
                 source: "background_monitor",
                 timestamp: Date()
             )
-            // Store duration separately for the webhook
-            let exitEvent = BeaconEvent(
-                type: "exit",
-                minor: minor,
-                proximity: nil,
-                rssi: nil,
-                distance: nil,
-                source: event.source,
-                timestamp: Date()
-            )
-            lastEvent = exitEvent
-            onBeaconEvent?(exitEvent)
+            lastEvent = event
+            onBeaconEvent?(event)
             logger.info("Exit event: minor=\(minor), duration=\(duration)s")
         }
 
@@ -185,8 +177,17 @@ class BeaconService: NSObject, CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didRange beacons: [CLBeacon], satisfying constraint: CLBeaconIdentityConstraint) {
         detectedBeacons = beacons
 
+        // Only fire events for configured+active beacons (or all if none configured)
+        let configured = BeaconConfigStore.loadBeacons()
+        let activeMinors: Set<Int>? = configured.isEmpty ? nil : Set(configured.filter(\.isActive).map(\.minor))
+
         for beacon in beacons where beacon.proximity != .unknown {
             let minor = beacon.minor.intValue
+
+            // Skip beacons not in active config (when config exists)
+            if let activeMinors, !activeMinors.contains(minor) {
+                continue
+            }
 
             // Debounce: suppress duplicate enter events within 60s
             if let lastEnter = lastEnterTimes[minor],
@@ -205,6 +206,7 @@ class BeaconService: NSObject, CLLocationManagerDelegate {
                     proximity: proximityString(beacon.proximity),
                     rssi: beacon.rssi,
                     distance: beacon.accuracy > 0 ? beacon.accuracy : nil,
+                    durationSeconds: nil,
                     source: "foreground_ranging",
                     timestamp: Date()
                 )

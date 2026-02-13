@@ -33,6 +33,7 @@ struct AgentRequest: Identifiable {
         case motion
         case productScan
         case beacon
+        case health
     }
 
     init(

@@ -26,6 +26,8 @@
 	<string>Robo uses Bluetooth to detect nearby iBeacon devices for room-aware automations.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Robo needs camera access to scan barcodes, capture photos, and perform LiDAR room scanning for AI analysis</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Robo reads your sleep, workout, and activity data to share with your AI agents.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Robo needs background location access to detect beacons when the app is closed, triggering room-based automations.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

@@ -71,7 +71,7 @@ struct MotionCaptureView: View {
                 .font(.title.bold())
 
             VStack(alignment: .leading, spacing: 16) {
-                tipRow(icon: "shoe", text: "Captures today's step count and distance walked")
+                tipRow(icon: "shoe", text: "Captures the last 7 days of step count and distance")
                 tipRow(icon: "arrow.up.right", text: "Includes floors ascended and descended")
                 tipRow(icon: "figure.run", text: "Detects activity types: walking, running, driving")
                 tipRow(icon: "lock.shield", text: "All data stays on your device until you share it")
@@ -123,7 +123,7 @@ struct MotionCaptureView: View {
         isCapturing = true
         Task {
             do {
-                let result = try await MotionService.captureToday()
+                let result = try await MotionService.capture(daysBack: 7)
 
                 let generator = UINotificationFeedbackGenerator()
                 generator.notificationOccurred(.success)

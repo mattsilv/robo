@@ -172,6 +172,8 @@ struct AgentsView: View {
             showingBeaconMonitor = true
         case .motion:
             break
+        case .health:
+            break
         }
     }
 
@@ -327,6 +329,7 @@ private struct AgentRequestCard: View {
         case .productScan: return "Scan Product"
         case .motion: return "Start Capture"
         case .beacon: return "Start Monitoring"
+        case .health: return "Capture Health"
         }
     }
 
@@ -338,6 +341,7 @@ private struct AgentRequestCard: View {
         case .productScan: return "barcode.viewfinder"
         case .motion: return "figure.walk"
         case .beacon: return "sensor.tag.radiowaves.forward"
+        case .health: return "heart.fill"
         }
     }
 }

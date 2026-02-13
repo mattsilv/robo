@@ -28,7 +28,7 @@ struct MotionResultView: View {
                 VStack(spacing: 4) {
                     Text("\(snapshot.stepCount)")
                         .font(.system(size: 48, weight: .bold, design: .rounded))
-                    Text("steps today")
+                    Text("steps (last 7 days)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }

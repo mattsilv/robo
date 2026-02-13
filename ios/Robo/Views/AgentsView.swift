@@ -7,20 +7,23 @@ struct AgentsView: View {
     @Query(sort: \RoomScanRecord.capturedAt, order: .reverse) private var roomScans: [RoomScanRecord]
     @Query(sort: \ScanRecord.capturedAt, order: .reverse) private var scans: [ScanRecord]
     @Query(sort: \ProductCaptureRecord.capturedAt, order: .reverse) private var productCaptures: [ProductCaptureRecord]
+    @Query(sort: \BeaconEventRecord.capturedAt, order: .reverse) private var beaconEvents: [BeaconEventRecord]
 
     /// Skill types with verified, working capture flows.
-    private let enabledSkillTypes: Set<AgentRequest.SkillType> = [.lidar, .barcode, .camera, .productScan]
+    private let enabledSkillTypes: Set<AgentRequest.SkillType> = [.lidar, .barcode, .camera, .productScan, .beacon]
 
     @State private var agents: [AgentConnection] = MockAgentService.loadAgents()
     @State private var showingLiDARScan = false
     @State private var showingBarcode = false
     @State private var showingProductScan = false
+    @State private var showingBeaconMonitor = false
     @State private var syncingAgentId: UUID?
     @State private var initialRoomCount = 0
     @State private var activePhotoAgent: AgentConnection?
     @State private var photoCapturedCount = 0
     @State private var initialBarcodeCount = 0
     @State private var initialProductCount = 0
+    @State private var initialBeaconCount = 0
     @State private var completedAgentName: String?
 
     var body: some View {
@@ -71,6 +74,9 @@ struct AgentsView: View {
         }
         .fullScreenCover(isPresented: $showingProductScan, onDismiss: handleProductScanDismiss) {
             ProductScanFlowView(captureContext: activeCaptureContext)
+        }
+        .fullScreenCover(isPresented: $showingBeaconMonitor, onDismiss: handleBeaconDismiss) {
+            BeaconMonitorView(captureContext: activeCaptureContext)
         }
     }
 
@@ -160,6 +166,10 @@ struct AgentsView: View {
             initialProductCount = productCaptures.count
             syncingAgentId = agent.id
             showingProductScan = true
+        case .beacon:
+            initialBeaconCount = beaconEvents.count
+            syncingAgentId = agent.id
+            showingBeaconMonitor = true
         case .motion:
             break
         }
@@ -199,6 +209,15 @@ struct AgentsView: View {
     private func handleBarcodeDismiss() {
         guard let agentId = syncingAgentId else { return }
         if scans.count > initialBarcodeCount {
+            triggerSyncAnimation(for: agentId)
+        } else {
+            syncingAgentId = nil
+        }
+    }
+
+    private func handleBeaconDismiss() {
+        guard let agentId = syncingAgentId else { return }
+        if beaconEvents.count > initialBeaconCount {
             triggerSyncAnimation(for: agentId)
         } else {
             syncingAgentId = nil
@@ -307,6 +326,7 @@ private struct AgentRequestCard: View {
         case .barcode: return "Scan Barcode"
         case .productScan: return "Scan Product"
         case .motion: return "Start Capture"
+        case .beacon: return "Start Monitoring"
         }
     }
 
@@ -317,6 +337,7 @@ private struct AgentRequestCard: View {
         case .barcode: return "barcode.viewfinder"
         case .productScan: return "barcode.viewfinder"
         case .motion: return "figure.walk"
+        case .beacon: return "sensor.tag.radiowaves.forward"
         }
     }
 }
@@ -458,5 +479,5 @@ private struct AgentDetailView: View {
 
 #Preview {
     AgentsView()
-        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self], inMemory: true)
+        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self, BeaconEventRecord.self], inMemory: true)
 }

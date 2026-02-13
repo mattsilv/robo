@@ -294,11 +294,12 @@ enum ExportService {
 
     // MARK: - Combined Export
 
-    /// Creates a ZIP containing all barcodes, rooms, and motion data in subdirectories.
+    /// Creates a ZIP containing all barcodes, rooms, motion, and beacon data in subdirectories.
     static func createCombinedExportZip(
         scans: [ExportableScan],
         rooms: [(name: String, summaryJSON: Data, fullRoomDataJSON: Data)],
-        motionRecords: [Data] = []
+        motionRecords: [Data] = [],
+        beaconEvents: [ExportableBeaconEvent] = []
     ) throws -> URL {
         let fm = FileManager.default
         let exportDir = fm.temporaryDirectory
@@ -414,6 +415,48 @@ enum ExportService {
             }
         }
 
+        // Beacons subdirectory
+        if !beaconEvents.isEmpty {
+            let beaconsDir = exportDir.appendingPathComponent("beacons")
+            try fm.createDirectory(at: beaconsDir, withIntermediateDirectories: true)
+
+            let jsonRecords: [[String: Any]] = beaconEvents.map { event in
+                var record: [String: Any] = [
+                    "event_type": event.eventType,
+                    "beacon_minor": event.beaconMinor,
+                    "source": event.source,
+                    "webhook_status": event.webhookStatus,
+                    "captured_at": formatter.string(from: event.capturedAt)
+                ]
+                if let name = event.roomName { record["room_name"] = name }
+                if let prox = event.proximity { record["proximity"] = prox }
+                if let rssi = event.rssi { record["rssi"] = rssi }
+                if let dist = event.distanceMeters { record["distance_meters"] = dist }
+                if let dur = event.durationSeconds { record["duration_seconds"] = dur }
+                return record
+            }
+            let jsonData = try JSONSerialization.data(
+                withJSONObject: jsonRecords,
+                options: [.prettyPrinted, .sortedKeys]
+            )
+            try jsonData.write(to: beaconsDir.appendingPathComponent("beacon_events.json"))
+
+            var csv = "event_type,beacon_minor,room_name,proximity,rssi,distance_meters,duration_seconds,source,webhook_status,captured_at\n"
+            for event in beaconEvents {
+                let room = csvField(event.roomName)
+                let prox = csvField(event.proximity)
+                let rssi = event.rssi.map { String($0) } ?? ""
+                let dist = event.distanceMeters.map { String($0) } ?? ""
+                let dur = event.durationSeconds.map { String($0) } ?? ""
+                csv += "\(event.eventType),\(event.beaconMinor),\(room),\(prox),\(rssi),\(dist),\(dur),\(event.source),\(event.webhookStatus),\(formatter.string(from: event.capturedAt))\n"
+            }
+            try csv.write(
+                to: beaconsDir.appendingPathComponent("beacon_events.csv"),
+                atomically: true,
+                encoding: .utf8
+            )
+        }
+
         // ZIP
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd-HHmmss"
@@ -464,4 +507,17 @@ enum ExportService {
 struct ExportableRoom {
     let summary: [String: Any]
     let fullRoom: CapturedRoom
+}
+
+struct ExportableBeaconEvent: Sendable {
+    let eventType: String
+    let beaconMinor: Int
+    let roomName: String?
+    let proximity: String?
+    let rssi: Int?
+    let distanceMeters: Double?
+    let durationSeconds: Int?
+    let source: String
+    let webhookStatus: String
+    let capturedAt: Date
 }

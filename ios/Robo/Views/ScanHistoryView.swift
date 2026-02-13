@@ -19,6 +19,8 @@ struct ScanHistoryView: View {
     private var completionRecords: [AgentCompletionRecord]
     @Query(sort: \ProductCaptureRecord.capturedAt, order: .reverse)
     private var productCaptures: [ProductCaptureRecord]
+    @Query(sort: \BeaconEventRecord.capturedAt, order: .reverse)
+    private var beaconEvents: [BeaconEventRecord]
     @Environment(\.modelContext) private var modelContext
 
     @State private var browseMode: BrowseMode = .byAgent
@@ -47,6 +49,7 @@ struct ScanHistoryView: View {
                         Text("Barcodes").tag(0)
                         Text("Rooms").tag(1)
                         Text("Motion").tag(2)
+                        Text("Beacons").tag(3)
                     }
                     .pickerStyle(.segmented)
                     .padding(.horizontal)
@@ -63,6 +66,7 @@ struct ScanHistoryView: View {
                         case 0: barcodeList
                         case 1: roomList
                         case 2: motionList
+                        case 3: beaconList
                         default: barcodeList
                         }
                     }
@@ -93,12 +97,13 @@ struct ScanHistoryView: View {
                                 Label("Export All", systemImage: "square.and.arrow.up")
                             }
                         }
-                        .disabled(isExporting || (scans.isEmpty && roomScans.isEmpty && motionRecords.isEmpty))
+                        .disabled(isExporting || (scans.isEmpty && roomScans.isEmpty && motionRecords.isEmpty && beaconEvents.isEmpty))
                     }
 
                     if (selectedSegment == 0 && !scans.isEmpty) ||
                        (selectedSegment == 1 && !roomScans.isEmpty) ||
-                       (selectedSegment == 2 && !motionRecords.isEmpty) {
+                       (selectedSegment == 2 && !motionRecords.isEmpty) ||
+                       (selectedSegment == 3 && !beaconEvents.isEmpty) {
                         ToolbarItem(placement: .destructiveAction) {
                             Button("Clear All", role: .destructive) {
                                 showingClearConfirmation = true
@@ -123,6 +128,8 @@ struct ScanHistoryView: View {
                     Text("This will permanently delete \(roomScans.count) room scan\(roomScans.count == 1 ? "" : "s").")
                 case 2:
                     Text("This will permanently delete \(motionRecords.count) motion record\(motionRecords.count == 1 ? "" : "s").")
+                case 3:
+                    Text("This will permanently delete \(beaconEvents.count) beacon event\(beaconEvents.count == 1 ? "" : "s").")
                 default:
                     Text("This will permanently delete all items.")
                 }
@@ -407,10 +414,30 @@ struct ScanHistoryView: View {
         }
     }
 
+    // MARK: - Beacon List
+
+    @ViewBuilder
+    private var beaconList: some View {
+        if beaconEvents.isEmpty {
+            ContentUnavailableView {
+                Label("No Beacon Events Yet", systemImage: "sensor.tag.radiowaves.forward")
+            } description: {
+                Text("Start beacon monitoring to see enter/exit events here.")
+            }
+        } else {
+            List {
+                ForEach(beaconEvents) { event in
+                    BeaconEventRow(event: event)
+                }
+                .onDelete(perform: deleteBeaconEvents)
+            }
+        }
+    }
+
     // MARK: - Export All Section
 
     private var totalItemCount: Int {
-        scans.count + roomScans.count + motionRecords.count
+        scans.count + roomScans.count + motionRecords.count + beaconEvents.count
     }
 
     @ViewBuilder
@@ -456,6 +483,13 @@ struct ScanHistoryView: View {
         try? modelContext.save()
     }
 
+    private func deleteBeaconEvents(at offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(beaconEvents[index])
+        }
+        try? modelContext.save()
+    }
+
     private func clearAll() {
         switch selectedSegment {
         case 0:
@@ -464,6 +498,8 @@ struct ScanHistoryView: View {
             for room in roomScans { modelContext.delete(room) }
         case 2:
             for motion in motionRecords { modelContext.delete(motion) }
+        case 3:
+            for event in beaconEvents { modelContext.delete(event) }
         default:
             break
         }
@@ -500,12 +536,16 @@ struct ScanHistoryView: View {
             (name: $0.roomName, summaryJSON: $0.summaryJSON, fullRoomDataJSON: $0.fullRoomDataJSON)
         }
         let motionData = motionRecords.map { $0.activityJSON }
+        let beaconData = beaconEvents.map {
+            ExportableBeaconEvent(eventType: $0.eventType, beaconMinor: $0.beaconMinor, roomName: $0.roomName, proximity: $0.proximity, rssi: $0.rssi, distanceMeters: $0.distanceMeters, durationSeconds: $0.durationSeconds, source: $0.source, webhookStatus: $0.webhookStatus, capturedAt: $0.capturedAt)
+        }
         Task.detached {
             do {
                 let url = try ExportService.createCombinedExportZip(
                     scans: barcodeData,
                     rooms: roomData,
-                    motionRecords: motionData
+                    motionRecords: motionData,
+                    beaconEvents: beaconData
                 )
                 await MainActor.run {
                     shareURL = url
@@ -765,7 +805,88 @@ struct ProductCaptureRow: View {
     }
 }
 
+// MARK: - Beacon Event Row
+
+struct BeaconEventRow: View {
+    let event: BeaconEventRecord
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: event.eventType == "enter" ? "arrow.right.circle.fill" : "arrow.left.circle.fill")
+                .font(.title3)
+                .foregroundColor(event.eventType == "enter" ? .green : .orange)
+                .frame(width: 32)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(event.eventType == "enter" ? "Entered" : "Exited")
+                        .font(.subheadline.weight(.medium))
+                    Text(event.roomName ?? "Beacon \(event.beaconMinor)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 8) {
+                    if let proximity = event.proximity {
+                        Text(proximity)
+                            .font(.caption)
+                    }
+                    Text("Minor: \(event.beaconMinor)")
+                        .font(.caption.monospaced())
+                    if let distance = event.distanceMeters {
+                        Text(String(format: "%.1fm", distance))
+                            .font(.caption)
+                    }
+                }
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(event.capturedAt, style: .relative)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                webhookStatusBadge
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var webhookStatusBadge: some View {
+        switch event.webhookStatus {
+        case "sent":
+            Text("Sent")
+                .font(.caption2)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(.green.opacity(0.15))
+                .foregroundStyle(.green)
+                .clipShape(Capsule())
+        case "failed":
+            Text("Failed")
+                .font(.caption2)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(.red.opacity(0.15))
+                .foregroundStyle(.red)
+                .clipShape(Capsule())
+        case "pending":
+            Text("Pending")
+                .font(.caption2)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(.yellow.opacity(0.15))
+                .foregroundStyle(.yellow)
+                .clipShape(Capsule())
+        default:
+            EmptyView()
+        }
+    }
+}
+
 #Preview {
     ScanHistoryView()
-        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self, MotionRecord.self, AgentCompletionRecord.self, ProductCaptureRecord.self], inMemory: true)
+        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self, MotionRecord.self, AgentCompletionRecord.self, ProductCaptureRecord.self, BeaconEventRecord.self], inMemory: true)
 }

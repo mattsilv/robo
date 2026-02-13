@@ -30,6 +30,25 @@ The future of building is agentic — but there's an insane amount of friction g
 
 See [docs/use-cases.md](docs/use-cases.md) for detailed examples.
 
+## Key Concepts
+
+### HIT Links (Human Intelligence Tasks)
+HIT links are Robo's mechanism for **getting data from people who don't have the app.** A HIT link is a shareable URL you can text/email to anyone — they open it in their browser, provide the requested data, and results flow back to you in Robo.
+
+- **No app install required** for the recipient — works in any browser
+- **Works via any channel** — iMessage, WhatsApp, email, Slack, etc.
+- **Configurable payloads** — photos, selections, text, dates, ratings
+- **Results aggregate** back to the requesting user's Robo app
+- **Backend:** `workers/src/routes/hits.ts`, D1 migration `0002_hits.sql`
+
+HIT links are a **general-purpose primitive** — any feature built on HIT links should keep the abstraction clean. Don't couple HIT link logic to a specific agent or use case.
+
+### Chat-First UX (Planned — see #113)
+The app's direction is **chat as the primary UI** for configuring agents and complex features. Instead of building form UIs for each new agent, users talk to a chat agent that can accomplish anything in the app. Backend: MCP server on Cloudflare Workers.
+
+### Agents
+Agents are defined in `ios/Robo/Services/MockAgentService.swift` and skills in `ios/Robo/Models/AgentConnection.swift`. Current agents include: Interior Designer, Pantry Tracker, Fitness Coach, Color Analyst, Florist, and Group Think (planned).
+
 ## Technology Stack
 
 ### iOS (Swift)

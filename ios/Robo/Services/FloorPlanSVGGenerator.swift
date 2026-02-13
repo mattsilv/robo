@@ -111,5 +111,7 @@ enum FloorPlanSVGGenerator {
             .replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")
             .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "'", with: "&apos;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
     }
 }

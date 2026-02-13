@@ -28,7 +28,6 @@ struct Room3DView: UIViewRepresentable {
         let walls = summary.walls
         let floorPolygon = summary.floorPolygon
         let ceilingHeight = summary.ceilingHeight
-        let objects = summary.objects
 
         // Compute centroid for camera targeting
         let centroid = computeCentroid(walls: walls, floorPolygon: floorPolygon)
@@ -59,12 +58,6 @@ struct Room3DView: UIViewRepresentable {
             scene.rootNode.addChildNode(ceilingNode)
         }
 
-        // Objects
-        for obj in objects {
-            let objNode = makeObjectNode(object: obj)
-            scene.rootNode.addChildNode(objNode)
-        }
-
         // Lighting
         addLighting(to: scene, centroid: centroid, ceilingHeight: ceilingHeight)
 
@@ -84,20 +77,10 @@ struct Room3DView: UIViewRepresentable {
         let rotationDeg: Double
     }
 
-    private struct ObjectInfo {
-        let category: String
-        let centerX: Double
-        let centerZ: Double
-        let widthFt: Double
-        let depthFt: Double
-        let heightFt: Double
-    }
-
     private struct RoomSummary {
         let walls: [WallInfo]
         let floorPolygon: [(x: Double, y: Double)]
         let ceilingHeight: Double
-        let objects: [ObjectInfo]
     }
 
     private func parseSummary() -> RoomSummary? {
@@ -125,19 +108,7 @@ struct Room3DView: UIViewRepresentable {
 
         let ceilingHeight = dict["ceiling_height_ft"] as? Double ?? 0
 
-        // Objects
-        let objDicts = dict["objects"] as? [[String: Any]] ?? []
-        let objects = objDicts.compactMap { o -> ObjectInfo? in
-            guard let cat = o["category"] as? String,
-                  let cx = o["center_x_ft"] as? Double,
-                  let cz = o["center_y_ft"] as? Double,
-                  let w = o["width_ft"] as? Double,
-                  let d = o["depth_ft"] as? Double,
-                  let h = o["height_ft"] as? Double else { return nil }
-            return ObjectInfo(category: cat, centerX: cx, centerZ: cz, widthFt: w, depthFt: d, heightFt: h)
-        }
-
-        return RoomSummary(walls: walls, floorPolygon: floorPolygon, ceilingHeight: ceilingHeight, objects: objects)
+        return RoomSummary(walls: walls, floorPolygon: floorPolygon, ceilingHeight: ceilingHeight)
     }
 
     // MARK: - Node Builders
@@ -203,26 +174,6 @@ struct Room3DView: UIViewRepresentable {
         let node = SCNNode(geometry: shape)
         node.eulerAngles.x = -.pi / 2
         node.position.y = Float(height)
-        return node
-    }
-
-    private func makeObjectNode(object: ObjectInfo) -> SCNNode {
-        let box = SCNBox(
-            width: CGFloat(object.widthFt),
-            height: CGFloat(object.heightFt),
-            length: CGFloat(object.depthFt),
-            chamferRadius: 0.02
-        )
-        let material = SCNMaterial()
-        material.diffuse.contents = colorForCategory(object.category)
-        box.materials = [material]
-
-        let node = SCNNode(geometry: box)
-        node.position = SCNVector3(
-            Float(object.centerX),
-            Float(object.heightFt / 2),
-            Float(object.centerZ)
-        )
         return node
     }
 
@@ -305,20 +256,6 @@ struct Room3DView: UIViewRepresentable {
         let dx = (xs.max() ?? 0) - (xs.min() ?? 0)
         let dz = (zs.max() ?? 0) - (zs.min() ?? 0)
         return max(dx, dz)
-    }
-
-    private func colorForCategory(_ category: String) -> UIColor {
-        switch category.lowercased() {
-        case "table": return .systemBrown.withAlphaComponent(0.7)
-        case "bed": return .systemBlue.withAlphaComponent(0.7)
-        case "sofa", "couch": return .systemGreen.withAlphaComponent(0.7)
-        case "chair": return .systemOrange.withAlphaComponent(0.7)
-        case "storage", "cabinet", "shelf": return .systemYellow.withAlphaComponent(0.7)
-        case "television", "tv", "screen": return .systemPurple.withAlphaComponent(0.7)
-        case "bathtub", "toilet", "sink": return .systemCyan.withAlphaComponent(0.7)
-        case "fireplace", "stove", "oven": return .systemRed.withAlphaComponent(0.7)
-        default: return .systemGray.withAlphaComponent(0.7)
-        }
     }
 
     private func formatFeetInches(_ feet: Double) -> String {

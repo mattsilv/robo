@@ -3,9 +3,12 @@ import SceneKit
 
 struct RoomDetailView: View {
     let room: RoomScanRecord
+    @Environment(\.modelContext) private var modelContext
 
     @State private var shareURL: URL?
     @State private var show3D = false
+    @State private var isEditingName = false
+    @State private var editedName = ""
 
     private var summary: [String: Any]? {
         try? JSONSerialization.jsonObject(with: room.summaryJSON) as? [String: Any]
@@ -15,8 +18,40 @@ struct RoomDetailView: View {
         List {
             Section {
                 VStack(spacing: 4) {
-                    Text(room.roomName)
-                        .font(.title2.bold())
+                    if isEditingName {
+                        HStack {
+                            TextField("Room name", text: $editedName)
+                                .textFieldStyle(.roundedBorder)
+                                .onChange(of: editedName) { _, newValue in
+                                    if newValue.count > 100 {
+                                        editedName = String(newValue.prefix(100))
+                                    }
+                                }
+                            Button("Done") {
+                                let trimmed = editedName.trimmingCharacters(in: .whitespacesAndNewlines)
+                                if !trimmed.isEmpty {
+                                    room.roomName = trimmed
+                                    try? modelContext.save()
+                                }
+                                isEditingName = false
+                            }
+                            .fontWeight(.semibold)
+                        }
+                    } else {
+                        HStack {
+                            Spacer()
+                            Text(room.roomName)
+                                .font(.title2.bold())
+                            Button {
+                                editedName = room.roomName
+                                isEditingName = true
+                            } label: {
+                                Image(systemName: "pencil.circle")
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                    }
                     Text(room.capturedAt, format: .dateTime)
                         .font(.caption)
                         .foregroundStyle(.secondary)

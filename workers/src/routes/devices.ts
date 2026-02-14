@@ -11,18 +11,21 @@ export const registerDevice = async (c: Context<{ Bindings: Env }>) => {
 
   const { name } = validated.data;
   const deviceId = crypto.randomUUID();
+  const mcpToken = [...crypto.getRandomValues(new Uint8Array(24))]
+    .map(b => b.toString(16).padStart(2, '0')).join('');
   const now = new Date().toISOString();
 
   try {
     await c.env.DB.prepare(
-      'INSERT INTO devices (id, name, registered_at) VALUES (?, ?, ?)'
+      'INSERT INTO devices (id, name, mcp_token, registered_at) VALUES (?, ?, ?, ?)'
     )
-      .bind(deviceId, name, now)
+      .bind(deviceId, name, mcpToken, now)
       .run();
 
     return c.json({
       id: deviceId,
       name,
+      mcp_token: mcpToken,
       registered_at: now,
       last_seen_at: null,
     }, 201);

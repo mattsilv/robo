@@ -34,7 +34,8 @@ class APIService {
         return DeviceConfig(
             id: response.id,
             name: response.name,
-            apiBaseURL: baseURL
+            apiBaseURL: baseURL,
+            mcpToken: response.mcpToken
         )
     }
 
@@ -135,6 +136,12 @@ class APIService {
 private struct RegisterResponse: Decodable {
     let id: String
     let name: String
+    let mcpToken: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name
+        case mcpToken = "mcp_token"
+    }
 }
 
 private struct SensorDataResponse: Decodable {

@@ -15,7 +15,7 @@ enum MockAgentService {
                 pendingRequest: AgentRequest(
                     id: UUID(uuidString: "00000000-0000-0000-0000-0000000000C0")!,
                     title: "Capture data for Claude Code",
-                    description: "Scan a room, photograph something, or scan a barcode. Then connect Claude Code:\nclaude mcp add robo --transport http https://robo-api.silv.workers.dev/mcp",
+                    description: "Scan a room, photograph something, or scan a barcode — then ask Claude about it. Visit robo.app/connect for setup.",
                     skillType: .lidar,
                     roomNameHint: nil
                 )

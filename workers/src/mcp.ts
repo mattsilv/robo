@@ -5,23 +5,23 @@ import type { Env } from './types';
 
 const MAX_R2_PAYLOAD_BYTES = 500_000; // 500 KB safety limit
 
-function createRoboMcpServer(env: Env) {
+function createRoboMcpServer(env: Env, deviceId: string) {
   const server = new McpServer({
     name: 'Robo Sensor Bridge',
     version: '1.0.0',
   });
 
   server.tool(
-    'list_devices',
-    'List all registered Robo devices with their names and last activity',
+    'get_device_info',
+    'Get info about the authenticated Robo device',
     {},
     async () => {
       try {
         const result = await env.DB.prepare(
-          'SELECT id, name, registered_at, last_seen_at FROM devices ORDER BY last_seen_at DESC'
-        ).all();
+          'SELECT id, name, registered_at, last_seen_at FROM devices WHERE id = ?'
+        ).bind(deviceId).first();
         return {
-          content: [{ type: 'text', text: JSON.stringify(result.results, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (err: any) {
         return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
@@ -31,18 +31,16 @@ function createRoboMcpServer(env: Env) {
 
   server.tool(
     'list_captures',
-    'List sensor captures. Filter by device_id and/or sensor_type (barcode, camera, lidar, motion, beacon). Returns IDs and timestamps — use get_capture for full data.',
+    'List sensor captures for this device. Filter by sensor_type (barcode, camera, lidar, motion, beacon). Returns IDs and timestamps — use get_capture for full data.',
     {
-      device_id: z.string().optional().describe('Device UUID (omit for all devices)'),
       sensor_type: z.enum(['barcode', 'camera', 'lidar', 'motion', 'beacon']).optional()
         .describe('Filter by sensor type'),
       limit: z.number().default(20).describe('Max results (default 20)'),
     },
-    async ({ device_id, sensor_type, limit }) => {
+    async ({ sensor_type, limit }) => {
       try {
-        let query = 'SELECT id, device_id, sensor_type, captured_at FROM sensor_data WHERE 1=1';
-        const binds: any[] = [];
-        if (device_id) { query += ' AND device_id = ?'; binds.push(device_id); }
+        let query = 'SELECT id, device_id, sensor_type, captured_at FROM sensor_data WHERE device_id = ?';
+        const binds: any[] = [deviceId];
         if (sensor_type) { query += ' AND sensor_type = ?'; binds.push(sensor_type); }
         query += ' ORDER BY captured_at DESC LIMIT ?';
         binds.push(limit);
@@ -64,8 +62,8 @@ function createRoboMcpServer(env: Env) {
     async ({ id }) => {
       try {
         const result = await env.DB.prepare(
-          'SELECT * FROM sensor_data WHERE id = ?'
-        ).bind(id).first();
+          'SELECT * FROM sensor_data WHERE id = ? AND device_id = ?'
+        ).bind(id, deviceId).first();
         if (!result) {
           return { content: [{ type: 'text', text: 'Capture not found' }] };
         }
@@ -81,23 +79,19 @@ function createRoboMcpServer(env: Env) {
 
   server.tool(
     'get_latest_capture',
-    'Get the most recent sensor capture. For LiDAR room scans, this returns the D1 summary — for the FULL 3D room data, also call list_debug_payloads and get_debug_payload to retrieve the complete room geometry from R2.',
+    'Get the most recent sensor capture from this device. For LiDAR room scans, this returns the D1 summary — for the FULL 3D room data, also call list_debug_payloads and get_debug_payload to retrieve the complete room geometry from R2.',
     {
-      device_id: z.string().optional().describe('Device UUID (omit to get latest across ALL devices)'),
       sensor_type: z.enum(['barcode', 'camera', 'lidar', 'motion', 'beacon']).optional()
         .describe('Filter by sensor type'),
     },
-    async ({ device_id, sensor_type }) => {
+    async ({ sensor_type }) => {
       try {
-        let query = 'SELECT * FROM sensor_data WHERE 1=1';
-        const binds: any[] = [];
-        if (device_id) { query += ' AND device_id = ?'; binds.push(device_id); }
+        let query = 'SELECT * FROM sensor_data WHERE device_id = ?';
+        const binds: any[] = [deviceId];
         if (sensor_type) { query += ' AND sensor_type = ?'; binds.push(sensor_type); }
         query += ' ORDER BY captured_at DESC LIMIT 1';
 
-        const result = binds.length
-          ? await env.DB.prepare(query).bind(...binds).first()
-          : await env.DB.prepare(query).first();
+        const result = await env.DB.prepare(query).bind(...binds).first();
         if (!result) {
           return { content: [{ type: 'text', text: 'No captures found. The user may not have scanned anything yet.' }] };
         }
@@ -119,13 +113,11 @@ function createRoboMcpServer(env: Env) {
 
   server.tool(
     'list_debug_payloads',
-    'List debug sync payloads stored in R2 — these contain FULL sensor data (complete LiDAR room scans with 3D geometry, wall positions, surfaces). Use get_debug_payload to retrieve one.',
-    {
-      device_id: z.string().optional().describe('Device UUID (omit to search all devices)'),
-    },
-    async ({ device_id }) => {
+    'List debug sync payloads stored in R2 for this device — these contain FULL sensor data (complete LiDAR room scans with 3D geometry, wall positions, surfaces). Use get_debug_payload to retrieve one.',
+    {},
+    async () => {
       try {
-        const prefix = device_id ? `debug/${device_id}/` : 'debug/';
+        const prefix = `debug/${deviceId}/`;
         const listed = await env.BUCKET.list({ prefix, limit: 50 });
         const items = listed.objects.map((obj) => ({
           key: obj.key,
@@ -152,6 +144,13 @@ function createRoboMcpServer(env: Env) {
     },
     async ({ key }) => {
       try {
+        const expectedPrefix = `debug/${deviceId}/`;
+        if (!key.startsWith(expectedPrefix)) {
+          return {
+            content: [{ type: 'text', text: `Access denied. Keys must start with ${expectedPrefix}` }],
+            isError: true,
+          };
+        }
         const obj = await env.BUCKET.get(key);
         if (!obj) {
           return { content: [{ type: 'text', text: 'Payload not found' }] };
@@ -181,7 +180,31 @@ function createRoboMcpServer(env: Env) {
  * Creates a new McpServer per request (SDK 1.26.0+ security requirement).
  */
 export async function handleMcpRequest(request: Request, env: Env): Promise<Response> {
-  const server = createRoboMcpServer(env);
+  // Extract and validate Bearer token
+  const authHeader = request.headers.get('Authorization');
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  if (!token) {
+    return new Response(JSON.stringify({
+      jsonrpc: '2.0',
+      error: { code: -32000, message: 'Missing Authorization header. Use: claude mcp add robo --transport http URL --header "Authorization: Bearer YOUR_TOKEN"' },
+      id: null,
+    }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  const device = await env.DB.prepare(
+    'SELECT id, name FROM devices WHERE mcp_token = ?'
+  ).bind(token).first<{ id: string; name: string }>();
+
+  if (!device) {
+    return new Response(JSON.stringify({
+      jsonrpc: '2.0',
+      error: { code: -32000, message: 'Invalid token' },
+      id: null,
+    }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  const server = createRoboMcpServer(env, device.id);
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // Stateless mode
   });

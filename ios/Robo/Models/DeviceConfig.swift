@@ -5,6 +5,7 @@ struct DeviceConfig: Codable {
     var id: String
     var name: String
     var apiBaseURL: String
+    var mcpToken: String?
 
     static let unregisteredID = "unregistered"
 

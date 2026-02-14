@@ -45,6 +45,7 @@ struct SettingsView: View {
                     }
                 }
 
+                #if DEBUG
                 Section("API Configuration") {
                     TextField("API Base URL", text: $apiURL)
                         .textInputAutocapitalization(.never)
@@ -58,7 +59,6 @@ struct SettingsView: View {
                     .disabled(apiURL == deviceService.config.apiBaseURL)
                 }
 
-                #if DEBUG
                 Section("Developer") {
                     Toggle("Sync to Cloud", isOn: $debugSyncEnabled)
                     if debugSyncEnabled {

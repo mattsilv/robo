@@ -144,6 +144,13 @@ function createRoboMcpServer(env: Env, deviceId: string) {
     },
     async ({ key }) => {
       try {
+        const expectedPrefix = `debug/${deviceId}/`;
+        if (!key.startsWith(expectedPrefix)) {
+          return {
+            content: [{ type: 'text', text: `Access denied. Keys must start with ${expectedPrefix}` }],
+            isError: true,
+          };
+        }
         const obj = await env.BUCKET.get(key);
         if (!obj) {
           return { content: [{ type: 'text', text: 'Payload not found' }] };

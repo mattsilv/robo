@@ -40,7 +40,7 @@ export const getDevice = async (c: Context<{ Bindings: Env }>) => {
 
   try {
     const device = await c.env.DB.prepare(
-      'SELECT * FROM devices WHERE id = ?'
+      'SELECT id, name, registered_at, last_seen_at FROM devices WHERE id = ?'
     ).bind(deviceId).first<Device>();
 
     if (!device) {

@@ -339,6 +339,15 @@ private struct AddBeaconSheet: View {
                     provisioner.cancel()
                     provisioner.startScanning()
                 }
+
+                ShareLink(
+                    item: provisioner.exportDiagnosticLog(),
+                    subject: Text("Robo BLE Diagnostic Log"),
+                    message: Text("Connection diagnostic log from Robo app")
+                ) {
+                    Label("Share Diagnostic Logs", systemImage: "square.and.arrow.up")
+                        .font(.subheadline)
+                }
             }
         } header: {
             Text("Discover Sensors")

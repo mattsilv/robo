@@ -6,29 +6,35 @@
 
 ## Overview
 
-Robo is an iOS app that exposes phone sensors as HTTP API endpoints, allowing AI agents to request real-world data. Built with SwiftUI and Cloudflare Workers.
+Robo is an open-source iOS app that turns your phone's sensors into APIs any AI agent can use. LiDAR, camera, barcodes — no iOS development required.
 
-**Live API:** https://robo-api.silv.workers.dev
+**Live API:** https://api.robo.app
+**MCP Server:** https://mcp.robo.app/mcp
+**Landing Page:** https://robo.app
 
 ## Features
 
-### M1 (Current)
-- ✅ Barcode scanner with VisionKit
-- ✅ Real-time data submission to cloud
-- ✅ Device registration with auth middleware
-- ✅ Cloudflare Workers backend (Hono + D1)
+- **LiDAR Room Scanning** — Walk a room with AR guidance, export 3D data for AI analysis
+- **Barcode Scanner** — VisionKit-powered scanning with real-time cloud submission
+- **HIT Links** — Text anyone a link to capture photos/data — no app install required
+- **MCP Bridge** — Connect Claude Code (or any MCP client) directly to phone sensors
+- **Device Auth** — UUID-based device registration + Bearer token auth for MCP
+- **Guided Capture** — Tips before scanning, real-time AR feedback during
 
-### Coming Soon
-- M2: Inbox card system + Camera + AI analysis
-- M3: LiDAR room scanning
-- M4: Task system + API documentation
-- M5: Production deployment
+### Connect Claude Code to Your Phone
+
+```bash
+claude mcp add robo --transport http https://mcp.robo.app/mcp \
+  -H "Authorization: Bearer YOUR_MCP_TOKEN"
+```
+
+Then ask: *"What rooms has my phone scanned?"*
 
 ## Quick Start
 
 ### Prerequisites
 
-- Xcode 15.0+ (for iOS development)
+- Xcode 26.0+ (for iOS development)
 - Node.js 18+ (for Workers development)
 - [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier works)
 - [wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/)
@@ -77,12 +83,14 @@ Robo is an iOS app that exposes phone sensors as HTTP API endpoints, allowing AI
 ```
 ┌─────────┐     ┌──────────────────┐     ┌─────────┐
 │  iOS    │────▶│  Workers (Hono)  │────▶│  Claude  │
-│  App    │◀────│  D1 + R2         │◀────│  Opus    │
+│  App    │◀────│  D1 + R2         │◀────│  Code    │
 └─────────┘     └──────────────────┘     └─────────┘
-                        ▲
-                        │
-                   AI Agents
-                  (external)
+                   │  api.robo.app          │
+                   │  mcp.robo.app          │
+                   │                    MCP Client
+                   │
+              HIT Links
+            (browser-based)
 ```
 
 ### Tech Stack
@@ -90,16 +98,18 @@ Robo is an iOS app that exposes phone sensors as HTTP API endpoints, allowing AI
 **iOS:**
 - SwiftUI (iOS 17+)
 - VisionKit (barcode scanning)
-- ARKit (LiDAR - coming in M3)
+- ARKit + RoomPlan (LiDAR room scanning)
 - URLSession (async/await networking)
 
 **Backend:**
 - Cloudflare Workers (Hono + TypeScript)
 - D1 (SQLite database)
 - R2 (object storage)
-- Anthropic Claude API (M2+)
+- MCP server (Streamable HTTP transport)
 
 ## API Endpoints
+
+Base URL: `https://api.robo.app`
 
 | Method | Path | Auth | Purpose |
 |--------|------|:----:|---------|
@@ -107,17 +117,24 @@ Robo is an iOS app that exposes phone sensors as HTTP API endpoints, allowing AI
 | POST | `/api/devices/register` | - | Register device |
 | GET | `/api/devices/:device_id` | - | Get device info |
 | POST | `/api/sensors/data` | `X-Device-ID` | Submit sensor data |
+| POST | `/api/sensors/upload` | `X-Device-ID` | Get presigned R2 URL |
 | GET | `/api/inbox/:device_id` | - | Poll pending cards |
 | POST | `/api/inbox/push` | `X-Device-ID` | Agent pushes card |
 | POST | `/api/inbox/:card_id/respond` | `X-Device-ID` | User responds |
-| POST | `/api/opus/analyze` | - | Trigger AI analysis (M2+) |
+| POST | `/api/hits` | `X-Device-ID` | Create a HIT |
+| GET | `/api/hits/:id` | - | Get HIT details (public) |
+| POST | `/api/hits/:id/upload` | - | Upload photo to HIT |
+| PATCH | `/api/hits/:id/complete` | - | Mark HIT completed |
+| GET | `/api/hits/:id/photos` | - | List HIT photos |
+| POST | `/api/debug/payload` | `X-Device-ID` | Store debug payload |
+| POST | `/mcp` | `Bearer` | MCP endpoint |
 
 ### Example: Device Registration
 
 ```bash
-curl -X POST https://robo-api.silv.workers.dev/api/devices/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"My iPhone"}'
+http POST https://api.robo.app/api/devices/register \
+  Content-Type:application/json \
+  name="My iPhone" --timeout=10
 ```
 
 Response:
@@ -133,10 +150,12 @@ Response:
 ### Example: Submit Sensor Data (requires auth)
 
 ```bash
-curl -X POST https://robo-api.silv.workers.dev/api/sensors/data \
-  -H "Content-Type: application/json" \
-  -H "X-Device-ID: 550e8400-e29b-41d4-a716-446655440000" \
-  -d '{"device_id":"550e8400-e29b-41d4-a716-446655440000","sensor_type":"barcode","data":{"value":"012345678901"}}'
+http POST https://api.robo.app/api/sensors/data \
+  Content-Type:application/json \
+  X-Device-ID:550e8400-e29b-41d4-a716-446655440000 \
+  device_id=550e8400-e29b-41d4-a716-446655440000 \
+  sensor_type=barcode \
+  data:='{"value":"012345678901"}' --timeout=10
 ```
 
 ## Development
@@ -153,7 +172,7 @@ xcodegen generate
 xcodebuild -scheme Robo -configuration Debug -sdk iphonesimulator build
 ```
 
-**Note:** Barcode scanner requires a physical device (not supported on simulator).
+**Note:** Barcode scanner and LiDAR require a physical device (not supported on simulator).
 
 ### Workers Development
 
@@ -187,25 +206,24 @@ wrangler d1 execute robo-db --command "SELECT * FROM devices"
 
 ```bash
 # Health check
-curl https://robo-api.silv.workers.dev/health
+http GET https://api.robo.app/health --timeout=10
 
 # Register device
-curl -X POST https://robo-api.silv.workers.dev/api/devices/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"test-device"}'
+http POST https://api.robo.app/api/devices/register \
+  Content-Type:application/json \
+  name=test-device --timeout=10
 ```
 
 ## Deployment
 
 ### TestFlight
 
-See [docs/testflight-deployment.md](docs/testflight-deployment.md) for complete TestFlight deployment guide.
+Auto-deploys to TestFlight on push to `main` when `ios/**` files change (via `.github/workflows/testflight.yml`). Can also trigger manually:
+```bash
+gh workflow run testflight.yml
+```
 
-**Quick steps:**
-1. Create 1024x1024 app icon
-2. Archive in Xcode: Product → Archive
-3. Upload to App Store Connect
-4. Submit for TestFlight review
+See [docs/testflight-deployment.md](docs/testflight-deployment.md) for complete TestFlight deployment guide.
 
 ### Workers Production
 
@@ -219,6 +237,7 @@ wrangler deploy
 - [CLAUDE.md](CLAUDE.md) - Development conventions
 - [docs/cloudflare-resources.md](docs/cloudflare-resources.md) - Cloudflare resource inventory
 - [docs/testflight-deployment.md](docs/testflight-deployment.md) - TestFlight deployment guide
+- [docs/use-cases.md](docs/use-cases.md) - Use cases and demo scenarios
 - [docs/solutions/](docs/solutions/) - Problem solutions and troubleshooting
 
 ## Contributing
@@ -241,8 +260,5 @@ Built by [Matt Silverman](https://silv.app) and [Claude Code](https://claude.ai/
 
 - [Hono](https://hono.dev/) web framework
 - [VisionKit](https://developer.apple.com/documentation/visionkit) for barcode scanning
+- [ARKit + RoomPlan](https://developer.apple.com/augmented-reality/roomplan/) for LiDAR scanning
 - [Cloudflare Workers](https://workers.cloudflare.com/) for serverless backend
-
----
-
-**Project Status:** M1 Complete (5/5 milestones) | **Next Milestone:** M2 (Inbox + Camera + AI)

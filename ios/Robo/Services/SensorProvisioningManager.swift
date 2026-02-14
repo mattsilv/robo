@@ -104,6 +104,7 @@ class SensorProvisioningManager: NSObject {
     // Timeout tasks
     private var connectionTimeoutTask: Task<Void, Never>?
     private var discoveryTimeoutTask: Task<Void, Never>?
+    private var readyTimeoutTask: Task<Void, Never>?
     private var saveTimeoutTask: Task<Void, Never>?
 
     override init() {
@@ -267,6 +268,18 @@ class SensorProvisioningManager: NSObject {
         }
     }
 
+    private func startReadyTimeout() {
+        readyTimeoutTask?.cancel()
+        readyTimeoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(BLETimeout.characteristicDiscovery))
+            guard !Task.isCancelled, let self else { return }
+            guard case .discoveringServices = self.state else { return }
+            self.log("Ready timeout", detail: "No 'ready' status after \(Int(BLETimeout.characteristicDiscovery))s — proceeding anyway (characteristics already discovered)")
+            // Transition to ready anyway — we have the characteristics, the status notification is optional
+            self.state = .ready
+        }
+    }
+
     private func startSaveTimeout() {
         saveTimeoutTask?.cancel()
         saveTimeoutTask = Task { @MainActor [weak self] in
@@ -283,6 +296,8 @@ class SensorProvisioningManager: NSObject {
         connectionTimeoutTask = nil
         discoveryTimeoutTask?.cancel()
         discoveryTimeoutTask = nil
+        readyTimeoutTask?.cancel()
+        readyTimeoutTask = nil
         saveTimeoutTask?.cancel()
         saveTimeoutTask = nil
     }
@@ -463,6 +478,10 @@ extension SensorProvisioningManager: CBPeripheralDelegate {
 
         let charUUIDs = chars.map(\.uuid.uuidString)
         log("Characteristics ready", detail: "Found \(chars.count): \(charUUIDs.joined(separator: ", "))")
+
+        // Start timeout for "ready" status notification — if sensor doesn't report ready,
+        // we proceed anyway since we already have all characteristics
+        startReadyTimeout()
     }
 
     func peripheral(_ peripheral: CBPeripheral,
@@ -476,6 +495,8 @@ extension SensorProvisioningManager: CBPeripheralDelegate {
 
         switch statusString {
         case "ready":
+            readyTimeoutTask?.cancel()
+            readyTimeoutTask = nil
             state = .ready
         case "saved":
             saveTimeoutTask?.cancel()

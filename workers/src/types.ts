@@ -92,6 +92,13 @@ export const CreateHitSchema = z.object({
   recipient_name: z.string().min(1).max(50),
   task_description: z.string().min(1).max(500),
   agent_name: z.string().max(100).optional(),
+  hit_type: z.enum(['photo', 'poll', 'availability']).optional(),
+  config: z.record(z.any()).optional(),
+});
+
+export const HitResponseSchema = z.object({
+  respondent_name: z.string().min(1).max(50),
+  response_data: z.record(z.any()),
 });
 
 export type HitStatus = 'pending' | 'in_progress' | 'completed' | 'expired';
@@ -108,6 +115,16 @@ export type Hit = {
   started_at: string | null;
   completed_at: string | null;
   device_id: string | null;
+  hit_type: string | null;
+  config: string | null;
+};
+
+export type HitResponse = {
+  id: string;
+  hit_id: string;
+  respondent_name: string;
+  response_data: string;
+  created_at: string;
 };
 
 export type HitPhoto = {

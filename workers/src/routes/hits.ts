@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import { CreateHitSchema, type Env, type Hit, type HitPhoto } from '../types';
+import { CreateHitSchema, HitResponseSchema, type Env, type Hit, type HitPhoto, type HitResponse } from '../types';
 
 // Default sender for CLI/API-created HITs
 const DEFAULT_SENDER = 'M. Silverman';
@@ -28,7 +28,7 @@ export async function createHit(c: Context<{ Bindings: Env }>) {
     return c.json({ error: 'Invalid request body', issues: validated.error.issues }, 400);
   }
 
-  const { recipient_name, task_description, agent_name } = validated.data;
+  const { recipient_name, task_description, agent_name, hit_type, config } = validated.data;
   const id = generateShortId();
   const now = new Date().toISOString();
 
@@ -37,10 +37,10 @@ export async function createHit(c: Context<{ Bindings: Env }>) {
 
   try {
     await c.env.DB.prepare(
-      `INSERT INTO hits (id, sender_name, recipient_name, task_description, agent_name, status, photo_count, created_at, device_id)
-       VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?)`
+      `INSERT INTO hits (id, sender_name, recipient_name, task_description, agent_name, status, photo_count, created_at, device_id, hit_type, config)
+       VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?)`
     )
-      .bind(id, DEFAULT_SENDER, recipient_name, task_description, agent_name || null, now, deviceId)
+      .bind(id, DEFAULT_SENDER, recipient_name, task_description, agent_name || null, now, deviceId, hit_type || 'photo', config ? JSON.stringify(config) : null)
       .run();
 
     return c.json(
@@ -273,5 +273,105 @@ export async function listHitPhotos(c: Context<{ Bindings: Env }>) {
   } catch (error) {
     console.error('Failed to list HIT photos:', error);
     return c.json({ error: 'Failed to list HIT photos' }, 500);
+  }
+}
+
+/**
+ * POST /api/hits/:id/respond — Submit a structured response to a HIT
+ */
+export async function respondToHit(c: Context<{ Bindings: Env }>) {
+  const hitId = c.req.param('id');
+
+  const body = await c.req.json().catch(() => null);
+  if (!body) {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  const validated = HitResponseSchema.safeParse(body);
+  if (!validated.success) {
+    return c.json({ error: 'Invalid request body', issues: validated.error.issues }, 400);
+  }
+
+  const { respondent_name, response_data } = validated.data;
+
+  try {
+    const hit = await c.env.DB.prepare('SELECT * FROM hits WHERE id = ?').bind(hitId).first<Hit>();
+
+    if (!hit) {
+      return c.json({ error: 'HIT not found' }, 404);
+    }
+
+    if (hit.status === 'completed' || hit.status === 'expired') {
+      return c.json({ error: `HIT is ${hit.status}` }, 400);
+    }
+
+    const responseId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    await c.env.DB.prepare(
+      'INSERT INTO hit_responses (id, hit_id, respondent_name, response_data, created_at) VALUES (?, ?, ?, ?, ?)'
+    )
+      .bind(responseId, hitId, respondent_name, JSON.stringify(response_data), now)
+      .run();
+
+    // Mark HIT as in_progress if still pending
+    if (hit.status === 'pending') {
+      await c.env.DB.prepare("UPDATE hits SET status = 'in_progress', started_at = ? WHERE id = ? AND status = 'pending'")
+        .bind(now, hitId)
+        .run();
+    }
+
+    return c.json(
+      {
+        id: responseId,
+        hit_id: hitId,
+        respondent_name,
+        response_data,
+        created_at: now,
+      },
+      201
+    );
+  } catch (error) {
+    console.error('Failed to submit HIT response:', error);
+    return c.json({ error: 'Failed to submit response' }, 500);
+  }
+}
+
+/**
+ * GET /api/hits/:id/responses — List structured responses for a HIT
+ */
+export async function listHitResponses(c: Context<{ Bindings: Env }>) {
+  const hitId = c.req.param('id');
+
+  try {
+    const hit = await c.env.DB.prepare('SELECT * FROM hits WHERE id = ?').bind(hitId).first<Hit>();
+
+    if (!hit) {
+      return c.json({ error: 'HIT not found' }, 404);
+    }
+
+    const result = await c.env.DB.prepare(
+      'SELECT * FROM hit_responses WHERE hit_id = ? ORDER BY created_at ASC'
+    )
+      .bind(hitId)
+      .all<HitResponse>();
+
+    // Parse response_data JSON for each response
+    const responses = result.results.map((r) => ({
+      ...r,
+      response_data: JSON.parse(r.response_data),
+    }));
+
+    return c.json(
+      {
+        hit_id: hitId,
+        responses,
+        count: responses.length,
+      },
+      200
+    );
+  } catch (error) {
+    console.error('Failed to list HIT responses:', error);
+    return c.json({ error: 'Failed to list HIT responses' }, 500);
   }
 }

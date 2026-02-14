@@ -63,7 +63,7 @@ class ChatService {
                 for try await partial in stream {
                     guard !Task.isCancelled else { break }
                     guard self.activeAssistantMessageId == targetId else { break }
-                    let text = String(describing: partial)
+                    let text = partial.content
                     self.currentStreamingText = text
                     self.updateMessage(id: targetId, content: text)
                 }
@@ -135,8 +135,9 @@ class ChatService {
         explain how the user can do it themselves using the Capture tab. \
         Action capabilities are coming in a future update.
 
-        Keep responses concise (2-3 sentences unless the user asks for detail). \
-        Be friendly and helpful.
+        IMPORTANT: Keep responses very short — 1-2 sentences max. \
+        Only give longer answers if the user explicitly asks for detail. \
+        Never use bullet points or lists unless asked. Be direct and conversational.
         """
     }
 }

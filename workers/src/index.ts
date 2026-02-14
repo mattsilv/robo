@@ -11,7 +11,7 @@ import { getInbox, pushCard, respondToCard } from './routes/inbox';
 import { analyzeWithOpus } from './routes/opus';
 import { debugSync, debugList, debugGet } from './routes/debug';
 import { lookupNutrition } from './routes/nutrition';
-import { createHit, getHit, uploadHitPhoto, completeHit, listHits, listHitPhotos } from './routes/hits';
+import { createHit, getHit, uploadHitPhoto, completeHit, listHits, listHitPhotos, respondToHit, listHitResponses } from './routes/hits';
 import { deviceAuth } from './middleware/deviceAuth';
 import { handleMcpRequest } from './mcp';
 
@@ -52,6 +52,8 @@ app.get('/api/hits/:id', getHit);
 app.post('/api/hits/:id/upload', uploadHitPhoto);
 app.patch('/api/hits/:id/complete', completeHit);
 app.get('/api/hits/:id/photos', listHitPhotos);
+app.post('/api/hits/:id/respond', respondToHit);
+app.get('/api/hits/:id/responses', listHitResponses);
 
 // Debug sync (stores scan data in R2 for developer debugging)
 app.post('/api/debug/sync', debugSync);

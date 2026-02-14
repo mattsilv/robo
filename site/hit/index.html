@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Robo — You've been invited</title>
+  <meta name="description" content="Someone sent you a request via Robo">
+
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#06060a">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+    :root {
+      --blue: #2563EB;
+      --blue-light: #3b82f6;
+      --blue-glow: rgba(37, 99, 235, 0.35);
+      --blue-dim: rgba(37, 99, 235, 0.12);
+      --green: #22c55e;
+      --green-dim: rgba(34, 197, 94, 0.12);
+      --green-border: rgba(34, 197, 94, 0.3);
+      --bg: #06060a;
+      --surface: #0d0d14;
+      --surface-raised: #12121c;
+      --border: rgba(255,255,255,0.06);
+      --border-accent: rgba(37, 99, 235, 0.2);
+      --text: #e2e2e8;
+      --text-dim: #6b6b7b;
+      --text-muted: #3d3d4d;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1.5rem 3rem;
+      max-width: 480px;
+      width: 100%;
+    }
+
+    /* Loading state */
+    .loading {
+      text-align: center;
+      padding: 4rem 1rem;
+    }
+
+    .loading .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+
+    /* Error state */
+    .error {
+      text-align: center;
+      padding: 4rem 1rem;
+    }
+
+    .error-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .error-msg {
+      font-size: 0.9rem;
+      color: var(--text-dim);
+    }
+
+    /* Header */
+    .hit-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .hit-logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      font-size: 0.8rem;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+    }
+
+    .hit-logo span { color: var(--blue-light); }
+
+    .hit-greeting {
+      font-size: 1.3rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+      line-height: 1.3;
+    }
+
+    .hit-description {
+      font-size: 1rem;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    /* Name input */
+    .name-section {
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+
+    .name-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    .name-input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .name-input:focus {
+      border-color: var(--blue);
+    }
+
+    .name-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    /* Availability grid */
+    .availability-section {
+      width: 100%;
+      margin-bottom: 2rem;
+    }
+
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+
+    .day-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .day-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .day-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      min-width: 3.5rem;
+      text-align: right;
+    }
+
+    .time-slots {
+      display: flex;
+      gap: 0.35rem;
+      flex: 1;
+    }
+
+    .time-slot {
+      flex: 1;
+      padding: 0.5rem 0.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .time-slot:hover {
+      border-color: var(--border-accent);
+      color: var(--text-dim);
+    }
+
+    .time-slot.selected {
+      background: var(--green-dim);
+      border-color: var(--green-border);
+      color: var(--green);
+    }
+
+    /* Submit button */
+    .submit-btn {
+      width: 100%;
+      padding: 0.85rem;
+      background: var(--blue);
+      border: none;
+      border-radius: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-bottom: 1rem;
+    }
+
+    .submit-btn:hover:not(:disabled) {
+      background: var(--blue-light);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .submit-btn.submitting {
+      opacity: 0.7;
+    }
+
+    /* Success state */
+    .success {
+      text-align: center;
+      padding: 2rem 0;
+      animation: fadeUp 0.5s ease-out;
+    }
+
+    .success-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+
+    .success-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--green);
+      margin-bottom: 0.5rem;
+    }
+
+    .success-msg {
+      font-size: 0.95rem;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Footer */
+    .hit-footer {
+      margin-top: 2rem;
+      text-align: center;
+    }
+
+    .hit-footer a {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      letter-spacing: 0.04em;
+      transition: color 0.2s;
+    }
+
+    .hit-footer a:hover {
+      color: var(--blue-light);
+    }
+
+    /* Responsive */
+    @media (max-width: 420px) {
+      .time-slot { font-size: 0.55rem; padding: 0.4rem 0.15rem; }
+      .day-label { min-width: 2.8rem; font-size: 0.65rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container" id="app">
+    <div class="loading" id="loading-state">
+      <div class="spinner"></div>
+      <p class="loading-text">Loading...</p>
+    </div>
+  </main>
+
+<script>
+(function() {
+  var API_BASE = 'https://robo-api.silv.workers.dev';
+  var app = document.getElementById('app');
+
+  // Extract HIT ID from URL path: /hit/{id}
+  var pathParts = window.location.pathname.split('/').filter(Boolean);
+  var hitId = pathParts.length >= 2 ? pathParts[pathParts.length - 1] : null;
+
+  if (!hitId || hitId === 'index.html') {
+    showError('Invalid link', 'This HIT link appears to be broken.');
+    return;
+  }
+
+  // Fetch HIT data
+  fetch(API_BASE + '/api/hits/' + hitId)
+    .then(function(res) {
+      if (!res.ok) throw new Error('HIT not found');
+      return res.json();
+    })
+    .then(function(hit) {
+      renderHit(hit);
+    })
+    .catch(function() {
+      showError('Not found', 'This link may have expired or been completed.');
+    });
+
+  function showError(title, msg) {
+    app.innerHTML = '<div class="error"><p class="error-title">' + title + '</p><p class="error-msg">' + msg + '</p></div>';
+  }
+
+  function renderHit(hit) {
+    var isAvailability = hit.hit_type === 'availability';
+    var isPoll = hit.hit_type === 'poll';
+
+    if (hit.status === 'completed') {
+      app.innerHTML = '<div class="hit-header"><div class="hit-logo">ROBO<span>.</span>APP</div></div>' +
+        '<div class="success"><div class="success-icon">&#10003;</div>' +
+        '<p class="success-title">This request has been completed</p>' +
+        '<p class="success-msg">Thanks for checking — ' + escapeHtml(hit.sender_name) + ' already has what they need.</p></div>' +
+        '<div class="hit-footer"><a href="https://robo.app">Powered by Robo</a></div>';
+      return;
+    }
+
+    if (isAvailability) {
+      renderAvailability(hit);
+    } else {
+      renderGenericHit(hit);
+    }
+  }
+
+  function renderAvailability(hit) {
+    var config = hit.config ? (typeof hit.config === 'string' ? JSON.parse(hit.config) : hit.config) : {};
+    var title = config.title || hit.task_description;
+    var dayCount = config.days || 5;
+    var timeSlots = config.time_slots || ['5 PM', '6 PM', '7 PM', '8 PM'];
+
+    // Generate next N days
+    var days = [];
+    for (var i = 0; i < dayCount; i++) {
+      var d = new Date();
+      d.setDate(d.getDate() + i + 1);
+      days.push({
+        label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+        short: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        date: d.toISOString().split('T')[0]
+      });
+    }
+
+    var html = '<div class="hit-header">' +
+      '<div class="hit-logo">ROBO<span>.</span>APP</div>' +
+      '<p class="hit-greeting">Hi! ' + escapeHtml(hit.sender_name) + ' is planning something.</p>' +
+      '<p class="hit-description">' + escapeHtml(title) + '</p>' +
+      '</div>';
+
+    html += '<div class="name-section">' +
+      '<label class="name-label" for="name-input">Your name</label>' +
+      '<input class="name-input" id="name-input" type="text" placeholder="' + escapeHtml(hit.recipient_name) + '" value="' + escapeHtml(hit.recipient_name) + '">' +
+      '</div>';
+
+    html += '<div class="availability-section">' +
+      '<span class="section-label">When are you free?</span>' +
+      '<div class="day-grid" id="day-grid">';
+
+    days.forEach(function(day) {
+      html += '<div class="day-row"><span class="day-label">' + day.short + '</span><div class="time-slots">';
+      timeSlots.forEach(function(time) {
+        html += '<div class="time-slot" data-day="' + day.date + '" data-time="' + time + '">' + time + '</div>';
+      });
+      html += '</div></div>';
+    });
+
+    html += '</div></div>';
+
+    html += '<button class="submit-btn" id="submit-btn" disabled>Select times, then submit</button>';
+    html += '<div id="result-area"></div>';
+    html += '<div class="hit-footer"><a href="https://robo.app">Powered by Robo</a></div>';
+
+    app.innerHTML = html;
+
+    // Wire up slot selection
+    var selectedSlots = {};
+    var grid = document.getElementById('day-grid');
+    grid.addEventListener('click', function(e) {
+      var slot = e.target.closest('.time-slot');
+      if (!slot) return;
+      var key = slot.dataset.day + '|' + slot.dataset.time;
+      if (selectedSlots[key]) {
+        delete selectedSlots[key];
+        slot.classList.remove('selected');
+      } else {
+        selectedSlots[key] = true;
+        slot.classList.add('selected');
+      }
+      updateSubmitBtn();
+    });
+
+    var submitBtn = document.getElementById('submit-btn');
+
+    function updateSubmitBtn() {
+      var count = Object.keys(selectedSlots).length;
+      if (count > 0) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit ' + count + ' time' + (count > 1 ? 's' : '');
+      } else {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Select times, then submit';
+      }
+    }
+
+    submitBtn.addEventListener('click', function() {
+      if (submitBtn.disabled) return;
+      submitBtn.disabled = true;
+      submitBtn.classList.add('submitting');
+      submitBtn.textContent = 'Submitting...';
+
+      var name = document.getElementById('name-input').value.trim() || hit.recipient_name;
+      var slots = Object.keys(selectedSlots).map(function(k) {
+        var parts = k.split('|');
+        return { date: parts[0], time: parts[1] };
+      });
+
+      fetch(API_BASE + '/api/hits/' + hitId + '/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          respondent_name: name,
+          response_data: { available_slots: slots }
+        })
+      })
+      .then(function(res) {
+        if (!res.ok) throw new Error('Failed to submit');
+        return res.json();
+      })
+      .then(function() {
+        document.getElementById('result-area').innerHTML =
+          '<div class="success"><div class="success-icon">&#10003;</div>' +
+          '<p class="success-title">Thanks, ' + escapeHtml(name) + '!</p>' +
+          '<p class="success-msg">Your availability has been shared with ' + escapeHtml(hit.sender_name) + '.</p></div>';
+        submitBtn.style.display = 'none';
+        document.querySelector('.availability-section').style.display = 'none';
+        document.querySelector('.name-section').style.display = 'none';
+      })
+      .catch(function() {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('submitting');
+        submitBtn.textContent = 'Error — tap to retry';
+      });
+    });
+  }
+
+  function renderGenericHit(hit) {
+    var html = '<div class="hit-header">' +
+      '<div class="hit-logo">ROBO<span>.</span>APP</div>' +
+      '<p class="hit-greeting">Hi ' + escapeHtml(hit.recipient_name) + '!</p>' +
+      '<p class="hit-description">' + escapeHtml(hit.sender_name) + ' sent you a request:</p>' +
+      '</div>';
+
+    html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem;width:100%;margin-bottom:2rem;">' +
+      '<p style="font-size:1.05rem;line-height:1.5;color:var(--text);">' + escapeHtml(hit.task_description) + '</p>';
+
+    if (hit.agent_name) {
+      html += '<p style="font-family:\'JetBrains Mono\',monospace;font-size:0.7rem;color:var(--text-muted);margin-top:0.75rem;text-transform:uppercase;letter-spacing:0.06em;">via ' + escapeHtml(hit.agent_name) + '</p>';
+    }
+
+    html += '</div>';
+    html += '<p style="font-size:0.85rem;color:var(--text-dim);text-align:center;">Photo upload is available in the Robo app.</p>';
+    html += '<div class="hit-footer"><a href="https://robo.app">Get Robo</a></div>';
+
+    app.innerHTML = html;
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+})();
+</script>
+</body>
+</html>

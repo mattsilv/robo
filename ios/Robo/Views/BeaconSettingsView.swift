@@ -235,6 +235,9 @@ private struct AddBeaconSheet: View {
 
                 // MARK: Manual Entry (Secondary)
                 manualEntrySection
+
+                // MARK: Diagnostic Log (Always visible when there are entries)
+                diagnosticLogSection
             }
             .navigationTitle("Add Beacon")
             .navigationBarTitleDisplayMode(.inline)
@@ -300,10 +303,22 @@ private struct AddBeaconSheet: View {
                 }
 
             case .connecting, .discoveringServices:
-                HStack(spacing: 12) {
-                    ProgressView()
-                    Text("Connecting...")
-                        .font(.subheadline)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(provisioner.state == .connecting ? "Connecting..." : "Discovering services...")
+                                .font(.subheadline)
+                            Text("This may take up to 15 seconds")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Button("Cancel", role: .destructive) {
+                        provisioner.cancel()
+                    }
+                    .font(.subheadline)
                 }
 
             case .ready:
@@ -338,15 +353,6 @@ private struct AddBeaconSheet: View {
                 Button("Try Again") {
                     provisioner.cancel()
                     provisioner.startScanning()
-                }
-
-                ShareLink(
-                    item: provisioner.exportDiagnosticLog(),
-                    subject: Text("Robo BLE Diagnostic Log"),
-                    message: Text("Connection diagnostic log from Robo app")
-                ) {
-                    Label("Share Diagnostic Logs", systemImage: "square.and.arrow.up")
-                        .font(.subheadline)
                 }
             }
         } header: {
@@ -587,6 +593,50 @@ private struct AddBeaconSheet: View {
         } footer: {
             if showManualEntry {
                 Text("Enter a room name and beacon ID if you've already configured your sensor.")
+            }
+        }
+    }
+
+    // MARK: - Diagnostic Log Section
+
+    @ViewBuilder
+    private var diagnosticLogSection: some View {
+        if !provisioner.diagnosticLog.isEmpty {
+            Section {
+                DisclosureGroup("Events (\(provisioner.diagnosticLog.count))") {
+                    let formatter = {
+                        let f = DateFormatter()
+                        f.dateFormat = "HH:mm:ss.SSS"
+                        return f
+                    }()
+                    ForEach(provisioner.diagnosticLog.suffix(20)) { entry in
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(formatter.string(from: entry.timestamp))
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(.tertiary)
+                                Text(entry.event)
+                                    .font(.caption.weight(.medium))
+                            }
+                            if let detail = entry.detail {
+                                Text(detail)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                ShareLink(
+                    item: provisioner.exportDiagnosticLog(),
+                    subject: Text("Robo BLE Diagnostic Log"),
+                    message: Text("BLE diagnostic log from Robo app")
+                ) {
+                    Label("Share Diagnostic Logs", systemImage: "square.and.arrow.up")
+                        .font(.subheadline)
+                }
+            } header: {
+                Text("Diagnostic Log")
             }
         }
     }

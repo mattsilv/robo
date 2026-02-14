@@ -14,7 +14,7 @@ interface HitData {
   photo_count: number;
 }
 
-const API_BASE = 'https://robo-api.silv.workers.dev';
+const API_BASE = 'https://api.robo.app';
 
 export const onRequest: PagesFunction = async (context) => {
   const hitId = context.params.id as string;

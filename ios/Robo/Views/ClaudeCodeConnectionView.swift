@@ -6,7 +6,7 @@ struct ClaudeCodeConnectionView: View {
     @State private var copied = false
 
     private var connectionCommand: String {
-        "claude mcp add robo --transport http https://robo-api.silv.workers.dev/mcp --header \"Authorization: Bearer \(mcpToken)\""
+        "claude mcp add robo --transport http https://mcp.robo.app/mcp --header \"Authorization: Bearer \(mcpToken)\""
     }
 
     var body: some View {

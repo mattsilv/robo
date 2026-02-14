@@ -16,7 +16,7 @@
 
 ## Workers
 - **Name:** robo-api
-- **URL:** https://robo-api.silv.workers.dev
+- **URL:** https://api.robo.app (custom domain), https://mcp.robo.app (MCP custom domain), https://robo-api.silv.workers.dev (workers.dev fallback)
 - **Version ID:** `98e106f7-db42-4791-ac6d-d9add74313e1`
 - **Main File:** `src/index.ts`
 - **Framework:** Hono + TypeScript

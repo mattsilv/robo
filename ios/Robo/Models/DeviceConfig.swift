@@ -12,7 +12,7 @@ struct DeviceConfig: Codable {
     static let `default` = DeviceConfig(
         id: unregisteredID,
         name: UIDevice.current.name,
-        apiBaseURL: "https://robo-api.silv.workers.dev"
+        apiBaseURL: "https://api.robo.app"
     )
 
     var isRegistered: Bool {

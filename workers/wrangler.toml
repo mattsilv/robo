@@ -15,5 +15,13 @@ database_id = "fb24f9a0-d52b-4a74-87ca-54069ec9471a"
 binding = "BUCKET"
 bucket_name = "robo-data"
 
+[[routes]]
+pattern = "api.robo.app"
+custom_domain = true
+
+[[routes]]
+pattern = "mcp.robo.app"
+custom_domain = true
+
 [vars]
 ENVIRONMENT = "production"

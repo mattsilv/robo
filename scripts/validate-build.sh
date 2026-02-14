@@ -19,7 +19,33 @@ else
     FAIL=1
 fi
 
-# 2. Check iOS SDK version (April 2026 requirement)
+# 2. Check all required Info.plist privacy keys are present
+REQUIRED_PLIST_KEYS=(
+    "NSCameraUsageDescription"
+    "NSPhotoLibraryUsageDescription"
+    "NSMotionUsageDescription"
+    "NSHealthShareUsageDescription"
+    "NSHealthUpdateUsageDescription"
+    "NSBluetoothAlwaysUsageDescription"
+    "NSLocationWhenInUseUsageDescription"
+    "NSLocationAlwaysAndWhenInUseUsageDescription"
+)
+PLIST_FILE="ios/Robo/Info.plist"
+PLIST_FAIL=0
+for KEY in "${REQUIRED_PLIST_KEYS[@]}"; do
+    if grep -q "$KEY" "$PLIST_FILE"; then
+        :
+    else
+        echo -e "${RED}FAIL${NC} Missing $KEY in Info.plist (App Store will reject)"
+        PLIST_FAIL=1
+        FAIL=1
+    fi
+done
+if [ $PLIST_FAIL -eq 0 ]; then
+    echo -e "${GREEN}PASS${NC} All required Info.plist privacy keys present"
+fi
+
+# 3. Check iOS SDK version (April 2026 requirement)
 SDK_VERSION=$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || echo "0")
 SDK_MAJOR=$(echo "$SDK_VERSION" | cut -d. -f1)
 if [ "$SDK_MAJOR" -ge 26 ]; then

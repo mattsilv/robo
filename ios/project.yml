@@ -67,6 +67,7 @@ targets:
         NSLocationAlwaysAndWhenInUseUsageDescription: "Robo needs background location access to detect beacons when the app is closed, triggering room-based automations."
         NSBluetoothAlwaysUsageDescription: "Robo uses Bluetooth to detect nearby iBeacon devices for room-aware automations."
         NSHealthShareUsageDescription: "Robo reads your sleep, workout, and activity data to share with your AI agents."
+        NSHealthUpdateUsageDescription: "Robo does not write health data, but HealthKit requires this description."
         UIBackgroundModes:
           - location
           - bluetooth-central

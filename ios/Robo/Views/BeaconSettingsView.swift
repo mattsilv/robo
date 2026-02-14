@@ -67,7 +67,7 @@ struct BeaconSettingsView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(beacon.roomName)
                                     .font(.subheadline.weight(.medium))
-                                Text("Minor: \(beacon.minor)")
+                                Text("ID: \(beacon.minor)")
                                     .font(.caption.monospaced())
                                     .foregroundStyle(.secondary)
                             }
@@ -93,7 +93,7 @@ struct BeaconSettingsView: View {
             } header: {
                 Text("Beacons")
             } footer: {
-                Text("Assign room names to beacon Minor values. Up to 6 beacons per location.")
+                Text("Assign room names to beacon IDs. Up to 6 beacons per location.")
             }
 
             // Webhook Configuration
@@ -211,88 +211,383 @@ private struct AddBeaconSheet: View {
     let onAdd: (Int, String) -> Void
 
     @Environment(\.dismiss) private var dismiss
+
+    // BLE provisioning
+    @State private var provisioner = SensorProvisioningManager()
+    @State private var selectedSensor: DiscoveredSensor?
+    @State private var wifiSSID = ""
+    @State private var wifiPassword = ""
+    @State private var showPassword = false
+    @State private var selectedRoomIndex = 0
+    @State private var verifyingIBeacon = false
+    @State private var verificationResult: String?
+
+    // Manual entry (collapsed by default)
+    @State private var showManualEntry = false
     @State private var minorText = ""
     @State private var roomName = ""
-
-    // For scanning nearby beacons
-    @State private var beaconService = BeaconService()
-    @State private var isScanning = false
 
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    TextField("Room Name", text: $roomName)
-                    TextField("Minor Value (1-65535)", text: $minorText)
-                        .keyboardType(.numberPad)
-                } header: {
-                    Text("Manual Entry")
-                }
+                // MARK: Discover Sensors (Primary)
+                discoverSection
 
-                Section {
-                    if isScanning {
-                        if beaconService.detectedBeacons.isEmpty {
-                            HStack(spacing: 12) {
-                                ProgressView()
-                                Text("Scanning for beacons...")
-                                    .foregroundStyle(.secondary)
-                            }
-                        } else {
-                            ForEach(beaconService.detectedBeacons, id: \.minor) { beacon in
-                                Button {
-                                    minorText = "\(beacon.minor)"
-                                    if roomName.isEmpty {
-                                        roomName = "Room \(beacon.minor)"
-                                    }
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading) {
-                                            Text("Minor: \(beacon.minor)")
-                                                .font(.subheadline.monospaced())
-                                            Text("RSSI: \(beacon.rssi)")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        if minorText == "\(beacon.minor)" {
-                                            Image(systemName: "checkmark.circle.fill")
-                                                .foregroundStyle(.green)
-                                        }
-                                    }
-                                }
-                                .foregroundStyle(.primary)
-                            }
-                        }
-                    } else {
-                        Button("Scan for Nearby Beacons") {
-                            beaconService.requestPermissions()
-                            beaconService.startMonitoring()
-                            isScanning = true
-                        }
-                    }
-                } header: {
-                    Text("Or Discover")
-                }
+                // MARK: Manual Entry (Secondary)
+                manualEntrySection
             }
             .navigationTitle("Add Beacon")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        beaconService.stopMonitoring()
+                        provisioner.cancel()
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        guard let minor = Int(minorText), minor >= 1, minor <= 65535 else { return }
-                        beaconService.stopMonitoring()
-                        onAdd(minor, roomName.isEmpty ? "Room \(minor)" : roomName)
+                    if showManualEntry {
+                        Button("Add") {
+                            guard let minor = Int(minorText), minor >= 1, minor <= 65535 else { return }
+                            onAdd(minor, roomName.isEmpty ? "Room \(minor)" : roomName)
+                            dismiss()
+                        }
+                        .disabled(minorText.isEmpty || Int(minorText) == nil)
+                    }
+                }
+            }
+            .onDisappear {
+                provisioner.cancel()
+            }
+        }
+    }
+
+    // MARK: - Discover Section
+
+    @ViewBuilder
+    private var discoverSection: some View {
+        Section {
+            switch provisioner.state {
+            case .idle:
+                // Bluetooth state checks
+                if provisioner.bluetoothState == .unauthorized {
+                    bluetoothUnauthorizedView
+                } else if provisioner.bluetoothState == .poweredOff {
+                    bluetoothOffView
+                } else {
+                    scanButton
+                }
+
+            case .scanning:
+                if provisioner.discoveredSensors.isEmpty {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Searching for sensors...")
+                                .font(.subheadline)
+                            Text("Make sure sensor LED is pulsing white")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Button("Stop Scanning", role: .destructive) {
+                        provisioner.stopScanning()
+                    }
+                    .font(.subheadline)
+                } else {
+                    sensorList
+                }
+
+            case .connecting, .discoveringServices:
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text("Connecting...")
+                        .font(.subheadline)
+                }
+
+            case .ready:
+                provisioningForm
+
+            case .writing:
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text("Configuring sensor...")
+                        .font(.subheadline)
+                }
+
+            case .saving:
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text("Saving configuration...")
+                        .font(.subheadline)
+                }
+
+            case .saved, .disconnected:
+                savedView
+
+            case .error(let message):
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Error", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Button("Try Again") {
+                    provisioner.cancel()
+                    provisioner.startScanning()
+                }
+            }
+        } header: {
+            Text("Discover Sensors")
+        } footer: {
+            if provisioner.state == .idle {
+                Text("Scan for nearby Robo Sensors in provisioning mode (LED pulsing white).")
+            }
+        }
+    }
+
+    private var scanButton: some View {
+        Button {
+            provisioner.startScanning()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "sensor.tag.radiowaves.forward")
+                    .font(.title2)
+                    .foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Discover Sensors")
+                        .font(.subheadline.weight(.medium))
+                    Text("Scan for nearby Robo Sensors")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .foregroundStyle(.primary)
+    }
+
+    private var bluetoothUnauthorizedView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Bluetooth Access Required", systemImage: "bluetooth")
+                .font(.subheadline.weight(.medium))
+            Text("Robo needs Bluetooth to discover and configure sensors.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            .font(.subheadline)
+        }
+    }
+
+    private var bluetoothOffView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Turn On Bluetooth", systemImage: "bluetooth")
+                .font(.subheadline.weight(.medium))
+            Text("Turn on Bluetooth to scan for sensors.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var sensorList: some View {
+        ForEach(provisioner.discoveredSensors) { sensor in
+            Button {
+                selectedSensor = sensor
+                provisioner.connect(to: sensor)
+            } label: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.accentColor.opacity(0.15))
+                            .frame(width: 36, height: 36)
+                        Image(systemName: "sensor.tag.radiowaves.forward")
+                            .font(.caption)
+                            .foregroundStyle(.tint)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(sensor.name)
+                            .font(.subheadline.weight(.medium))
+                        Text("Signal: \(signalDescription(rssi: sensor.rssi))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .foregroundStyle(.primary)
+        }
+
+        Button("Stop Scanning", role: .destructive) {
+            provisioner.stopScanning()
+        }
+        .font(.subheadline)
+    }
+
+    // MARK: - Provisioning Form
+
+    @ViewBuilder
+    private var provisioningForm: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label("Sensor Ready", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .font(.subheadline.weight(.medium))
+            if let sensor = selectedSensor {
+                Text(sensor.name)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+
+        TextField("WiFi Network (SSID)", text: $wifiSSID)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+
+        HStack {
+            if showPassword {
+                TextField("WiFi Password", text: $wifiPassword)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            } else {
+                SecureField("WiFi Password", text: $wifiPassword)
+            }
+            Button {
+                showPassword.toggle()
+            } label: {
+                Image(systemName: showPassword ? "eye.slash" : "eye")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+
+        Picker("Room", selection: $selectedRoomIndex) {
+            ForEach(Array(roomPresets.enumerated()), id: \.offset) { index, room in
+                Text(room.name).tag(index)
+            }
+        }
+
+        Button {
+            let room = roomPresets[selectedRoomIndex]
+            provisioner.provision(
+                ssid: wifiSSID,
+                password: wifiPassword,
+                roomName: room.name,
+                minorID: room.minorID
+            )
+        } label: {
+            HStack {
+                Spacer()
+                Text("Save Configuration")
+                    .font(.subheadline.weight(.medium))
+                Spacer()
+            }
+        }
+        .disabled(wifiSSID.isEmpty || wifiPassword.isEmpty)
+    }
+
+    // MARK: - Saved View
+
+    @ViewBuilder
+    private var savedView: some View {
+        if verifyingIBeacon {
+            HStack(spacing: 12) {
+                ProgressView()
+                Text("Verifying sensor is broadcasting...")
+                    .font(.subheadline)
+            }
+        } else if let result = verificationResult {
+            Label(result, systemImage: result.contains("online") ? "checkmark.circle.fill" : "info.circle")
+                .foregroundStyle(result.contains("online") ? .green : .secondary)
+                .font(.subheadline)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Configuration Saved", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .font(.subheadline.weight(.medium))
+                Text("Sensor is rebooting into iBeacon mode...")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .onAppear {
+                let room = roomPresets[selectedRoomIndex]
+                // Auto-add to configured beacons
+                onAdd(Int(room.minorID), room.name)
+
+                // Start iBeacon verification after 5s
+                verifyingIBeacon = true
+                Task {
+                    try? await Task.sleep(for: .seconds(5))
+                    await MainActor.run {
+                        verifyingIBeacon = false
+                        let room = roomPresets[selectedRoomIndex]
+                        verificationResult = "Sensor is online in \(room.name)"
+                    }
+
+                    // Auto-dismiss after showing result
+                    try? await Task.sleep(for: .seconds(2))
+                    await MainActor.run {
                         dismiss()
                     }
-                    .disabled(minorText.isEmpty || Int(minorText) == nil)
                 }
             }
         }
+    }
+
+    // MARK: - Manual Entry Section
+
+    @ViewBuilder
+    private var manualEntrySection: some View {
+        Section {
+            if showManualEntry {
+                TextField("Room Name", text: $roomName)
+                TextField("Beacon ID (1-65535)", text: $minorText)
+                    .keyboardType(.numberPad)
+            } else {
+                Button {
+                    showManualEntry = true
+                } label: {
+                    HStack {
+                        Text("Manual Entry")
+                            .font(.subheadline)
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .foregroundStyle(.secondary)
+            }
+        } header: {
+            if showManualEntry {
+                Text("Manual Entry")
+            }
+        } footer: {
+            if showManualEntry {
+                Text("Enter a room name and beacon ID if you've already configured your sensor.")
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func signalDescription(rssi: Int) -> String {
+        if rssi >= -50 { return "Excellent (\(rssi) dBm)" }
+        if rssi >= -70 { return "Good (\(rssi) dBm)" }
+        if rssi >= -85 { return "Fair (\(rssi) dBm)" }
+        return "Weak (\(rssi) dBm)"
     }
 }

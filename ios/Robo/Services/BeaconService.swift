@@ -49,6 +49,9 @@ class BeaconService: NSObject, CLLocationManagerDelegate {
     /// Track enter timestamps per Minor for duration calculation on exit.
     private var enterTimestamps: [Int: Date] = [:]
 
+    /// When true, startMonitoring() will be called after authorization is granted.
+    private var pendingMonitorAfterAuth = false
+
     // MARK: - Init
 
     override init() {
@@ -64,6 +67,18 @@ class BeaconService: NSObject, CLLocationManagerDelegate {
             manager.requestWhenInUseAuthorization()
         } else if manager.authorizationStatus == .authorizedWhenInUse {
             manager.requestAlwaysAuthorization()
+        }
+    }
+
+    /// Requests permissions and starts monitoring once authorized.
+    /// Handles the race condition where startMonitoring() is called before auth is granted.
+    func requestPermissionsAndMonitor() {
+        let status = manager.authorizationStatus
+        if status == .authorizedAlways || status == .authorizedWhenInUse {
+            startMonitoring()
+        } else {
+            pendingMonitorAfterAuth = true
+            requestPermissions()
         }
     }
 
@@ -93,6 +108,8 @@ class BeaconService: NSObject, CLLocationManagerDelegate {
     }
 
     func stopMonitoring() {
+        pendingMonitorAfterAuth = false
+
         guard isMonitoring else { return }
 
         if let region = beaconRegion {
@@ -116,6 +133,13 @@ class BeaconService: NSObject, CLLocationManagerDelegate {
         // After WhenInUse is granted, request Always for background monitoring
         if manager.authorizationStatus == .authorizedWhenInUse {
             manager.requestAlwaysAuthorization()
+        }
+
+        // Start monitoring if it was deferred pending authorization
+        if pendingMonitorAfterAuth,
+           manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse {
+            pendingMonitorAfterAuth = false
+            startMonitoring()
         }
     }
 

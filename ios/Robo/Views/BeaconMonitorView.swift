@@ -179,7 +179,7 @@ struct BeaconMonitorView: View {
                                 .foregroundStyle(lastEvent.type == "enter" ? .green : .orange)
                             Text(lastEvent.type == "enter" ? "Entered" : "Exited")
                                 .font(.headline)
-                            Text("Minor \(lastEvent.minor)")
+                            Text("ID \(lastEvent.minor)")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -207,13 +207,11 @@ struct BeaconMonitorView: View {
     // MARK: - Actions
 
     private func startMonitoring() {
-        beaconService.requestPermissions()
-
         beaconService.onBeaconEvent = { event in
             handleBeaconEvent(event)
         }
 
-        beaconService.startMonitoring()
+        beaconService.requestPermissionsAndMonitor()
 
         // Haptic
         let generator = UIImpactFeedbackGenerator(style: .medium)
@@ -312,7 +310,7 @@ private struct BeaconRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(roomName ?? "Beacon \(beacon.minor)")
                         .font(.subheadline.weight(.medium))
-                    Text("Minor: \(beacon.minor)")
+                    Text("ID: \(beacon.minor)")
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
                 }

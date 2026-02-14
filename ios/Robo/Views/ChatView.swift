@@ -127,7 +127,7 @@ struct ChatView: View {
                 .padding(10)
                 .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 20))
                 .onSubmit {
-                    if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    if !chatService.isStreaming && !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         sendMessage(inputText)
                     }
                 }

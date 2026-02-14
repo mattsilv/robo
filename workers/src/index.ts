@@ -13,6 +13,7 @@ import { debugSync, debugList, debugGet } from './routes/debug';
 import { lookupNutrition } from './routes/nutrition';
 import { createHit, getHit, uploadHitPhoto, completeHit, listHits, listHitPhotos } from './routes/hits';
 import { deviceAuth } from './middleware/deviceAuth';
+import { handleMcpRequest } from './mcp';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -71,4 +72,27 @@ app.notFound((c) => {
   return c.json({ error: 'Not Found' }, 404);
 });
 
-export default app;
+// Export with MCP routing before Hono
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+
+    // MCP endpoint — handled outside Hono (needs raw Request for WebStandardStreamableHTTPServerTransport)
+    if (url.pathname === '/mcp') {
+      // CORS preflight for MCP Inspector (browser-based testing)
+      if (request.method === 'OPTIONS') {
+        return new Response(null, {
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Accept, Mcp-Session-Id',
+          },
+        });
+      }
+      return handleMcpRequest(request, env);
+    }
+
+    // Everything else → existing Hono app
+    return app.fetch(request, env, ctx);
+  },
+};

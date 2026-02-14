@@ -51,6 +51,20 @@ jobs:
             FAIL=1
           fi
 
+          # Required Info.plist privacy keys (App Store rejects without these)
+          REQUIRED_KEYS="NSCameraUsageDescription NSPhotoLibraryUsageDescription NSMotionUsageDescription NSHealthShareUsageDescription NSHealthUpdateUsageDescription NSBluetoothAlwaysUsageDescription NSLocationWhenInUseUsageDescription NSLocationAlwaysAndWhenInUseUsageDescription"
+          PLIST_FAIL=0
+          for KEY in $REQUIRED_KEYS; do
+            if ! grep -q "$KEY" ios/Robo/Info.plist; then
+              echo "FAIL: Missing $KEY in Info.plist (App Store will reject)"
+              PLIST_FAIL=1
+              FAIL=1
+            fi
+          done
+          if [ $PLIST_FAIL -eq 0 ]; then
+            echo "PASS: All required Info.plist privacy keys present"
+          fi
+
           # Explicit modelContext.save() in save locations
           LIDAR_SAVE=$(grep -c "modelContext.save()" ios/Robo/Views/LiDARScanView.swift 2>/dev/null || true)
           BARCODE_SAVE=$(grep -c "modelContext.save()" ios/Robo/Views/BarcodeScannerView.swift 2>/dev/null || true)

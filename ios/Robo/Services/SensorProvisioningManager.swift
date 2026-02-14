@@ -1,5 +1,6 @@
 import Foundation
 import CoreBluetooth
+import UIKit
 import os
 
 private let logger = Logger(subsystem: "com.silv.Robo", category: "SensorProvisioning")
@@ -61,6 +62,24 @@ let roomPresets: [RoomPreset] = [
     RoomPreset(name: "Bathroom",    minorID: 6),
 ]
 
+// MARK: - Timeout Configuration
+
+private enum BLETimeout {
+    static let connection: TimeInterval = 15
+    static let serviceDiscovery: TimeInterval = 10
+    static let characteristicDiscovery: TimeInterval = 10
+    static let saveCommand: TimeInterval = 10
+}
+
+// MARK: - Diagnostic Log
+
+struct BLEDiagnosticEntry: Identifiable {
+    let id = UUID()
+    let timestamp: Date
+    let event: String
+    let detail: String?
+}
+
 // MARK: - SensorProvisioningManager
 
 @Observable
@@ -69,6 +88,7 @@ class SensorProvisioningManager: NSObject {
     private(set) var state: ProvisioningState = .idle
     private(set) var discoveredSensors: [DiscoveredSensor] = []
     private(set) var bluetoothState: CBManagerState = .unknown
+    private(set) var diagnosticLog: [BLEDiagnosticEntry] = []
 
     private var centralManager: CBCentralManager!
     private var connectedPeripheral: CBPeripheral?
@@ -81,9 +101,45 @@ class SensorProvisioningManager: NSObject {
     private var pendingWriteCount = 0
     private var completedWriteCount = 0
 
+    // Timeout tasks
+    private var connectionTimeoutTask: Task<Void, Never>?
+    private var discoveryTimeoutTask: Task<Void, Never>?
+    private var saveTimeoutTask: Task<Void, Never>?
+
     override init() {
         super.init()
         centralManager = CBCentralManager(delegate: self, queue: .main)
+        log("Initialized", detail: "CBCentralManager created on main queue")
+    }
+
+    // MARK: - Diagnostic Logging
+
+    private func log(_ event: String, detail: String? = nil) {
+        let entry = BLEDiagnosticEntry(timestamp: Date(), event: event, detail: detail)
+        diagnosticLog.append(entry)
+        if let detail {
+            logger.info("[\(event)] \(detail)")
+        } else {
+            logger.info("[\(event)]")
+        }
+    }
+
+    /// Returns all diagnostic entries as a shareable string.
+    func exportDiagnosticLog() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss.SSS"
+        var lines = ["Robo BLE Diagnostic Log", "=======================", ""]
+        for entry in diagnosticLog {
+            let ts = formatter.string(from: entry.timestamp)
+            if let detail = entry.detail {
+                lines.append("[\(ts)] \(entry.event): \(detail)")
+            } else {
+                lines.append("[\(ts)] \(entry.event)")
+            }
+        }
+        lines.append("")
+        lines.append("iOS \(UIDevice.current.systemVersion), \(UIDevice.current.model)")
+        return lines.joined(separator: "\n")
     }
 
     // MARK: - Public API
@@ -94,7 +150,7 @@ class SensorProvisioningManager: NSObject {
         guard centralManager.state == .poweredOn else {
             pendingScan = true
             state = .scanning
-            logger.info("Bluetooth not ready, will scan when powered on")
+            log("Scan deferred", detail: "Bluetooth state: \(centralManager.state.rawValue), will scan when powered on")
             return
         }
 
@@ -104,7 +160,7 @@ class SensorProvisioningManager: NSObject {
             withServices: nil,
             options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
         )
-        logger.info("Started BLE scan for Robo Sensors")
+        log("Scan started", detail: "Scanning for 'Robo Sensor' devices")
     }
 
     func stopScanning() {
@@ -113,6 +169,7 @@ class SensorProvisioningManager: NSObject {
             state = .idle
         }
         pendingScan = false
+        log("Scan stopped")
     }
 
     func connect(to sensor: DiscoveredSensor) {
@@ -121,12 +178,16 @@ class SensorProvisioningManager: NSObject {
         sensor.peripheral.delegate = self
         state = .connecting
         centralManager.connect(sensor.peripheral, options: nil)
-        logger.info("Connecting to \(sensor.name)")
+        log("Connecting", detail: "Peripheral: \(sensor.name), ID: \(sensor.id), RSSI: \(sensor.rssi)")
+
+        // Start connection timeout
+        startConnectionTimeout()
     }
 
     func provision(ssid: String, password: String, roomName: String, minorID: UInt16) {
         guard let peripheral = connectedPeripheral else {
             state = .error("No connected sensor")
+            log("Provision failed", detail: "No connected peripheral")
             return
         }
 
@@ -163,15 +224,67 @@ class SensorProvisioningManager: NSObject {
             pendingWriteCount += 1
         }
 
-        logger.info("Writing \(self.pendingWriteCount) characteristics")
+        log("Provisioning", detail: "Writing \(pendingWriteCount) characteristics (room: \(roomName), minor: \(minorID))")
     }
 
     func cancel() {
+        cancelAllTimeouts()
         centralManager.stopScan()
         if let peripheral = connectedPeripheral {
             centralManager.cancelPeripheralConnection(peripheral)
         }
+        log("Cancelled")
         cleanup()
+    }
+
+    // MARK: - Timeout Management
+
+    private func startConnectionTimeout() {
+        connectionTimeoutTask?.cancel()
+        connectionTimeoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(BLETimeout.connection))
+            guard !Task.isCancelled, let self else { return }
+            guard case .connecting = self.state else { return }
+            self.log("Connection timeout", detail: "No response after \(Int(BLETimeout.connection))s. Try toggling Bluetooth off/on in iOS Settings.")
+            self.state = .error("Connection timed out (\(Int(BLETimeout.connection))s). Try toggling Bluetooth off/on in Settings.")
+            if let peripheral = self.connectedPeripheral {
+                self.centralManager.cancelPeripheralConnection(peripheral)
+            }
+        }
+    }
+
+    private func startServiceDiscoveryTimeout() {
+        discoveryTimeoutTask?.cancel()
+        discoveryTimeoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(BLETimeout.serviceDiscovery))
+            guard !Task.isCancelled, let self else { return }
+            guard case .discoveringServices = self.state else { return }
+            self.log("Service discovery timeout", detail: "No services found after \(Int(BLETimeout.serviceDiscovery))s. iOS may have cached stale GATT data — toggle Bluetooth off/on.")
+            self.state = .error("Service discovery timed out. Try toggling Bluetooth off/on in Settings.")
+            if let peripheral = self.connectedPeripheral {
+                self.centralManager.cancelPeripheralConnection(peripheral)
+            }
+        }
+    }
+
+    private func startSaveTimeout() {
+        saveTimeoutTask?.cancel()
+        saveTimeoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(BLETimeout.saveCommand))
+            guard !Task.isCancelled, let self else { return }
+            guard case .saving = self.state else { return }
+            self.log("Save timeout", detail: "No save confirmation after \(Int(BLETimeout.saveCommand))s")
+            self.state = .error("Save command timed out. The sensor may not have received the configuration.")
+        }
+    }
+
+    private func cancelAllTimeouts() {
+        connectionTimeoutTask?.cancel()
+        connectionTimeoutTask = nil
+        discoveryTimeoutTask?.cancel()
+        discoveryTimeoutTask = nil
+        saveTimeoutTask?.cancel()
+        saveTimeoutTask = nil
     }
 
     // MARK: - Private
@@ -188,10 +301,12 @@ class SensorProvisioningManager: NSObject {
 
         state = .saving
         peripheral.writeValue(data, for: cmdChar, type: .withResponse)
-        logger.info("Sent SAVE command")
+        log("Save command sent", detail: "Waiting for sensor confirmation")
+        startSaveTimeout()
     }
 
     private func cleanup() {
+        cancelAllTimeouts()
         connectedPeripheral = nil
         characteristics.removeAll()
         pendingWriteCount = 0
@@ -207,7 +322,7 @@ extension SensorProvisioningManager: CBCentralManagerDelegate {
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         bluetoothState = central.state
-        logger.info("Bluetooth state: \(String(describing: central.state.rawValue))")
+        log("Bluetooth state changed", detail: "State: \(central.state.rawValue)")
 
         if central.state == .poweredOn, pendingScan {
             pendingScan = false
@@ -215,7 +330,7 @@ extension SensorProvisioningManager: CBCentralManagerDelegate {
                 withServices: nil,
                 options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
             )
-            logger.info("Bluetooth powered on, starting deferred scan")
+            log("Deferred scan started", detail: "Bluetooth now powered on")
         }
     }
 
@@ -238,36 +353,44 @@ extension SensorProvisioningManager: CBCentralManagerDelegate {
             rssi: RSSI.intValue
         )
         discoveredSensors.append(sensor)
-        logger.info("Discovered sensor: \(name), RSSI: \(RSSI.intValue)")
+        log("Sensor discovered", detail: "\(name), RSSI: \(RSSI.intValue) dBm, ID: \(peripheral.identifier)")
     }
 
     func centralManager(_ central: CBCentralManager,
                          didConnect peripheral: CBPeripheral) {
+        connectionTimeoutTask?.cancel()
+        connectionTimeoutTask = nil
         state = .discoveringServices
         peripheral.discoverServices([SensorUUID.provisioningService])
-        logger.info("Connected to sensor")
+        log("Connected", detail: "Starting service discovery for \(SensorUUID.provisioningService.uuidString)")
+        startServiceDiscoveryTimeout()
     }
 
     func centralManager(_ central: CBCentralManager,
                          didFailToConnect peripheral: CBPeripheral,
                          error: Error?) {
-        state = .error("Failed to connect: \(error?.localizedDescription ?? "unknown")")
-        logger.error("Connection failed: \(error?.localizedDescription ?? "unknown")")
+        connectionTimeoutTask?.cancel()
+        connectionTimeoutTask = nil
+        let msg = error?.localizedDescription ?? "unknown"
+        state = .error("Failed to connect: \(msg)")
+        log("Connection failed", detail: msg)
     }
 
     func centralManager(_ central: CBCentralManager,
                          didDisconnectPeripheral peripheral: CBPeripheral,
                          error: Error?) {
+        cancelAllTimeouts()
         // After SAVE, the device reboots — disconnection is expected
         if case .saving = state {
             state = .disconnected
-            logger.info("Sensor disconnected after save (expected reboot)")
+            log("Disconnected (expected)", detail: "Sensor rebooting after save")
         } else if case .saved = state {
             state = .disconnected
-            logger.info("Sensor disconnected after saved state")
+            log("Disconnected (expected)", detail: "After saved state")
         } else {
+            let msg = error?.localizedDescription ?? "none"
             state = .error("Sensor disconnected unexpectedly")
-            logger.error("Unexpected disconnect: \(error?.localizedDescription ?? "none")")
+            log("Unexpected disconnect", detail: "Error: \(msg), state was: \(String(describing: self.state))")
         }
     }
 }
@@ -278,15 +401,26 @@ extension SensorProvisioningManager: CBPeripheralDelegate {
 
     func peripheral(_ peripheral: CBPeripheral,
                      didDiscoverServices error: Error?) {
+        discoveryTimeoutTask?.cancel()
+        discoveryTimeoutTask = nil
+
         if let error {
             state = .error("Service discovery failed: \(error.localizedDescription)")
+            log("Service discovery failed", detail: "\(error.localizedDescription). This can happen if iOS cached stale GATT data — toggle Bluetooth off/on in Settings.")
             return
         }
 
+        let serviceUUIDs = peripheral.services?.map(\.uuid.uuidString) ?? []
+        log("Services discovered", detail: "Found: \(serviceUUIDs.joined(separator: ", "))")
+
         guard let service = peripheral.services?.first(where: { $0.uuid == SensorUUID.provisioningService }) else {
-            state = .error("Provisioning service not found")
+            state = .error("Provisioning service not found on sensor")
+            log("Service not found", detail: "Expected \(SensorUUID.provisioningService.uuidString) but got: \(serviceUUIDs.joined(separator: ", "))")
             return
         }
+
+        // Reuse discovery timeout for characteristic discovery
+        startServiceDiscoveryTimeout()
 
         peripheral.discoverCharacteristics([
             SensorUUID.ssid,
@@ -296,18 +430,24 @@ extension SensorProvisioningManager: CBPeripheralDelegate {
             SensorUUID.command,
             SensorUUID.status,
         ], for: service)
+        log("Discovering characteristics", detail: "For service \(service.uuid.uuidString)")
     }
 
     func peripheral(_ peripheral: CBPeripheral,
                      didDiscoverCharacteristicsFor service: CBService,
                      error: Error?) {
+        discoveryTimeoutTask?.cancel()
+        discoveryTimeoutTask = nil
+
         if let error {
             state = .error("Characteristic discovery failed: \(error.localizedDescription)")
+            log("Characteristic discovery failed", detail: error.localizedDescription)
             return
         }
 
         guard let chars = service.characteristics else {
             state = .error("No characteristics found")
+            log("No characteristics", detail: "Service \(service.uuid.uuidString) returned nil characteristics")
             return
         }
 
@@ -321,7 +461,8 @@ extension SensorProvisioningManager: CBPeripheralDelegate {
             peripheral.readValue(for: statusChar)
         }
 
-        logger.info("Discovered \(chars.count) characteristics")
+        let charUUIDs = chars.map(\.uuid.uuidString)
+        log("Characteristics ready", detail: "Found \(chars.count): \(charUUIDs.joined(separator: ", "))")
     }
 
     func peripheral(_ peripheral: CBPeripheral,
@@ -331,12 +472,14 @@ extension SensorProvisioningManager: CBPeripheralDelegate {
               let data = characteristic.value,
               let statusString = String(data: data, encoding: .utf8) else { return }
 
-        logger.info("Status update: \(statusString)")
+        log("Status update", detail: "Value: \(statusString)")
 
         switch statusString {
         case "ready":
             state = .ready
         case "saved":
+            saveTimeoutTask?.cancel()
+            saveTimeoutTask = nil
             state = .saved
         default:
             if statusString.hasPrefix("error:") {
@@ -350,15 +493,18 @@ extension SensorProvisioningManager: CBPeripheralDelegate {
                      error: Error?) {
         if let error {
             state = .error("Write failed: \(error.localizedDescription)")
-            logger.error("Write failed for \(characteristic.uuid): \(error.localizedDescription)")
+            log("Write failed", detail: "Characteristic \(characteristic.uuid.uuidString): \(error.localizedDescription)")
             return
         }
 
         // Don't count the SAVE command write
-        guard characteristic.uuid != SensorUUID.command else { return }
+        guard characteristic.uuid != SensorUUID.command else {
+            log("Save command write confirmed")
+            return
+        }
 
         completedWriteCount += 1
-        logger.info("Write \(self.completedWriteCount)/\(self.pendingWriteCount) completed")
+        log("Write completed", detail: "\(completedWriteCount)/\(pendingWriteCount) — \(characteristic.uuid.uuidString)")
 
         // All config writes done — send SAVE
         if completedWriteCount >= pendingWriteCount {

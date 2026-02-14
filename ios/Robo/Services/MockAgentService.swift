@@ -5,6 +5,22 @@ enum MockAgentService {
     static func loadAgents() -> [AgentConnection] {
         [
             AgentConnection(
+                id: UUID(uuidString: "00000000-0000-0000-0000-00000000000C")!,
+                name: "Claude Code",
+                description: "Bridge sensor data to Claude Code via MCP. Any capture — room scans, photos, barcodes — is instantly available in your terminal.",
+                iconSystemName: "terminal",
+                accentColor: .orange,
+                status: .connected,
+                lastSyncDate: nil,
+                pendingRequest: AgentRequest(
+                    id: UUID(uuidString: "00000000-0000-0000-0000-0000000000C0")!,
+                    title: "Capture data for Claude Code",
+                    description: "Scan a room, photograph something, or scan a barcode. Then connect Claude Code:\nclaude mcp add robo --transport http https://robo-api.silv.workers.dev/mcp",
+                    skillType: .lidar,
+                    roomNameHint: nil
+                )
+            ),
+            AgentConnection(
                 id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
                 name: "Interior Designer",
                 description: "AI-powered room design and furniture placement",

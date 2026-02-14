@@ -426,6 +426,9 @@ private struct ConnectedAgentRow: View {
 
 private struct AgentDetailView: View {
     let agent: AgentConnection
+    @Environment(DeviceService.self) private var deviceService
+
+    private static let claudeCodeAgentId = UUID(uuidString: "00000000-0000-0000-0000-00000000000C")!
 
     var body: some View {
         List {
@@ -449,6 +452,13 @@ private struct AgentDetailView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
                 .listRowBackground(Color.clear)
+            }
+
+            if agent.id == Self.claudeCodeAgentId, let token = deviceService.config.mcpToken {
+                Section {
+                    ClaudeCodeConnectionView(mcpToken: token)
+                        .listRowInsets(EdgeInsets())
+                }
             }
 
             Section {

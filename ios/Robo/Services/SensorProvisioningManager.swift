@@ -15,6 +15,7 @@ enum SensorUUID {
     static let minorID  = CBUUID(string: "12345678-9ABC-DEF0-1234-000000000005")
     static let command  = CBUUID(string: "12345678-9ABC-DEF0-1234-000000000006")
     static let status   = CBUUID(string: "12345678-9ABC-DEF0-1234-000000000007")
+    static let wifiScan = CBUUID(string: "12345678-9ABC-DEF0-1234-000000000008")
 }
 
 // MARK: - Provisioning State
@@ -80,6 +81,18 @@ struct BLEDiagnosticEntry: Identifiable {
     let detail: String?
 }
 
+// MARK: - Discovered WiFi Network
+
+struct DiscoveredWiFiNetwork: Identifiable, Comparable {
+    let id = UUID()
+    let ssid: String
+    let rssi: Int
+
+    static func < (lhs: DiscoveredWiFiNetwork, rhs: DiscoveredWiFiNetwork) -> Bool {
+        lhs.rssi > rhs.rssi  // Stronger signal first
+    }
+}
+
 // MARK: - SensorProvisioningManager
 
 @Observable
@@ -89,6 +102,8 @@ class SensorProvisioningManager: NSObject {
     private(set) var discoveredSensors: [DiscoveredSensor] = []
     private(set) var bluetoothState: CBManagerState = .unknown
     private(set) var diagnosticLog: [BLEDiagnosticEntry] = []
+    private(set) var wifiNetworks: [DiscoveredWiFiNetwork] = []
+    private(set) var isScannningWiFi = false
 
     private var centralManager: CBCentralManager!
     private var connectedPeripheral: CBPeripheral?
@@ -304,6 +319,35 @@ class SensorProvisioningManager: NSObject {
 
     // MARK: - Private
 
+    func scanWiFiNetworks() {
+        guard let peripheral = connectedPeripheral,
+              let wifiChar = characteristics[SensorUUID.wifiScan],
+              let data = "SCAN".data(using: .utf8) else {
+            log("WiFi scan unavailable", detail: "Characteristic not found — use manual entry")
+            return
+        }
+
+        isScannningWiFi = true
+        wifiNetworks = []
+        peripheral.setNotifyValue(true, for: wifiChar)
+        peripheral.writeValue(data, for: wifiChar, type: .withResponse)
+        log("WiFi scan requested", detail: "Waiting for sensor to scan nearby networks")
+
+        // 5s timeout for WiFi scan
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(5))
+            guard let self, self.isScannningWiFi else { return }
+            self.isScannningWiFi = false
+            if self.wifiNetworks.isEmpty {
+                self.log("WiFi scan timeout", detail: "No networks returned in 5s")
+            }
+        }
+    }
+
+    var hasWiFiScanSupport: Bool {
+        characteristics[SensorUUID.wifiScan] != nil
+    }
+
     private func sendSaveCommand() {
         guard let peripheral = connectedPeripheral,
               let cmdChar = characteristics[SensorUUID.command],
@@ -318,6 +362,25 @@ class SensorProvisioningManager: NSObject {
         peripheral.writeValue(data, for: cmdChar, type: .withResponse)
         log("Save command sent", detail: "Waiting for sensor confirmation")
         startSaveTimeout()
+    }
+
+    private func parseWiFiScanResponse(_ response: String) {
+        let lines = response.split(separator: "\n")
+        var networks: [DiscoveredWiFiNetwork] = []
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed == "MORE" || trimmed == "END" || trimmed.isEmpty { continue }
+
+            let parts = trimmed.split(separator: ",", maxSplits: 1)
+            guard let ssid = parts.first.map(String.init), !ssid.isEmpty else { continue }
+            let rssi = parts.count > 1 ? Int(parts[1]) ?? -100 : -100
+            networks.append(DiscoveredWiFiNetwork(ssid: ssid, rssi: rssi))
+        }
+
+        wifiNetworks = networks.sorted()
+        isScannningWiFi = false
+        log("WiFi networks found", detail: "\(networks.count) networks: \(networks.map(\.ssid).joined(separator: ", "))")
     }
 
     private func cleanup() {
@@ -444,6 +507,7 @@ extension SensorProvisioningManager: CBPeripheralDelegate {
             SensorUUID.minorID,
             SensorUUID.command,
             SensorUUID.status,
+            SensorUUID.wifiScan,
         ], for: service)
         log("Discovering characteristics", detail: "For service \(service.uuid.uuidString)")
     }
@@ -487,6 +551,15 @@ extension SensorProvisioningManager: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral,
                      didUpdateValueFor characteristic: CBCharacteristic,
                      error: Error?) {
+        // Handle WiFi scan response
+        if characteristic.uuid == SensorUUID.wifiScan,
+           let data = characteristic.value,
+           let response = String(data: data, encoding: .utf8) {
+            log("WiFi scan response", detail: "\(response.count) bytes")
+            parseWiFiScanResponse(response)
+            return
+        }
+
         guard characteristic.uuid == SensorUUID.status,
               let data = characteristic.value,
               let statusString = String(data: data, encoding: .utf8) else { return }
@@ -518,7 +591,11 @@ extension SensorProvisioningManager: CBPeripheralDelegate {
             return
         }
 
-        // Don't count the SAVE command write
+        // Don't count command or WiFi scan writes
+        guard characteristic.uuid != SensorUUID.wifiScan else {
+            log("WiFi scan write confirmed")
+            return
+        }
         guard characteristic.uuid != SensorUUID.command else {
             log("Save command write confirmed")
             return

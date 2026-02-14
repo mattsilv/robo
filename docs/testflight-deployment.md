@@ -15,7 +15,7 @@ The Workers API is already deployed and live:
 
 ```bash
 # Test the API
-echo '{"name":"test-device"}' | http POST https://robo-api.silv.workers.dev/api/devices/register
+echo '{"name":"test-device"}' | http POST https://api.robo.app/api/devices/register --timeout=10
 ```
 
 Expected response:

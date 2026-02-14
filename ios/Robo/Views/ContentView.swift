@@ -16,6 +16,11 @@ struct ContentView: View {
                     Label(AppStrings.Tabs.history, systemImage: "archivebox")
                 }
 
+            ChatTabView()
+                .tabItem {
+                    Label(AppStrings.Tabs.chat, systemImage: "bubble.left.and.bubble.right")
+                }
+
             SettingsView()
                 .tabItem {
                     Label(AppStrings.Tabs.settings, systemImage: "gearshape")

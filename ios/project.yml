@@ -65,13 +65,9 @@ targets:
         NSCameraUsageDescription: "Robo needs camera access to scan barcodes, capture photos, and perform LiDAR room scanning for AI analysis"
         NSPhotoLibraryUsageDescription: "Robo needs photo library access to save captured images"
         NSMotionUsageDescription: "Robo needs motion access to capture step count, distance, and activity data for AI analysis"
-        NSLocationWhenInUseUsageDescription: "Robo uses your location to detect nearby Bluetooth beacons for room-based automations."
-        NSLocationAlwaysAndWhenInUseUsageDescription: "Robo needs background location access to detect beacons when the app is closed, triggering room-based automations."
         NSBluetoothAlwaysUsageDescription: "Robo uses Bluetooth to detect nearby iBeacon devices for room-aware automations."
         NSHealthShareUsageDescription: "Robo reads your sleep, workout, and activity data to share with your AI agents."
         NSHealthUpdateUsageDescription: "Robo does not write health data, but HealthKit requires this description."
-        UIBackgroundModes:
-          - location
           - bluetooth-central
           - remote-notification
 

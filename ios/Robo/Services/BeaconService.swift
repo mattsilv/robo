@@ -63,22 +63,19 @@ class BeaconService: NSObject, CLLocationManagerDelegate {
     // MARK: - Public API
 
     func requestPermissions() {
-        if manager.authorizationStatus == .notDetermined {
-            manager.requestWhenInUseAuthorization()
-        } else if manager.authorizationStatus == .authorizedWhenInUse {
-            manager.requestAlwaysAuthorization()
-        }
+        // Location permissions disabled for now — beacon monitoring requires location
+        // but we don't want to prompt users for location access yet.
+        logger.info("Location permissions request suppressed")
     }
 
     /// Requests permissions and starts monitoring once authorized.
-    /// Handles the race condition where startMonitoring() is called before auth is granted.
     func requestPermissionsAndMonitor() {
         let status = manager.authorizationStatus
         if status == .authorizedAlways || status == .authorizedWhenInUse {
             startMonitoring()
         } else {
-            pendingMonitorAfterAuth = true
-            requestPermissions()
+            // Don't request permissions — just log
+            logger.info("Beacon monitoring requires location permission (not requesting)")
         }
     }
 
@@ -129,11 +126,6 @@ class BeaconService: NSObject, CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationStatus = manager.authorizationStatus
         logger.info("Authorization changed: \(String(describing: manager.authorizationStatus.rawValue))")
-
-        // After WhenInUse is granted, request Always for background monitoring
-        if manager.authorizationStatus == .authorizedWhenInUse {
-            manager.requestAlwaysAuthorization()
-        }
 
         // Start monitoring if it was deferred pending authorization
         if pendingMonitorAfterAuth,

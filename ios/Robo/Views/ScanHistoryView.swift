@@ -1,13 +1,6 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Browse Mode
-
-private enum BrowseMode: String, CaseIterable {
-    case byAgent = "By Agent"
-    case byType = "By Type"
-}
-
 struct ScanHistoryView: View {
     @Query(sort: \ScanRecord.capturedAt, order: .reverse)
     private var scans: [ScanRecord]
@@ -15,15 +8,10 @@ struct ScanHistoryView: View {
     private var roomScans: [RoomScanRecord]
     @Query(sort: \MotionRecord.capturedAt, order: .reverse)
     private var motionRecords: [MotionRecord]
-    @Query(sort: \AgentCompletionRecord.completedAt, order: .reverse)
-    private var completionRecords: [AgentCompletionRecord]
-    @Query(sort: \ProductCaptureRecord.capturedAt, order: .reverse)
-    private var productCaptures: [ProductCaptureRecord]
-    @Query(sort: \BeaconEventRecord.capturedAt, order: .reverse)
+@Query(sort: \BeaconEventRecord.capturedAt, order: .reverse)
     private var beaconEvents: [BeaconEventRecord]
     @Environment(\.modelContext) private var modelContext
 
-    @State private var browseMode: BrowseMode = .byAgent
     @State private var selectedSegment = 0
     @State private var showingClearConfirmation = false
     @State private var shareURL: URL?
@@ -36,40 +24,25 @@ struct ScanHistoryView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                Picker("Browse", selection: $browseMode) {
-                    ForEach(BrowseMode.allCases, id: \.self) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
+                Picker("Type", selection: $selectedSegment) {
+                    Text("Barcodes").tag(0)
+                    Text("Rooms").tag(1)
+                    Text("Motion").tag(2)
+                    Text("Beacons").tag(3)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
                 .padding(.top, 8)
 
-                if browseMode == .byType {
-                    Picker("Type", selection: $selectedSegment) {
-                        Text("Barcodes").tag(0)
-                        Text("Rooms").tag(1)
-                        Text("Motion").tag(2)
-                        Text("Beacons").tag(3)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    .padding(.top, 6)
-                }
-
                 Spacer().frame(height: 8)
 
-                if browseMode == .byAgent {
-                    agentDataList
-                } else {
-                    Group {
-                        switch selectedSegment {
-                        case 0: barcodeList
-                        case 1: roomList
-                        case 2: motionList
-                        case 3: beaconList
-                        default: barcodeList
-                        }
+                Group {
+                    switch selectedSegment {
+                    case 0: barcodeList
+                    case 1: roomList
+                    case 2: motionList
+                    case 3: beaconList
+                    default: barcodeList
                     }
                 }
             }
@@ -87,7 +60,6 @@ struct ScanHistoryView: View {
                 ProductDetailView(product: product)
             }
             .toolbar {
-                if browseMode == .byType {
                     ToolbarItem(placement: .primaryAction) {
                         Button {
                             exportAll()
@@ -111,7 +83,6 @@ struct ScanHistoryView: View {
                             }
                         }
                     }
-                }
             }
             .confirmationDialog(
                 "Clear All?",
@@ -158,210 +129,23 @@ struct ScanHistoryView: View {
         }
     }
 
-    // MARK: - Agent Data Grouping (extracted to help Swift type-checker)
-
-    private struct AgentGrouping {
-        let agentRooms: [String: [RoomScanRecord]]
-        let agentBarcodes: [String: [ScanRecord]]
-        let agentMotion: [String: [MotionRecord]]
-        let agentCompletions: [String: [AgentCompletionRecord]]
-        let agentProducts: [String: [ProductCaptureRecord]]
-        let agentBeacons: [String: [BeaconEventRecord]]
-        let allAgentIds: [String]
-        let unlinkedRooms: [RoomScanRecord]
-        let unlinkedBarcodes: [ScanRecord]
-        let unlinkedMotion: [MotionRecord]
-        let unlinkedBeacons: [BeaconEventRecord]
-        let hasUnlinked: Bool
-    }
-
-    private var agentGrouping: AgentGrouping {
-        let agentRooms = Dictionary(grouping: roomScans.filter { $0.agentId != nil }) { $0.agentId ?? "" }
-        let agentBarcodes = Dictionary(grouping: scans.filter { $0.agentId != nil }) { $0.agentId ?? "" }
-        let agentMotion = Dictionary(grouping: motionRecords.filter { $0.agentId != nil }) { $0.agentId ?? "" }
-        let agentCompletions = Dictionary(grouping: completionRecords) { $0.agentId }
-        let agentProducts = Dictionary(grouping: productCaptures.filter { $0.agentId != nil }) { $0.agentId ?? "" }
-        let agentBeacons = Dictionary(grouping: beaconEvents.filter { $0.agentId != nil }) { $0.agentId ?? "" }
-
-        var ids = Set<String>(agentRooms.keys)
-        ids.formUnion(agentBarcodes.keys)
-        ids.formUnion(agentMotion.keys)
-        ids.formUnion(agentCompletions.keys)
-        ids.formUnion(agentProducts.keys)
-        ids.formUnion(agentBeacons.keys)
-
-        let unlinkedRooms = roomScans.filter { $0.agentId == nil }
-        let unlinkedBarcodes = scans.filter { $0.agentId == nil }
-        let unlinkedMotion = motionRecords.filter { $0.agentId == nil }
-        let unlinkedBeacons = beaconEvents.filter { $0.agentId == nil }
-
-        return AgentGrouping(
-            agentRooms: agentRooms,
-            agentBarcodes: agentBarcodes,
-            agentMotion: agentMotion,
-            agentCompletions: agentCompletions,
-            agentProducts: agentProducts,
-            agentBeacons: agentBeacons,
-            allAgentIds: ids.sorted(),
-            unlinkedRooms: unlinkedRooms,
-            unlinkedBarcodes: unlinkedBarcodes,
-            unlinkedMotion: unlinkedMotion,
-            unlinkedBeacons: unlinkedBeacons,
-            hasUnlinked: !unlinkedRooms.isEmpty || !unlinkedBarcodes.isEmpty || !unlinkedMotion.isEmpty || !unlinkedBeacons.isEmpty
-        )
-    }
-
-    private func agentName(for agentId: String, grouping g: AgentGrouping) -> String {
-        let candidates: [String?] = [
-            g.agentRooms[agentId]?.first?.agentName,
-            g.agentBarcodes[agentId]?.first?.agentName,
-            g.agentMotion[agentId]?.first?.agentName,
-            g.agentCompletions[agentId]?.first?.agentName,
-            g.agentProducts[agentId]?.first?.agentName,
-            g.agentBeacons[agentId]?.first?.agentName
-        ]
-        let fallback: String? = candidates.compactMap { $0 }.first
-        return AgentStore.name(for: agentId, fallback: fallback)
-    }
-
-    // MARK: - By Agent View
+    // MARK: - Quick Capture Section
 
     @ViewBuilder
-    private var agentDataList: some View {
-        let g = agentGrouping
-
-        if g.allAgentIds.isEmpty && !g.hasUnlinked {
-            ContentUnavailableView {
-                Label("No Agent Data Yet", systemImage: "tray")
-            } description: {
-                Text("When you capture data for an agent, it appears here grouped by agent.")
-            } actions: {
-                Button("Scan Room") { showingLiDARScanner = true }
-                Button("Scan Barcode") { showingBarcodeScanner = true }
+    private var quickCaptureSection: some View {
+        Section("Quick Capture") {
+            Button { showingLiDARScanner = true } label: {
+                Label("Scan Room", systemImage: "camera.metering.spot")
             }
-        } else {
-            List {
-                ForEach(g.allAgentIds, id: \.self) { agentId in
-                    Section {
-                        agentSectionContent(agentId: agentId, grouping: g)
-                    } header: {
-                        HStack(spacing: 8) {
-                            Image(systemName: AgentStore.icon(for: agentId))
-                                .font(.caption)
-                                .foregroundStyle(AgentStore.color(for: agentId))
-                            Text(agentName(for: agentId, grouping: g))
-                        }
-                    }
-                }
-
-                // Unlinked scans section
-                if g.hasUnlinked {
-                    Section {
-                        unlinkedSectionContent(grouping: g)
-                    } header: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "tray")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("Direct Captures")
-                        }
-                    }
-                }
-
-                // Quick capture section
-                Section("Quick Capture") {
-                    Button { showingLiDARScanner = true } label: {
-                        Label("Scan Room", systemImage: "camera.metering.spot")
-                    }
-                    Button { showingBarcodeScanner = true } label: {
-                        Label("Scan Barcode", systemImage: "barcode.viewfinder")
-                    }
-                    Button { showingMotionCapture = true } label: {
-                        Label("Capture Motion", systemImage: "figure.walk.motion")
-                    }
-                    Button { showingBeaconMonitor = true } label: {
-                        Label("Monitor Beacons", systemImage: "sensor.tag.radiowaves.forward")
-                    }
-                }
+            Button { showingBarcodeScanner = true } label: {
+                Label("Scan Barcode", systemImage: "barcode.viewfinder")
             }
-        }
-    }
-
-    @ViewBuilder
-    private func agentSectionContent(agentId: String, grouping g: AgentGrouping) -> some View {
-        if let rooms = g.agentRooms[agentId] {
-            ForEach(rooms) { room in
-                NavigationLink(value: room) {
-                    RoomScanRow(room: room)
-                }
+            Button { showingMotionCapture = true } label: {
+                Label("Capture Motion", systemImage: "figure.walk.motion")
             }
-        }
-        if let barcodes = g.agentBarcodes[agentId] {
-            ForEach(barcodes) { scan in
-                NavigationLink(value: scan) {
-                    ScanRow(scan: scan)
-                }
+            Button { showingBeaconMonitor = true } label: {
+                Label("Monitor Beacons", systemImage: "sensor.tag.radiowaves.forward")
             }
-        }
-        if let motion = g.agentMotion[agentId] {
-            ForEach(motion) { record in
-                NavigationLink(value: record) {
-                    MotionRow(motion: record)
-                }
-            }
-        }
-        if let products = g.agentProducts[agentId] {
-            ForEach(products) { product in
-                NavigationLink(value: product) {
-                    ProductCaptureRow(product: product)
-                }
-            }
-        }
-        if let beacons = g.agentBeacons[agentId] {
-            ForEach(beacons) { event in
-                BeaconEventRow(event: event)
-            }
-        }
-        if let completions = g.agentCompletions[agentId] {
-            let photoCompletions = completions.filter { $0.skillType == "camera" }
-            ForEach(photoCompletions) { completion in
-                HStack {
-                    Image(systemName: "camera.fill")
-                        .font(.title3)
-                        .foregroundColor(.accentColor)
-                        .frame(width: 32)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("\(completion.itemCount) photo\(completion.itemCount == 1 ? "" : "s") captured")
-                            .font(.subheadline)
-                        Text(completion.completedAt, style: .relative)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func unlinkedSectionContent(grouping g: AgentGrouping) -> some View {
-        ForEach(g.unlinkedRooms) { room in
-            NavigationLink(value: room) {
-                RoomScanRow(room: room)
-            }
-        }
-        ForEach(g.unlinkedBarcodes) { scan in
-            NavigationLink(value: scan) {
-                ScanRow(scan: scan)
-            }
-        }
-        ForEach(g.unlinkedMotion) { record in
-            NavigationLink(value: record) {
-                MotionRow(motion: record)
-            }
-        }
-        ForEach(g.unlinkedBeacons) { event in
-            BeaconEventRow(event: event)
         }
     }
 
@@ -389,6 +173,7 @@ struct ScanHistoryView: View {
                 .onDelete(perform: deleteBarcodeScans)
 
                 exportAllSection
+                quickCaptureSection
             }
         }
     }
@@ -440,6 +225,7 @@ struct ScanHistoryView: View {
                 .onDelete(perform: deleteRoomScans)
 
                 exportAllSection
+                quickCaptureSection
             }
         }
     }
@@ -476,6 +262,7 @@ struct ScanHistoryView: View {
                 .onDelete(perform: deleteMotionRecords)
 
                 exportAllSection
+                quickCaptureSection
             }
         }
     }
@@ -513,6 +300,8 @@ struct ScanHistoryView: View {
                     }
                     .onDelete(perform: deleteBeaconEvents)
                 }
+
+                quickCaptureSection
             }
         }
     }
@@ -1131,5 +920,5 @@ struct BeaconTimelineView: View {
 
 #Preview {
     ScanHistoryView()
-        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self, MotionRecord.self, AgentCompletionRecord.self, ProductCaptureRecord.self, BeaconEventRecord.self], inMemory: true)
+        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self, MotionRecord.self, BeaconEventRecord.self], inMemory: true)
 }

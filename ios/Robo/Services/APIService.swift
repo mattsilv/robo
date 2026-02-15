@@ -156,6 +156,26 @@ class APIService {
         return response.responses
     }
 
+    // MARK: - API Keys (require MCP token auth)
+
+    func fetchAPIKeys() async throws -> [APIKeyMeta] {
+        let url = try makeURL(path: "/api/keys")
+        let response: APIKeyListResponse = try await authenticatedGet(url: url)
+        return response.keys
+    }
+
+    func createAPIKey(label: String?) async throws -> APIKeyCreated {
+        let url = try makeURL(path: "/api/keys")
+        var payload: [String: Any] = [:]
+        if let label { payload["label"] = label }
+        return try await authenticatedPost(url: url, body: payload)
+    }
+
+    func deleteAPIKey(id: String) async throws {
+        let url = try makeURL(path: "/api/keys/\(id)")
+        let _: DeleteResponse = try await authenticatedDelete(url: url)
+    }
+
     // MARK: - Health Check
 
     func checkHealth() async -> Bool {
@@ -167,6 +187,46 @@ class APIService {
               let http = response as? HTTPURLResponse,
               http.statusCode == 200 else { return false }
         return true
+    }
+
+    // MARK: - Authenticated HTTP Methods (with MCP token)
+
+    private var bearerToken: String? {
+        deviceService.config.mcpToken
+    }
+
+    private func authenticatedGet<T: Decodable>(url: URL) async throws -> T {
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-ID")
+        if let token = bearerToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        return try await performRequest(request)
+    }
+
+    private func authenticatedPost<T: Decodable>(url: URL, body: Any) async throws -> T {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-ID")
+        if let token = bearerToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return try await performRequest(request)
+    }
+
+    private func authenticatedDelete<T: Decodable>(url: URL) async throws -> T {
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-ID")
+        if let token = bearerToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        return try await performRequest(request)
     }
 
     // MARK: - HTTP Methods
@@ -186,6 +246,15 @@ class APIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(deviceId, forHTTPHeaderField: "X-Device-ID")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        return try await performRequest(request)
+    }
+
+    private func delete<T: Decodable>(url: URL) async throws -> T {
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-ID")
 
         return try await performRequest(request)
     }
@@ -399,4 +468,8 @@ struct HitResponseItem: Decodable, Identifiable {
 private struct HitResponseListResponse: Decodable {
     let responses: [HitResponseItem]
     let count: Int
+}
+
+private struct DeleteResponse: Decodable {
+    let deleted: Bool
 }

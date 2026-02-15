@@ -124,6 +124,14 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Developer Portal") {
+                    NavigationLink {
+                        DeveloperPortalView()
+                    } label: {
+                        Label("API Keys & Quick Start", systemImage: "key")
+                    }
+                }
+
                 Section("Barcode Scanner") {
                     Picker("Scan Quality", selection: $scanQuality) {
                         Text("Fast").tag("fast")

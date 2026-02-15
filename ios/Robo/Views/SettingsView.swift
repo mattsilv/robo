@@ -9,7 +9,7 @@ struct SettingsView: View {
     @State private var copiedMCPToken = false
     @State private var showingReRegisterConfirm = false
     @State private var isReRegistering = false
-    @State private var mcpStatus: MCPConnectionStatus = .unknown
+    @State private var lastMcpCallDate: Date?
     @State private var pollingTask: Task<Void, Never>?
     #if DEBUG
     @AppStorage("dev.syncToCloud") private var debugSyncEnabled = false
@@ -65,21 +65,20 @@ struct SettingsView: View {
                         }
                     }
 
-                    HStack {
-                        Text("MCP Status")
-                        Spacer()
+                    LabeledContent("MCP Last Seen") {
                         HStack(spacing: 6) {
-                            Circle()
-                                .fill(mcpStatus.color)
-                                .frame(width: 8, height: 8)
-                            Text(mcpStatus.label)
-                                .foregroundStyle(.secondary)
+                            if let date = lastMcpCallDate {
+                                Circle()
+                                    .fill(mcpDotColor(for: date))
+                                    .frame(width: 8, height: 8)
+                                Text(mcpLastSeenText(for: date))
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("Never")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
-
-                    Text("Updates when Claude Code uses MCP tools")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
 
                     Button {
                         showingReRegisterConfirm = true
@@ -260,51 +259,34 @@ extension SettingsView {
             let device = try await apiService.fetchDevice()
             if let lastCall = device.lastMcpCallAt {
                 let formatter = ISO8601DateFormatter()
-                if let date = formatter.date(from: lastCall) {
-                    let elapsed = Date().timeIntervalSince(date)
-                    if elapsed < 60 {
-                        mcpStatus = .connected
-                    } else if elapsed < 300 {
-                        mcpStatus = .recent
-                    } else {
-                        mcpStatus = .notConnected
-                    }
-                } else {
-                    mcpStatus = .notConnected
-                }
-            } else {
-                mcpStatus = .notConnected
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                lastMcpCallDate = formatter.date(from: lastCall)
+                    ?? ISO8601DateFormatter().date(from: lastCall)
             }
         } catch {
             // Keep last known state on network failure
         }
     }
-}
 
-// MARK: - MCP Connection Status
-
-enum MCPConnectionStatus {
-    case connected
-    case recent
-    case notConnected
-    case unknown
-
-    var label: String {
-        switch self {
-        case .connected: "Connected"
-        case .recent: "Recent"
-        case .notConnected: "Not connected"
-        case .unknown: "Not connected"
-        }
+    func mcpDotColor(for date: Date) -> Color {
+        let elapsed = Date().timeIntervalSince(date)
+        if elapsed < 60 { return .green }
+        if elapsed < 300 { return .yellow }
+        return .gray
     }
 
-    var color: Color {
-        switch self {
-        case .connected: .green
-        case .recent: .yellow
-        case .notConnected: .gray
-        case .unknown: .gray
-        }
+    func mcpLastSeenText(for date: Date) -> String {
+        let elapsed = Int(Date().timeIntervalSince(date))
+        if elapsed < 60 { return "Just now" }
+        let minutes = elapsed / 60
+        if minutes == 1 { return "1 min ago" }
+        if minutes < 60 { return "\(minutes) min ago" }
+        let hours = minutes / 60
+        if hours == 1 { return "1 hour ago" }
+        if hours < 24 { return "\(hours) hours ago" }
+        let days = hours / 24
+        if days == 1 { return "1 day ago" }
+        return "\(days) days ago"
     }
 }
 

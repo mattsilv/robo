@@ -98,6 +98,13 @@ class DeviceService {
     func reRegister(apiService: DeviceRegistering) async {
         self.registrationError = nil
         self.registrationErrorDetail = nil
+
+        // Quick connectivity check before wiping config
+        if let api = apiService as? APIService, !(await api.checkHealth()) {
+            self.registrationError = "Cannot reach server. Check your internet connection and try again."
+            return
+        }
+
         let previousConfig = config
         config = DeviceConfig(
             id: DeviceConfig.unregisteredID,

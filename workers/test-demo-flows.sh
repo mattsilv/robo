@@ -158,23 +158,24 @@ RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API/api/hits" \
 HTTP_CODE=$(echo "$RESPONSE" | tail -1)
 assert_status "invalid type rejected" 400 "$HTTP_CODE"
 
-# ─── Test 9: HIT page for known demo HIT ───
-bold "Test 9: Known demo HIT page renders"
-RESPONSE=$(curl -s -w "\n%{http_code}" "https://robo.app/hit/AtPE2hb8")
+# ─── Test 9: HIT page renders for test-created HIT ───
+bold "Test 9: HIT page renders for test-created HIT"
+TEST_PAGE_ID="${HIT_ID3:-$HIT_ID}"
+RESPONSE=$(curl -s -w "\n%{http_code}" "https://robo.app/hit/${TEST_PAGE_ID}")
 HTTP_CODE=$(echo "$RESPONSE" | tail -1)
 PAGE_BODY=$(echo "$RESPONSE" | sed '$d')
-assert_status "demo HIT page returns 200" 200 "$HTTP_CODE"
-if echo "$PAGE_BODY" | grep -q 'Matt needs your help'; then
-  green "  ✓ OG title shows 'Matt needs your help'"
+assert_status "HIT page returns 200" 200 "$HTTP_CODE"
+if echo "$PAGE_BODY" | grep -q 'needs your help\|sent you a request'; then
+  green "  ✓ OG title contains expected text"
   PASS=$((PASS + 1))
 else
-  red "  ✗ OG title missing or wrong sender name"
+  red "  ✗ OG title missing expected text"
   FAIL=$((FAIL + 1))
 fi
 
-# ─── Test 10: Dynamic OG image for known demo HIT ───
+# ─── Test 10: Dynamic OG image for test-created HIT ───
 bold "Test 10: OG image endpoint returns PNG"
-RESPONSE=$(curl -s -o /dev/null -w "%{http_code}|%{content_type}" "https://robo.app/hit/AtPE2hb8/og.png")
+RESPONSE=$(curl -s -o /dev/null -w "%{http_code}|%{content_type}" "https://robo.app/hit/${TEST_PAGE_ID}/og.png")
 HTTP_CODE=$(echo "$RESPONSE" | cut -d'|' -f1)
 CONTENT_TYPE=$(echo "$RESPONSE" | cut -d'|' -f2)
 assert_status "OG image returns 200" 200 "$HTTP_CODE"

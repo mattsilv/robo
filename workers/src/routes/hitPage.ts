@@ -280,13 +280,17 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       '<div class="task-meta"><span class="task-pill">Group Poll</span></div></div></div></div>';
 
     html += '<div class="name-section fi"><span class="name-label">Who are you?</span><div class="name-picker" id="name-picker">';
-    participants.forEach(function(name) {
-      var voted = respondedNames[name];
-      html += '<label class="name-option' + (voted ? ' voted' : '') + '">' +
-        '<input type="radio" name="participant" value="' + esc(name) + '"' + (voted ? ' disabled' : '') + '>' +
-        '<span class="name-option-label">' + esc(name) + '</span>' +
-        (voted ? '<span class="voted-badge">Voted</span>' : '') + '</label>';
-    });
+    if (participants.length > 0) {
+      participants.forEach(function(name) {
+        var voted = respondedNames[name];
+        html += '<label class="name-option' + (voted ? ' voted' : '') + '">' +
+          '<input type="radio" name="participant" value="' + esc(name) + '"' + (voted ? ' disabled' : '') + '>' +
+          '<span class="name-option-label">' + esc(name) + '</span>' +
+          (voted ? '<span class="voted-badge">Voted</span>' : '') + '</label>';
+      });
+    } else {
+      html += '<input class="name-input" id="poll-name-input" type="text" placeholder="Enter your name" style="width:100%;padding:0.75rem;border:1px solid var(--border);border-radius:0.5rem;font-size:0.95rem;background:var(--bg);color:var(--text);">';
+    }
     html += '</div></div>';
 
     if (dateOptions.length > 0) {
@@ -317,6 +321,13 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
         if (dg) dg.scrollIntoView({ behavior:'smooth', block:'start' });
       });
     });
+    var pollNameInput = document.getElementById('poll-name-input');
+    if (pollNameInput) {
+      pollNameInput.addEventListener('input', function() {
+        selectedName = this.value.trim() || null;
+        updateBtn();
+      });
+    }
 
     var dateGrid = document.getElementById('date-grid');
     if (dateGrid) {

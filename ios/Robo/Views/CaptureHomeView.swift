@@ -165,6 +165,27 @@ struct CaptureHomeView: View {
             CaptureButton(icon: "heart.fill", label: "Health\nData", color: .pink) {
                 showingHealthCapture = true
             }
+
+            NavigationLink {
+                ShareScreenshotGuideView()
+            } label: {
+                VStack(spacing: 12) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.cyan)
+
+                    Text("Screenshot\nto AI")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 120)
+                .background(Color.cyan.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
         }
     }
 

@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   typecheck:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 5
 
     steps:
@@ -35,7 +35,7 @@ jobs:
         run: NODE_OPTIONS="--max-old-space-size=4096" npx tsc --noEmit
 
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     needs: typecheck
     timeout-minutes: 5
 

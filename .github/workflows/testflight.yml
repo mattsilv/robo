@@ -11,8 +11,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-runner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    outputs:
+      use_self_hosted: ${{ steps.check.outputs.available }}
+    steps:
+      - id: check
+        run: |
+          ONLINE_COUNT=$(gh api repos/${{ github.repository }}/actions/runners --jq '[.runners[] | select(.status == "online")] | length' 2>/dev/null || echo "0")
+          echo "Online self-hosted runners: $ONLINE_COUNT"
+          if [ "$ONLINE_COUNT" -gt "0" ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+            echo "No self-hosted runners online, falling back to GitHub-hosted"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build-and-upload:
-    runs-on: macos-15
+    needs: check-runner
+    runs-on: ${{ needs.check-runner.outputs.use_self_hosted == 'true' && fromJSON('["self-hosted", "macOS", "ARM64"]') || 'macos-15' }}
     timeout-minutes: 45
 
     steps:
@@ -23,7 +43,7 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
 
       - name: Install xcodegen
-        run: brew install xcodegen
+        run: command -v xcodegen || brew install xcodegen
 
       - name: Generate Xcode project
         working-directory: ios

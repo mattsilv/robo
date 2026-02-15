@@ -59,3 +59,40 @@ export async function debugGet(c: Context<{ Bindings: Env }>) {
   const data = await obj.json();
   return c.json({ key: fullKey, data });
 }
+
+/**
+ * GET /api/debug/download/:key+ — Download raw R2 object as JSON file
+ * Authenticated via Bearer token (same as MCP).
+ * Designed for Claude Code to download full scan data to a local file.
+ */
+export async function debugDownload(c: Context<{ Bindings: Env }>) {
+  const authHeader = c.req.header('Authorization');
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) {
+    return c.json({ error: 'Missing Authorization header' }, 401);
+  }
+
+  const device = await c.env.DB.prepare(
+    'SELECT id FROM devices WHERE mcp_token = ?'
+  ).bind(token).first<{ id: string }>();
+  if (!device) {
+    return c.json({ error: 'Invalid token' }, 401);
+  }
+
+  const key = c.req.param('key');
+  if (!key.startsWith(`debug/${device.id}/`)) {
+    return c.json({ error: 'Access denied' }, 403);
+  }
+
+  const obj = await c.env.BUCKET.get(key);
+  if (!obj) {
+    return c.json({ error: 'Not found' }, 404);
+  }
+
+  return new Response(obj.body, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Disposition': `attachment; filename="${key.split('/').pop()}"`,
+    },
+  });
+}

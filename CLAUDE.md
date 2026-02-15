@@ -130,9 +130,14 @@ xcodebuild -scheme Robo -configuration Debug \
   CODE_SIGN_IDENTITY="Apple Development" \
   DEVELOPMENT_TEAM=R3Z5CY34Q5
 
+# IMPORTANT: Clean stale DerivedData before building for device install.
+# Multiple Robo-* dirs accumulate across branches/worktrees, and the install
+# command below will pick a random (possibly stale) one if you don't clean first.
+rm -rf ~/Library/Developer/Xcode/DerivedData/Robo-*
+
 # Install and launch on physical device (no Xcode UI needed)
 DEVICE_ID=7BDE5F34-030C-589D-9F0F-65C6B8DD2B48
-APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData/Robo-*/Build/Products/Debug-iphoneos -name "Robo.app" -maxdepth 1 | head -1)
+APP_PATH=$(ls -dt ~/Library/Developer/Xcode/DerivedData/Robo-*/Build/Products/Debug-iphoneos/Robo.app | head -1)
 xcrun devicectl device install app --device $DEVICE_ID "$APP_PATH"
 xcrun devicectl device process launch --device $DEVICE_ID com.silv.Robo
 ```
@@ -211,6 +216,7 @@ See `docs/cloudflare-resources.md` for complete resource inventory.
 - **DataScannerViewController:** Must call `startScanning()` explicitly, must guard `DataScannerViewController.isAvailable`, no simulator support
 - **Camera Permissions:** Add `NSCameraUsageDescription` to Info.plist
 - Always set `Content-Type: application/json` header in URLSession requests
+- **Stale DerivedData:** Multiple `Robo-*` DerivedData dirs accumulate across branches/worktrees. **Always `rm -rf ~/Library/Developer/Xcode/DerivedData/Robo-*` before building for device install.** Otherwise the install step may pick a stale build from another branch, and your code changes won't appear on device.
 
 ### Workers
 - **Hono + Zod:** Add `onError` handler for Zod validation failures

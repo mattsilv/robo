@@ -20,7 +20,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Device") {
+                Section("My Mobile Device") {
                     Button {
                         UIPasteboard.general.string = deviceService.config.id
                         copiedDeviceID = true
@@ -113,10 +113,19 @@ struct SettingsView: View {
                         Text(error)
                             .foregroundStyle(.red)
                             .font(.caption)
+
+                        if let detail = deviceService.registrationErrorDetail {
+                            Button {
+                                UIPasteboard.general.string = detail
+                            } label: {
+                                Label("Copy Error Details", systemImage: "doc.on.clipboard")
+                                    .font(.caption)
+                            }
+                        }
                     }
                 }
 
-                Section("Scanner") {
+                Section("Barcode Scanner") {
                     Picker("Scan Quality", selection: $scanQuality) {
                         Text("Fast").tag("fast")
                         Text("Balanced").tag("balanced")
@@ -124,7 +133,7 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                 }
 
-                Section("Beacons") {
+                Section("Bluetooth Beacons") {
                     NavigationLink {
                         BeaconSettingsView()
                     } label: {
@@ -170,7 +179,16 @@ struct SettingsView: View {
 
                 Section("About") {
                     LabeledContent("Version", value: "1.0 (M1)")
-                    LabeledContent("Build", value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—")
+                    LabeledContent("Build", value: Self.buildString)
+
+                    Link(destination: URL(string: "https://www.robo.app")!) {
+                        HStack {
+                            Label("Website", systemImage: "globe")
+                            Spacer()
+                            Text("robo.app")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
 
                     HStack {
                         Text("Built by")
@@ -195,6 +213,18 @@ struct SettingsView: View {
             }
             #endif
         }
+    }
+
+    static var buildString: String {
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        #if DEBUG
+        return "\(build)-debug"
+        #else
+        if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" {
+            return "\(build)-testflight"
+        }
+        return "\(build)-release"
+        #endif
     }
 }
 

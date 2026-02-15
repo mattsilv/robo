@@ -1,21 +1,26 @@
 #if canImport(FoundationModels)
 import SwiftUI
+import SwiftData
 import FoundationModels
 
 @available(iOS 26, *)
 struct ChatView: View {
     @Environment(APIService.self) private var apiService
+    @Environment(CaptureCoordinator.self) private var captureCoordinator
+    @Environment(\.modelContext) private var modelContext
     @State private var chatService = ChatService()
     @State private var inputText = ""
     @State private var speechService = SpeechRecognitionService()
     @State private var copiedHitId: String?
+    @State private var roomCountBeforeCapture = 0
+    @State private var barcodeCountBeforeCapture = 0
     @FocusState private var isInputFocused: Bool
 
     private let suggestionChips = [
-        "Plan a ski trip with friends",
-        "What agents are available?",
-        "What sensors does Robo support?",
-        "How do I scan a room?"
+        "Scan my room",
+        "Scan a barcode",
+        "Take a photo",
+        "Plan something with friends"
     ]
 
     var body: some View {
@@ -54,10 +59,105 @@ struct ChatView: View {
                 }
             }
             .onAppear {
-                chatService.configure(apiService: apiService)
+                chatService.configure(apiService: apiService, captureCoordinator: captureCoordinator)
                 chatService.prewarm()
             }
+            .fullScreenCover(item: captureBinding) { capture in
+                captureView(for: capture)
+            }
         }
+    }
+
+    // MARK: - Capture Presentation
+
+    private var captureBinding: Binding<PendingCapture?> {
+        Binding(
+            get: { captureCoordinator.pendingCapture },
+            set: { newValue in
+                if newValue == nil && captureCoordinator.pendingCapture != nil {
+                    handleCaptureDismiss()
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func captureView(for capture: PendingCapture) -> some View {
+        switch capture.type {
+        case .lidar:
+            LiDARScanView(suggestedRoomName: capture.roomName)
+                .onAppear { recordCountsBefore() }
+        case .barcode:
+            BarcodeScannerView()
+                .onAppear { recordCountsBefore() }
+        case .photo:
+            PhotoCaptureView(agentName: "Chat Assistant", checklist: [])
+                .onAppear { recordCountsBefore() }
+        }
+    }
+
+    private func recordCountsBefore() {
+        roomCountBeforeCapture = (try? modelContext.fetchCount(FetchDescriptor<RoomScanRecord>())) ?? 0
+        barcodeCountBeforeCapture = (try? modelContext.fetchCount(FetchDescriptor<ScanRecord>())) ?? 0
+    }
+
+    private func handleCaptureDismiss() {
+        guard let capture = captureCoordinator.pendingCapture else { return }
+
+        switch capture.type {
+        case .lidar:
+            let descriptor = FetchDescriptor<RoomScanRecord>(
+                sortBy: [SortDescriptor(\RoomScanRecord.capturedAt, order: .reverse)]
+            )
+            let currentCount = (try? modelContext.fetchCount(FetchDescriptor<RoomScanRecord>())) ?? 0
+            if currentCount > roomCountBeforeCapture,
+               let newest = try? modelContext.fetch(descriptor).first {
+                captureCoordinator.completeCapture(result: formatRoomSummary(newest))
+            } else {
+                captureCoordinator.cancelCapture()
+            }
+
+        case .barcode:
+            let descriptor = FetchDescriptor<ScanRecord>(
+                sortBy: [SortDescriptor(\ScanRecord.capturedAt, order: .reverse)]
+            )
+            let currentCount = (try? modelContext.fetchCount(FetchDescriptor<ScanRecord>())) ?? 0
+            if currentCount > barcodeCountBeforeCapture,
+               let newest = try? modelContext.fetch(descriptor).first {
+                captureCoordinator.completeCapture(result: formatBarcodeSummary(newest))
+            } else {
+                captureCoordinator.cancelCapture()
+            }
+
+        case .photo:
+            captureCoordinator.completeCapture(result: "Photo capture completed. Photos are saved to the app.")
+        }
+    }
+
+    private func formatRoomSummary(_ room: RoomScanRecord) -> String {
+        let sqft = room.floorAreaSqM * 10.7639
+        let ceilingFt = room.ceilingHeightM * 3.28084
+        var result = "Room scan complete: \(room.roomName)\n"
+        result += "Floor area: \(String(format: "%.0f", sqft)) sq ft (\(String(format: "%.1f", room.floorAreaSqM)) sq m)\n"
+        if room.ceilingHeightM > 0 {
+            result += "Ceiling height: \(String(format: "%.1f", ceilingFt)) ft\n"
+        }
+        result += "Walls: \(room.wallCount), Objects detected: \(room.objectCount)"
+        return result
+    }
+
+    private func formatBarcodeSummary(_ scan: ScanRecord) -> String {
+        var result = "Barcode scanned: \(scan.barcodeValue) (\(scan.symbology))"
+        if let name = scan.foodName {
+            result += "\nProduct: \(name)"
+        }
+        if let brand = scan.brandName {
+            result += " by \(brand)"
+        }
+        if let calories = scan.calories {
+            result += "\nCalories: \(String(format: "%.0f", calories))"
+        }
+        return result
     }
 
     // MARK: - Empty State

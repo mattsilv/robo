@@ -17,12 +17,16 @@ class DeviceService {
 
     init() {
         if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
-           let saved = try? JSONDecoder().decode(DeviceConfig.self, from: data) {
+           var saved = try? JSONDecoder().decode(DeviceConfig.self, from: data) {
+            // Migrate stale API URLs (e.g. old workers.dev URLs) to current default
+            if saved.apiBaseURL != DeviceConfig.default.apiBaseURL {
+                saved.apiBaseURL = DeviceConfig.default.apiBaseURL
+            }
             self.config = saved
         } else {
             self.config = .default
-            save()
         }
+        save()
     }
 
     /// Testable initializer — skips UserDefaults.
@@ -89,22 +93,16 @@ class DeviceService {
         }
     }
 
-    func updateAPIBaseURL(_ url: String) {
-        config.apiBaseURL = url
-        save()
-    }
-
     /// Clear local config and re-register to get a fresh device with MCP token.
     /// Use when the device was registered before auth existed.
     func reRegister(apiService: DeviceRegistering) async {
         self.registrationError = nil
         self.registrationErrorDetail = nil
         let previousConfig = config
-        let savedBaseURL = config.apiBaseURL
         config = DeviceConfig(
             id: DeviceConfig.unregisteredID,
             name: config.name,
-            apiBaseURL: savedBaseURL
+            apiBaseURL: DeviceConfig.default.apiBaseURL
         )
         // Don't save yet — let bootstrap() save on success
         await bootstrap(apiService: apiService)

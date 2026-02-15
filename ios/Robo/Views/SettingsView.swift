@@ -3,9 +3,12 @@ import SwiftData
 
 struct SettingsView: View {
     @Environment(DeviceService.self) private var deviceService
+    @Environment(APIService.self) private var apiService
     @AppStorage("scanQuality") private var scanQuality: String = "balanced"
-    @State private var apiURL: String = ""
-    @State private var showingSaveConfirmation = false
+    @State private var copiedDeviceID = false
+    @State private var copiedMCPToken = false
+    @State private var showingReRegisterConfirm = false
+    @State private var isReRegistering = false
     #if DEBUG
     @AppStorage("dev.syncToCloud") private var debugSyncEnabled = false
     @Query(sort: \RoomScanRecord.capturedAt, order: .reverse) private var roomScans: [RoomScanRecord]
@@ -16,8 +19,77 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section("Device") {
-                    LabeledContent("Device ID", value: deviceService.config.id)
+                    Button {
+                        UIPasteboard.general.string = deviceService.config.id
+                        copiedDeviceID = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copiedDeviceID = false }
+                    } label: {
+                        LabeledContent("Device ID") {
+                            HStack(spacing: 4) {
+                                Text(deviceService.config.id)
+                                    .foregroundStyle(.secondary)
+                                Image(systemName: copiedDeviceID ? "checkmark" : "doc.on.doc")
+                                    .foregroundStyle(copiedDeviceID ? .green : .accentColor)
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                    .tint(.primary)
+
                     LabeledContent("Device Name", value: deviceService.config.name)
+
+                    if let token = deviceService.config.mcpToken {
+                        Button {
+                            UIPasteboard.general.string = token
+                            copiedMCPToken = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copiedMCPToken = false }
+                        } label: {
+                            LabeledContent("MCP Token") {
+                                HStack(spacing: 4) {
+                                    Text("••••\(String(token.suffix(4)))")
+                                        .foregroundStyle(.secondary)
+                                    Image(systemName: copiedMCPToken ? "checkmark" : "doc.on.doc")
+                                        .foregroundStyle(copiedMCPToken ? .green : .accentColor)
+                                        .font(.caption)
+                                }
+                            }
+                        }
+                        .tint(.primary)
+                    } else {
+                        LabeledContent("MCP Token") {
+                            Text("Missing — re-register below")
+                                .foregroundStyle(.orange)
+                                .font(.caption)
+                        }
+                    }
+
+                    Button {
+                        showingReRegisterConfirm = true
+                    } label: {
+                        HStack {
+                            Label("Re-register Device", systemImage: "arrow.triangle.2.circlepath")
+                            if isReRegistering {
+                                Spacer()
+                                ProgressView()
+                            }
+                        }
+                    }
+                    .disabled(isReRegistering)
+                    .confirmationDialog(
+                        "Re-register Device?",
+                        isPresented: $showingReRegisterConfirm,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Re-register", role: .destructive) {
+                            isReRegistering = true
+                            Task {
+                                await deviceService.reRegister(apiService: apiService)
+                                isReRegistering = false
+                            }
+                        }
+                    } message: {
+                        Text("This creates a new device ID and MCP token. Previous scan history will not carry over.")
+                    }
                 }
 
                 Section("Scanner") {
@@ -46,19 +118,6 @@ struct SettingsView: View {
                 }
 
                 #if DEBUG
-                Section("API Configuration") {
-                    TextField("API Base URL", text: $apiURL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-
-                    Button("Save") {
-                        deviceService.updateAPIBaseURL(apiURL)
-                        showingSaveConfirmation = true
-                    }
-                    .disabled(apiURL == deviceService.config.apiBaseURL)
-                }
-
                 Section("Developer") {
                     Toggle("Sync to Cloud", isOn: $debugSyncEnabled)
                     if debugSyncEnabled {
@@ -100,14 +159,6 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
-            .alert("Saved", isPresented: $showingSaveConfirmation) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("API URL updated successfully")
-            }
-            .onAppear {
-                apiURL = deviceService.config.apiBaseURL
-            }
             #if DEBUG
             .sheet(item: $fixtureExportURL) { url in
                 ShareSheet(activityItems: [url])
@@ -134,6 +185,8 @@ struct ShareSheet: UIViewControllerRepresentable {
 #endif
 
 #Preview {
+    let deviceService = DeviceService()
     SettingsView()
-        .environment(DeviceService())
+        .environment(deviceService)
+        .environment(APIService(deviceService: deviceService))
 }

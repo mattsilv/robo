@@ -112,6 +112,13 @@ class ChatService {
                 }
             } catch is CancellationError {
                 logger.debug("Stream cancelled")
+                // Show a friendly message instead of leaving an empty bubble
+                if self.activeAssistantMessageId == targetId {
+                    let existing = self.messageContent(for: targetId)
+                    if existing.isEmpty {
+                        self.updateMessage(id: targetId, content: "Capture cancelled. Let me know if you'd like to try again.")
+                    }
+                }
             } catch {
                 logger.error("Chat error: \(error.localizedDescription)")
                 if self.activeAssistantMessageId == targetId {

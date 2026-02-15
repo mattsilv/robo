@@ -14,6 +14,7 @@ struct ChatView: View {
     @State private var copiedHitId: String?
     @State private var roomCountBeforeCapture = 0
     @State private var barcodeCountBeforeCapture = 0
+    @State private var photoCapturedCount = 0
     @FocusState private var isInputFocused: Bool
 
     private let suggestionChips = [
@@ -91,7 +92,7 @@ struct ChatView: View {
             BarcodeScannerView()
                 .onAppear { recordCountsBefore() }
         case .photo:
-            PhotoCaptureView(agentName: "Chat Assistant", checklist: [])
+            PhotoCaptureView(agentName: "Chat Assistant", checklist: [], photoCapturedCount: $photoCapturedCount)
                 .onAppear { recordCountsBefore() }
         }
     }
@@ -130,7 +131,14 @@ struct ChatView: View {
             }
 
         case .photo:
-            captureCoordinator.completeCapture(result: "Photo capture completed. Photos are saved to the app.")
+            if photoCapturedCount > 0 {
+                captureCoordinator.completeCapture(
+                    result: "Photo capture completed. \(photoCapturedCount) photo\(photoCapturedCount == 1 ? "" : "s") saved."
+                )
+            } else {
+                captureCoordinator.cancelCapture()
+            }
+            photoCapturedCount = 0
         }
     }
 

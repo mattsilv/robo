@@ -332,6 +332,62 @@
       color: var(--blue-light);
     }
 
+    /* Name picker (group poll) */
+    .name-picker {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .name-option {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.7rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .name-option:hover:not(.voted) {
+      border-color: var(--border-accent);
+    }
+
+    .name-option:has(input:checked) {
+      background: var(--blue-dim);
+      border-color: var(--blue);
+    }
+
+    .name-option input[type="radio"] {
+      accent-color: var(--blue);
+      width: 18px;
+      height: 18px;
+    }
+
+    .name-option-label {
+      font-size: 1rem;
+      color: var(--text);
+    }
+
+    .name-option.voted {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .voted-badge {
+      margin-left: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: var(--green);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
     /* Responsive */
     @media (max-width: 420px) {
       .time-slot { font-size: 0.55rem; padding: 0.4rem 0.15rem; }
@@ -391,11 +447,166 @@
       return;
     }
 
-    if (isAvailability) {
+    if (hit.hit_type === 'group_poll') {
+      renderGroupPoll(hit);
+    } else if (isAvailability) {
       renderAvailability(hit);
     } else {
       renderGenericHit(hit);
     }
+  }
+
+  function renderGroupPoll(hit) {
+    var config = hit.config ? (typeof hit.config === 'string' ? JSON.parse(hit.config) : hit.config) : {};
+    var title = config.title || hit.task_description;
+    var participants = config.participants || [];
+    var dateOptions = config.date_options || [];
+    var context = config.context || title;
+
+    fetch(API_BASE + '/api/hits/' + hitId + '/responses')
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        renderGroupPollUI(hit, participants, dateOptions, context, data.responses || []);
+      })
+      .catch(function() {
+        renderGroupPollUI(hit, participants, dateOptions, context, []);
+      });
+  }
+
+  function renderGroupPollUI(hit, participants, dateOptions, context, existingResponses) {
+    var respondedNames = {};
+    existingResponses.forEach(function(r) { respondedNames[r.respondent_name] = true; });
+
+    var html = '<div class="hit-header">' +
+      '<div class="hit-logo">ROBO<span>.</span>APP</div>' +
+      '<p class="hit-greeting">' + escapeHtml(hit.sender_name) + ' needs your help</p>' +
+      '<p class="hit-description">' + escapeHtml(context) + '</p>' +
+      '</div>';
+
+    html += '<div class="name-section">' +
+      '<span class="name-label">Who are you?</span>' +
+      '<div class="name-picker" id="name-picker">';
+
+    participants.forEach(function(name) {
+      var alreadyVoted = respondedNames[name];
+      html += '<label class="name-option' + (alreadyVoted ? ' voted' : '') + '">' +
+        '<input type="radio" name="participant" value="' + escapeHtml(name) + '"' + (alreadyVoted ? ' disabled' : '') + '>' +
+        '<span class="name-option-label">' + escapeHtml(name) + '</span>' +
+        (alreadyVoted ? '<span class="voted-badge">Voted</span>' : '') +
+        '</label>';
+    });
+
+    html += '</div></div>';
+
+    if (dateOptions.length > 0) {
+      html += '<div class="availability-section">' +
+        '<span class="section-label">Which dates work for you?</span>' +
+        '<div class="day-grid" id="date-grid">';
+
+      dateOptions.forEach(function(isoDate) {
+        var d = new Date(isoDate + 'T12:00:00');
+        var label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        html += '<div class="day-row"><div class="time-slots">' +
+          '<div class="time-slot date-option" data-date="' + isoDate + '" style="flex:1;padding:0.75rem;font-size:0.75rem;">' + label + '</div>' +
+          '</div></div>';
+      });
+
+      html += '</div></div>';
+    }
+
+    html += '<button class="submit-btn" id="submit-btn" disabled>Pick your name, then vote</button>';
+    html += '<div id="result-area"></div>';
+    html += '<div class="hit-footer"><a href="https://robo.app">Powered by Robo</a></div>';
+
+    app.innerHTML = html;
+
+    var selectedName = null;
+    var selectedDates = {};
+    var nameInputs = document.querySelectorAll('#name-picker input[type="radio"]');
+    nameInputs.forEach(function(input) {
+      input.addEventListener('change', function() {
+        selectedName = this.value;
+        updateGroupSubmitBtn();
+      });
+    });
+
+    var dateGrid = document.getElementById('date-grid');
+    if (dateGrid) {
+      dateGrid.addEventListener('click', function(e) {
+        var slot = e.target.closest('.date-option');
+        if (!slot) return;
+        var date = slot.dataset.date;
+        if (selectedDates[date]) {
+          delete selectedDates[date];
+          slot.classList.remove('selected');
+        } else {
+          selectedDates[date] = true;
+          slot.classList.add('selected');
+        }
+        updateGroupSubmitBtn();
+      });
+    }
+
+    var submitBtn = document.getElementById('submit-btn');
+
+    function updateGroupSubmitBtn() {
+      var dateCount = Object.keys(selectedDates).length;
+      if (selectedName && dateCount > 0) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit vote (' + dateCount + ' date' + (dateCount > 1 ? 's' : '') + ')';
+      } else if (selectedName) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Select at least one date';
+      } else {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Pick your name, then vote';
+      }
+    }
+
+    submitBtn.addEventListener('click', function() {
+      if (submitBtn.disabled) return;
+      submitBtn.disabled = true;
+      submitBtn.classList.add('submitting');
+      submitBtn.textContent = 'Submitting...';
+
+      fetch(API_BASE + '/api/hits/' + hitId + '/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          respondent_name: selectedName,
+          response_data: { selected_dates: Object.keys(selectedDates) }
+        })
+      })
+      .then(function(res) {
+        if (res.status === 409) throw new Error('already_responded');
+        if (!res.ok) throw new Error('Failed to submit');
+        return res.json();
+      })
+      .then(function() {
+        document.getElementById('result-area').innerHTML =
+          '<div class="success"><div class="success-icon">&#10003;</div>' +
+          '<p class="success-title">Thanks, ' + escapeHtml(selectedName) + '!</p>' +
+          '<p class="success-msg">Your vote has been recorded.</p></div>';
+        submitBtn.style.display = 'none';
+        if (document.querySelector('.availability-section')) document.querySelector('.availability-section').style.display = 'none';
+        document.querySelector('.name-section').style.display = 'none';
+      })
+      .catch(function(err) {
+        if (err.message === 'already_responded') {
+          document.getElementById('result-area').innerHTML =
+            '<div class="success"><div class="success-icon">&#10003;</div>' +
+            '<p class="success-title">Already voted!</p>' +
+            '<p class="success-msg">You\'ve already submitted your response.</p></div>';
+          submitBtn.style.display = 'none';
+          if (document.querySelector('.availability-section')) document.querySelector('.availability-section').style.display = 'none';
+          document.querySelector('.name-section').style.display = 'none';
+        } else {
+          submitBtn.disabled = false;
+          submitBtn.classList.remove('submitting');
+          submitBtn.textContent = 'Error — tap to retry';
+        }
+      });
+    });
   }
 
   function renderAvailability(hit) {

@@ -61,6 +61,10 @@ targets:
         UIRequiresFullScreen: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        CFBundleURLTypes:
+          - CFBundleURLSchemes:
+              - robo
+            CFBundleURLName: com.silv.Robo
         ITSAppUsesNonExemptEncryption: false
         NSCameraUsageDescription: "Robo needs camera access to scan barcodes, capture photos, and perform LiDAR room scanning for AI analysis"
         NSPhotoLibraryUsageDescription: "Robo needs photo library access to save captured images"

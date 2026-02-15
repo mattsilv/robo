@@ -81,6 +81,7 @@ struct RoboApp: App {
             ContentView()
                 .environment(deviceService)
                 .environment(apiService)
+                .modifier(CaptureCoordinatorModifier())
                 .task {
                     SummaryMigrationService.migrateIfNeeded(container: modelContainer)
                     await deviceService.bootstrap(apiService: apiService)

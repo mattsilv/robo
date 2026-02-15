@@ -21,12 +21,14 @@ class ChatService {
     private var streamTask: Task<Void, Never>?
     private var activeAssistantMessageId: UUID?
     private var apiService: APIService?
+    private var captureCoordinator: CaptureCoordinator?
 
     init() {}
 
-    func configure(apiService: APIService) {
+    func configure(apiService: APIService, captureCoordinator: CaptureCoordinator) {
         guard self.apiService == nil else { return }
         self.apiService = apiService
+        self.captureCoordinator = captureCoordinator
         resetSession()
     }
 
@@ -41,13 +43,22 @@ class ChatService {
 
         let prompt = Self.buildSystemPrompt()
 
+        var tools: [any Tool] = []
         if let apiService {
-            let tool = CreateAvailabilityHITTool(apiService: apiService)
-            session = LanguageModelSession(tools: [tool]) {
+            tools.append(CreateAvailabilityHITTool(apiService: apiService))
+        }
+        if let captureCoordinator {
+            tools.append(ScanRoomTool(captureCoordinator: captureCoordinator))
+            tools.append(ScanBarcodeTool(captureCoordinator: captureCoordinator))
+            tools.append(TakePhotoTool(captureCoordinator: captureCoordinator))
+        }
+
+        if tools.isEmpty {
+            session = LanguageModelSession {
                 prompt
             }
         } else {
-            session = LanguageModelSession {
+            session = LanguageModelSession(tools: tools) {
                 prompt
             }
         }
@@ -77,7 +88,7 @@ class ChatService {
             guard let self, let session else { return }
 
             do {
-                if self.apiService != nil {
+                if self.apiService != nil || self.captureCoordinator != nil {
                     // Use non-streaming respond() for tool calling support
                     let response = try await session.respond(to: text)
                     guard !Task.isCancelled else { return }
@@ -101,6 +112,13 @@ class ChatService {
                 }
             } catch is CancellationError {
                 logger.debug("Stream cancelled")
+                // Show a friendly message instead of leaving an empty bubble
+                if self.activeAssistantMessageId == targetId {
+                    let existing = self.messageContent(for: targetId)
+                    if existing.isEmpty {
+                        self.updateMessage(id: targetId, content: "Capture cancelled. Let me know if you'd like to try again.")
+                    }
+                }
             } catch {
                 logger.error("Chat error: \(error.localizedDescription)")
                 if self.activeAssistantMessageId == targetId {
@@ -168,15 +186,20 @@ class ChatService {
         You are Robo's on-device assistant. Robo is an iOS app that turns phone sensors \
         (LiDAR, camera, barcode scanner) into APIs for AI agents.
 
-        You can help users create Group Think availability polls using the create_availability_poll tool. \
-        When a user wants to plan something with friends (trip, dinner, meetup), guide them through:
-        1. Ask who's coming (participant names)
-        2. Ask for date options (suggest specific dates if they say things like "weekends in May")
-        3. Ask for time slot preferences
-        Then call the tool to create the poll and share links.
+        You have these sensor tools — use them when the user asks:
+        - scan_room: Launches LiDAR to scan and measure a room. Use when user says "scan my room", \
+        "measure the kitchen", "map the bedroom", etc.
+        - scan_barcode: Launches the barcode scanner. Use when user says "scan a barcode", \
+        "look up this product", "scan a QR code", etc.
+        - take_photo: Launches the camera to capture photos. Use when user says "take a photo", \
+        "photograph my desk", "capture the label", etc.
+        - create_availability_poll: Creates a group availability poll with shareable links.
 
-        When the user mentions dates loosely (e.g. "weekends in May"), convert them to specific ISO dates. \
-        For time slots, default to evening times (5 PM, 6 PM, 7 PM, 8 PM) unless the user specifies otherwise.
+        When the user asks to scan, photograph, or capture something, call the appropriate tool \
+        immediately. Do NOT tell them to go to the Capture tab — you can do it directly.
+
+        After a room scan, you'll receive dimensions and details. Use this to answer follow-up \
+        questions like "could a queen bed fit?" or "how much paint do I need?".
 
         IMPORTANT: Keep responses short — 1-2 sentences. Be conversational and friendly. \
         When you have enough info, call the tool immediately without asking for confirmation.

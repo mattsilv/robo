@@ -6,17 +6,18 @@ import type { Env } from '../types';
  * Body: { device_id: string, type: "barcode" | "room", data: any }
  */
 export async function debugSync(c: Context<{ Bindings: Env }>) {
+  const authenticatedDeviceId = c.req.header('X-Device-ID')!; // guaranteed by deviceAuth middleware
   const body = await c.req.json().catch(() => null);
-  if (!body || !body.device_id || !body.type || !body.data) {
-    return c.json({ error: 'Missing required fields: device_id, type, data' }, 400);
+  if (!body || !body.type || !body.data) {
+    return c.json({ error: 'Missing required fields: type, data' }, 400);
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const key = `debug/${body.device_id}/${timestamp}-${body.type}.json`;
+  const key = `debug/${authenticatedDeviceId}/${timestamp}-${body.type}.json`;
 
   await c.env.BUCKET.put(key, JSON.stringify(body.data, null, 2), {
     customMetadata: {
-      device_id: body.device_id,
+      device_id: authenticatedDeviceId,
       type: body.type,
       uploaded_at: new Date().toISOString(),
     },
@@ -29,7 +30,12 @@ export async function debugSync(c: Context<{ Bindings: Env }>) {
  * GET /api/debug/sync/:device_id — List debug payloads for a device
  */
 export async function debugList(c: Context<{ Bindings: Env }>) {
+  const authenticatedDeviceId = c.req.header('X-Device-ID')!; // guaranteed by deviceAuth middleware
   const deviceId = c.req.param('device_id');
+
+  if (deviceId !== authenticatedDeviceId) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
   const prefix = `debug/${deviceId}/`;
 
   const listed = await c.env.BUCKET.list({ prefix, limit: 100 });
@@ -47,7 +53,12 @@ export async function debugList(c: Context<{ Bindings: Env }>) {
  * GET /api/debug/sync/:device_id/:key+ — Retrieve a specific debug payload
  */
 export async function debugGet(c: Context<{ Bindings: Env }>) {
+  const authenticatedDeviceId = c.req.header('X-Device-ID')!; // guaranteed by deviceAuth middleware
   const deviceId = c.req.param('device_id');
+
+  if (deviceId !== authenticatedDeviceId) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
   const key = c.req.param('key');
   const fullKey = `debug/${deviceId}/${key}`;
 

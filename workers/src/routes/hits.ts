@@ -246,24 +246,20 @@ export async function completeHit(c: Context<{ Bindings: Env }>) {
  * GET /api/hits — List HITs for a sender device (auth required)
  */
 export async function listHits(c: Context<{ Bindings: Env }>) {
-  const deviceId = c.req.header('X-Device-ID');
+  const deviceId = c.req.header('X-Device-ID')!; // guaranteed by deviceAuth middleware
   const groupId = c.req.query('group_id');
 
   try {
     let result;
     if (groupId) {
-      // Filter by group_id (cross-device, for aggregating group polls)
+      // Filter by group_id, scoped to authenticated device
       result = await c.env.DB.prepare(
-        'SELECT h.*, (SELECT COUNT(*) FROM hit_responses WHERE hit_id = h.id) as response_count FROM hits h WHERE h.group_id = ? ORDER BY h.created_at DESC LIMIT 50'
-      ).bind(groupId).all<Hit & { response_count: number }>();
-    } else if (deviceId) {
+        'SELECT h.*, (SELECT COUNT(*) FROM hit_responses WHERE hit_id = h.id) as response_count FROM hits h WHERE h.group_id = ? AND h.device_id = ? ORDER BY h.created_at DESC LIMIT 50'
+      ).bind(groupId, deviceId).all<Hit & { response_count: number }>();
+    } else {
       result = await c.env.DB.prepare(
         'SELECT h.*, (SELECT COUNT(*) FROM hit_responses WHERE hit_id = h.id) as response_count FROM hits h WHERE h.device_id = ? ORDER BY h.created_at DESC LIMIT 50'
       ).bind(deviceId).all<Hit & { response_count: number }>();
-    } else {
-      result = await c.env.DB.prepare(
-        'SELECT h.*, (SELECT COUNT(*) FROM hit_responses WHERE hit_id = h.id) as response_count FROM hits h ORDER BY h.created_at DESC LIMIT 50'
-      ).all<Hit & { response_count: number }>();
     }
 
     return c.json(
@@ -425,12 +421,17 @@ export async function respondToHit(c: Context<{ Bindings: Env }>) {
  */
 export async function deleteHit(c: Context<{ Bindings: Env }>) {
   const hitId = c.req.param('id');
+  const deviceId = c.req.header('X-Device-ID')!; // guaranteed by deviceAuth middleware
 
   try {
     const hit = await c.env.DB.prepare('SELECT * FROM hits WHERE id = ?').bind(hitId).first<Hit>();
 
     if (!hit) {
       return c.json({ error: 'HIT not found' }, 404);
+    }
+
+    if (hit.device_id !== deviceId) {
+      return c.json({ error: 'Forbidden' }, 403);
     }
 
     // Delete associated photos from R2

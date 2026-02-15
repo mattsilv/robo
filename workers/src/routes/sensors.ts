@@ -9,7 +9,8 @@ export const submitSensorData = async (c: Context<{ Bindings: Env }>) => {
     return c.json({ error: 'Invalid request body', issues: validated.error.issues }, 400);
   }
 
-  const { device_id, sensor_type, data } = validated.data;
+  const { sensor_type, data } = validated.data;
+  const device_id = c.req.header('X-Device-ID')!; // use authenticated identity, ignore body device_id
   const now = new Date().toISOString();
 
   try {

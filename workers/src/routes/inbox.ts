@@ -2,7 +2,12 @@ import type { Context } from 'hono';
 import { PushCardSchema, RespondCardSchema, type Env, type InboxCard } from '../types';
 
 export const getInbox = async (c: Context<{ Bindings: Env }>) => {
+  const authenticatedDeviceId = c.req.header('X-Device-ID')!; // guaranteed by deviceAuth middleware
   const deviceId = c.req.param('device_id');
+
+  if (deviceId !== authenticatedDeviceId) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
 
   try {
     const result = await c.env.DB.prepare(

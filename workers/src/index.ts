@@ -39,8 +39,8 @@ app.post('/api/devices/:device_id/apns-token', deviceAuth, saveAPNsToken);
 // Sensor routes (auth required)
 app.post('/api/sensors/data', deviceAuth, submitSensorData);
 
-// Inbox routes
-app.get('/api/inbox/:device_id', getInbox);
+// Inbox routes (auth required)
+app.get('/api/inbox/:device_id', deviceAuth, getInbox);
 app.post('/api/inbox/push', deviceAuth, pushCard);
 app.post('/api/inbox/:card_id/respond', deviceAuth, respondToCard);
 
@@ -50,16 +50,18 @@ app.get('/api/nutrition/lookup', deviceAuth, lookupNutrition);
 // Opus integration
 app.post('/api/opus/analyze', analyzeWithOpus);
 
-// HIT routes
-app.post('/api/hits', createHit);
-app.get('/api/hits', listHits);
+// HIT owner routes (auth required)
+app.post('/api/hits', deviceAuth, createHit);
+app.get('/api/hits', deviceAuth, listHits);
+app.delete('/api/hits/:id', deviceAuth, deleteHit);
+app.get('/api/hits/:id/photos', deviceAuth, listHitPhotos);
+app.get('/api/hits/:id/responses', deviceAuth, listHitResponses);
+
+// HIT public routes (accessed via share link by non-app users)
 app.get('/api/hits/:id', getHit);
-app.delete('/api/hits/:id', deleteHit);
 app.post('/api/hits/:id/upload', uploadHitPhoto);
 app.patch('/api/hits/:id/complete', completeHit);
-app.get('/api/hits/:id/photos', listHitPhotos);
 app.post('/api/hits/:id/respond', respondToHit);
-app.get('/api/hits/:id/responses', listHitResponses);
 
 // HIT web page — served by Workers with dynamic OG tags (not Pages static files)
 app.get('/hit/:id/og.png', serveOgImage);
@@ -70,10 +72,10 @@ app.get('/api/keys', mcpTokenAuth, listAPIKeys);
 app.post('/api/keys', mcpTokenAuth, createAPIKey);
 app.delete('/api/keys/:key_id', mcpTokenAuth, deleteAPIKey);
 
-// Debug sync (stores scan data in R2 for developer debugging)
-app.post('/api/debug/sync', debugSync);
-app.get('/api/debug/sync/:device_id', debugList);
-app.get('/api/debug/sync/:device_id/:key{.+}', debugGet);
+// Debug sync (auth required — stores scan data in R2 for developer debugging)
+app.post('/api/debug/sync', deviceAuth, debugSync);
+app.get('/api/debug/sync/:device_id', deviceAuth, debugList);
+app.get('/api/debug/sync/:device_id/:key{.+}', deviceAuth, debugGet);
 app.get('/api/debug/download/:key{.+}', debugDownload);
 
 // Error handling

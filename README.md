@@ -142,6 +142,7 @@ Response:
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
   "name": "My iPhone",
+  "mcp_token": "4E00A6CBBC1B9AE14EFA4447CB191EEE",
   "registered_at": "2026-02-10T18:19:39.262Z",
   "last_seen_at": null
 }

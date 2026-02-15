@@ -51,4 +51,17 @@ class DeviceService {
         config.apiBaseURL = url
         save()
     }
+
+    /// Clear local config and re-register to get a fresh device with MCP token.
+    /// Use when the device was registered before auth existed.
+    func reRegister(apiService: APIService) async {
+        let savedBaseURL = config.apiBaseURL
+        config = DeviceConfig(
+            id: DeviceConfig.unregisteredID,
+            name: config.name,
+            apiBaseURL: savedBaseURL
+        )
+        save()
+        await bootstrap(apiService: apiService)
+    }
 }

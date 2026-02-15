@@ -111,18 +111,35 @@ Changed `createRoboMcpServer(env)` to `createRoboMcpServer(env, deviceId)`. All 
 
 ## Verification
 
+Tested 2026-02-14 against production (`https://mcp.robo.app/mcp`):
+
 ```bash
 # No token -> 401
 echo '{"jsonrpc":"2.0","method":"initialize","id":1}' | \
-  http POST https://robo-api.silv.workers.dev/mcp Content-Type:application/json
-# {"jsonrpc":"2.0","error":{"code":-32000,"message":"Missing Authorization header..."},"id":null}
+  http --timeout=10 POST https://mcp.robo.app/mcp Content-Type:application/json
+# → {"jsonrpc":"2.0","error":{"code":-32000,"message":"Missing Authorization header..."},"id":null}
 
-# Valid token -> MCP initializes
-echo '{"jsonrpc":"2.0","method":"initialize","params":{...},"id":1}' | \
-  http POST https://robo-api.silv.workers.dev/mcp \
-  Content-Type:application/json Accept:'application/json, text/event-stream' \
-  "Authorization:Bearer <valid_token>"
-# {"result":{"serverInfo":{"name":"Robo Sensor Bridge","version":"1.0.0"},...}}
+# Invalid token -> 401
+echo '{"jsonrpc":"2.0","method":"tools/list","id":1,"params":{}}' | \
+  http --timeout=10 POST https://mcp.robo.app/mcp \
+  Content-Type:application/json 'Accept:application/json, text/event-stream' \
+  'Authorization:Bearer INVALIDTOKEN'
+# → {"jsonrpc":"2.0","error":{"code":-32000,"message":"Invalid token"},"id":null}
+
+# Valid token -> MCP initializes with device-scoped access
+echo '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | \
+  http --timeout=10 POST https://mcp.robo.app/mcp \
+  Content-Type:application/json 'Accept:application/json, text/event-stream' \
+  'Authorization:Bearer YOUR_TOKEN'
+# → event: message
+# → data: {"result":{"protocolVersion":"2025-03-26","capabilities":{"tools":{"listChanged":true}},"serverInfo":{"name":"Robo Sensor Bridge","version":"1.0.0"}},...}
+
+# Device info returns only the authenticated device
+echo '{"jsonrpc":"2.0","method":"tools/call","id":2,"params":{"name":"get_device_info","arguments":{}}}' | \
+  http --timeout=10 POST https://mcp.robo.app/mcp \
+  Content-Type:application/json 'Accept:application/json, text/event-stream' \
+  'Authorization:Bearer YOUR_TOKEN'
+# → returns only the device matching the token, not all devices
 ```
 
 ## Files Changed

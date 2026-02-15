@@ -35,6 +35,10 @@
 	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Robo uses Bluetooth to detect nearby iBeacon devices for room-aware automations.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Robo uses your location to tag sensor captures with where they were taken.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Robo uses your location to tag sensor captures with where they were taken.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Robo needs camera access to scan barcodes, capture photos, and perform LiDAR room scanning for AI analysis</string>
 	<key>NSHealthShareUsageDescription</key>

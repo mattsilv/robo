@@ -22,6 +22,7 @@ struct ChatView: View {
         "Scan my room",
         "Scan a barcode",
         "Take a photo",
+        "Upload coins to Coindex",
         "Plan something with friends"
     ]
 

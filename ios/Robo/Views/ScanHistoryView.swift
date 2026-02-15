@@ -10,6 +10,8 @@ struct ScanHistoryView: View {
     private var motionRecords: [MotionRecord]
 @Query(sort: \BeaconEventRecord.capturedAt, order: .reverse)
     private var beaconEvents: [BeaconEventRecord]
+    @Query(sort: \AgentCompletionRecord.completedAt, order: .reverse)
+    private var agentCompletions: [AgentCompletionRecord]
     @Environment(\.modelContext) private var modelContext
 
     @State private var selectedSegment = 0
@@ -29,6 +31,7 @@ struct ScanHistoryView: View {
                     Text("Rooms").tag(1)
                     Text("Motion").tag(2)
                     Text("Beacons").tag(3)
+                    Text("Tasks").tag(4)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
@@ -42,6 +45,7 @@ struct ScanHistoryView: View {
                     case 1: roomList
                     case 2: motionList
                     case 3: beaconList
+                    case 4: tasksList
                     default: barcodeList
                     }
                 }
@@ -76,7 +80,8 @@ struct ScanHistoryView: View {
                     if (selectedSegment == 0 && !scans.isEmpty) ||
                        (selectedSegment == 1 && !roomScans.isEmpty) ||
                        (selectedSegment == 2 && !motionRecords.isEmpty) ||
-                       (selectedSegment == 3 && !beaconEvents.isEmpty) {
+                       (selectedSegment == 3 && !beaconEvents.isEmpty) ||
+                       (selectedSegment == 4 && !agentCompletions.isEmpty) {
                         ToolbarItem(placement: .destructiveAction) {
                             Button("Clear All", role: .destructive) {
                                 showingClearConfirmation = true
@@ -102,6 +107,8 @@ struct ScanHistoryView: View {
                     Text("This will permanently delete \(motionRecords.count) motion record\(motionRecords.count == 1 ? "" : "s").")
                 case 3:
                     Text("This will permanently delete \(beaconEvents.count) beacon event\(beaconEvents.count == 1 ? "" : "s").")
+                case 4:
+                    Text("This will permanently delete \(agentCompletions.count) task\(agentCompletions.count == 1 ? "" : "s").")
                 default:
                     Text("This will permanently delete all items.")
                 }
@@ -306,10 +313,37 @@ struct ScanHistoryView: View {
         }
     }
 
+    // MARK: - Tasks List
+
+    @ViewBuilder
+    private var tasksList: some View {
+        if agentCompletions.isEmpty {
+            ContentUnavailableView {
+                Label("No Tasks Yet", systemImage: "checklist")
+            } description: {
+                Text("Completed agent tasks will appear here.")
+            }
+        } else {
+            List {
+                ForEach(agentCompletions) { completion in
+                    AgentCompletionRow(completion: completion)
+                }
+                .onDelete(perform: deleteCompletions)
+            }
+        }
+    }
+
+    private func deleteCompletions(at offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(agentCompletions[index])
+        }
+        try? modelContext.save()
+    }
+
     // MARK: - Export All Section
 
     private var totalItemCount: Int {
-        scans.count + roomScans.count + motionRecords.count + beaconEvents.count
+        scans.count + roomScans.count + motionRecords.count + beaconEvents.count + agentCompletions.count
     }
 
     @ViewBuilder
@@ -372,6 +406,8 @@ struct ScanHistoryView: View {
             for motion in motionRecords { modelContext.delete(motion) }
         case 3:
             for event in beaconEvents { modelContext.delete(event) }
+        case 4:
+            for completion in agentCompletions { modelContext.delete(completion) }
         default:
             break
         }
@@ -918,7 +954,113 @@ struct BeaconTimelineView: View {
     }
 }
 
+// MARK: - Agent Completion Row
+
+struct AgentCompletionRow: View {
+    let completion: AgentCompletionRecord
+    @State private var thumbnails: [UIImage] = []
+
+    private var skillIcon: String {
+        switch completion.skillType {
+        case "camera": return "camera.fill"
+        case "lidar": return "camera.metering.spot"
+        case "barcode": return "barcode.viewfinder"
+        case "beacon": return "sensor.tag.radiowaves.forward"
+        default: return "checkmark.circle"
+        }
+    }
+
+    private var skillColor: Color {
+        switch completion.skillType {
+        case "camera": return .blue
+        case "lidar": return .purple
+        case "barcode": return .orange
+        case "beacon": return .indigo
+        default: return .green
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Image(systemName: skillIcon)
+                    .font(.title2)
+                    .foregroundStyle(skillColor)
+                    .frame(width: 40, height: 40)
+                    .background(skillColor.opacity(0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(completion.agentName)
+                        .font(.headline)
+                    HStack(spacing: 8) {
+                        Text(completion.skillType.capitalized)
+                            .font(.caption)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(skillColor.opacity(0.15))
+                            .foregroundStyle(skillColor)
+                            .clipShape(Capsule())
+                        Text("\(completion.itemCount) item\(completion.itemCount == 1 ? "" : "s")")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Text(completion.completedAt, style: .relative)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            // Photo thumbnails grid
+            if !thumbnails.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(Array(thumbnails.prefix(6).enumerated()), id: \.offset) { _, thumb in
+                            Image(uiImage: thumb)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 50, height: 50)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
+                }
+            }
+
+            // Album URL link
+            if let urlStr = completion.albumURL, let url = URL(string: urlStr) {
+                Link(destination: url) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "link")
+                        Text("View Album")
+                            .font(.subheadline)
+                    }
+                    .foregroundStyle(.blue)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+        .task {
+            loadThumbnails()
+        }
+    }
+
+    private func loadThumbnails() {
+        let filenames = completion.photoFilenames
+        guard !filenames.isEmpty else { return }
+        var loaded: [UIImage] = []
+        for name in filenames.prefix(6) {
+            if let img = PhotoStorageService.loadThumbnail(name) {
+                loaded.append(img)
+            }
+        }
+        thumbnails = loaded
+    }
+}
+
 #Preview {
     ScanHistoryView()
-        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self, MotionRecord.self, BeaconEventRecord.self], inMemory: true)
+        .modelContainer(for: [ScanRecord.self, RoomScanRecord.self, MotionRecord.self, BeaconEventRecord.self, AgentCompletionRecord.self], inMemory: true)
 }

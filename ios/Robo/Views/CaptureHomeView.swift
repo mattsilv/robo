@@ -4,12 +4,16 @@ import AudioToolbox
 
 struct CaptureHomeView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(CoindexService.self) private var coindexService
     @Query(sort: \RoomScanRecord.capturedAt, order: .reverse) private var roomScans: [RoomScanRecord]
     @Query(sort: \ScanRecord.capturedAt, order: .reverse) private var scans: [ScanRecord]
     @Query(sort: \ProductCaptureRecord.capturedAt, order: .reverse) private var productCaptures: [ProductCaptureRecord]
     @Query(sort: \BeaconEventRecord.capturedAt, order: .reverse) private var beaconEvents: [BeaconEventRecord]
 
     @State private var agents: [AgentConnection] = MockAgentService.loadAgents()
+    @State private var showingCoindexAuth = false
+    @State private var pendingCoindexAgent: AgentConnection?
+    @State private var coindexAuthError: String?
 
     // Capture presentation state
     @State private var showingLiDARScan = false
@@ -85,6 +89,31 @@ struct CaptureHomeView: View {
         .fullScreenCover(isPresented: $showingHealthCapture, onDismiss: handleHealthDismiss) {
             HealthCaptureView(captureContext: activeCaptureContext)
         }
+        .alert("Link Coindex Account", isPresented: $showingCoindexAuth) {
+            Button("Link Account") {
+                Task {
+                    do {
+                        try await coindexService.authenticate()
+                        if let agent = pendingCoindexAgent {
+                            handleAgentScanNow(agent)
+                        }
+                    } catch {
+                        coindexAuthError = error.localizedDescription
+                    }
+                    pendingCoindexAgent = nil
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                pendingCoindexAgent = nil
+            }
+        } message: {
+            Text("To use this feature, link your Coindex.app account.")
+        }
+        .alert("Authentication Failed", isPresented: Binding(get: { coindexAuthError != nil }, set: { if !$0 { coindexAuthError = nil } })) {
+            Button("OK") { coindexAuthError = nil }
+        } message: {
+            Text(coindexAuthError ?? "")
+        }
         .sheet(item: $pendingRouting) { routing in
             RoutingSuggestionSheet(
                 routing: routing,
@@ -121,8 +150,15 @@ struct CaptureHomeView: View {
                 }
 
                 ForEach(pendingAgents) { agent in
-                    AgentRequestBanner(agent: agent) {
-                        handleAgentScanNow(agent)
+                    if agent.name == "Coindex" && !coindexService.isAuthenticated {
+                        CoindexLinkBanner(agent: agent) {
+                            showingCoindexAuth = true
+                            pendingCoindexAgent = agent
+                        }
+                    } else {
+                        AgentRequestBanner(agent: agent) {
+                            handleAgentScanNow(agent)
+                        }
                     }
                 }
             }
@@ -415,6 +451,53 @@ private struct AgentRequestBanner: View {
             .background(.secondary.opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
+    }
+}
+
+// MARK: - Coindex Link Banner
+
+private struct CoindexLinkBanner: View {
+    let agent: AgentConnection
+    let onLink: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: agent.iconSystemName)
+                    .font(.title3)
+                    .foregroundStyle(agent.accentColor)
+                    .frame(width: 36, height: 36)
+                    .background(agent.accentColor.opacity(0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(agent.name)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Text("Account not linked")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+
+            Text("To use this feature, link your Coindex.app account. Tap below to get started.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Button(action: onLink) {
+                Label("Link Coindex Account", systemImage: "link")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(agent.accentColor)
+        }
+        .padding(12)
+        .background(.secondary.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 

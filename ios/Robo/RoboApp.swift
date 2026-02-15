@@ -13,6 +13,8 @@ struct RoboApp: App {
 
     let modelContainer: ModelContainer
 
+    @State private var coindexService = CoindexService()
+
     init() {
         let deviceService = DeviceService()
         _deviceService = State(initialValue: deviceService)
@@ -24,7 +26,7 @@ struct RoboApp: App {
     /// Attempts to create a ModelContainer with migration, falling back to a
     /// backup-and-recreate strategy. NEVER deletes the store without backing up first.
     private static func createResilientContainer() -> ModelContainer {
-        let schema = Schema(versionedSchema: RoboSchemaV9.self)
+        let schema = Schema(versionedSchema: RoboSchemaV10.self)
         let config = ModelConfiguration(schema: schema)
 
         // Attempt 1: Normal migration
@@ -81,6 +83,7 @@ struct RoboApp: App {
             ContentView()
                 .environment(deviceService)
                 .environment(apiService)
+                .environment(coindexService)
                 .modifier(CaptureCoordinatorModifier())
                 .task {
                     SummaryMigrationService.migrateIfNeeded(container: modelContainer)

@@ -37,6 +37,22 @@ enum MockAgentService {
                 )
             ),
             AgentConnection(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!,
+                name: "Coindex",
+                description: "Upload coin photos to your Coindex collection — EXIF metadata stripped automatically",
+                iconSystemName: "dollarsign.circle",
+                accentColor: .yellow,
+                status: .connected,
+                lastSyncDate: nil,
+                pendingRequest: AgentRequest(
+                    id: UUID(uuidString: "00000000-0000-0000-0000-000000000030")!,
+                    title: "Upload coins to Coindex",
+                    description: "Take photos of your coins and I'll upload them to your Coindex album with location metadata stripped.",
+                    skillType: .camera,
+                    roomNameHint: nil
+                )
+            ),
+            AgentConnection(
                 id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
                 name: "Practical Chef",
                 description: "Analyzes ingredients and nutrition for meal planning",

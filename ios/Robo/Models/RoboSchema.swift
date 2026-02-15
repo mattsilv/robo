@@ -614,18 +614,75 @@ enum RoboSchemaV9: VersionedSchema {
     }
 }
 
+// MARK: - Schema V10 (Coindex album URL + photo filenames on agent completions)
+
+enum RoboSchemaV10: VersionedSchema {
+    static var versionIdentifier = Schema.Version(10, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [ScanRecord.self, RoomScanRecord.self, MotionRecord.self,
+         AgentCompletionRecord.self, ProductCaptureRecord.self,
+         BeaconEventRecord.self, HealthRecord.self]
+    }
+
+    // Re-export V9 models unchanged
+    typealias ScanRecord = RoboSchemaV4.ScanRecord
+    typealias RoomScanRecord = RoboSchemaV9.RoomScanRecord
+    typealias MotionRecord = RoboSchemaV4.MotionRecord
+    typealias ProductCaptureRecord = RoboSchemaV6.ProductCaptureRecord
+    typealias BeaconEventRecord = RoboSchemaV7.BeaconEventRecord
+    typealias HealthRecord = RoboSchemaV8.HealthRecord
+
+    @Model
+    final class AgentCompletionRecord {
+        var agentId: String
+        var agentName: String
+        var requestId: String
+        var skillType: String
+        var itemCount: Int
+        var completedAt: Date
+
+        // V10: Coindex album link and photo filenames
+        var albumURL: String?
+        var photoFilenamesJSON: String?
+
+        init(
+            agentId: String,
+            agentName: String,
+            requestId: String,
+            skillType: String,
+            itemCount: Int
+        ) {
+            self.agentId = agentId
+            self.agentName = agentName
+            self.requestId = requestId
+            self.skillType = skillType
+            self.itemCount = itemCount
+            self.completedAt = Date()
+        }
+
+        var photoFilenames: [String] {
+            guard let json = photoFilenamesJSON,
+                  let data = json.data(using: .utf8) else { return [] }
+            return (try? JSONDecoder().decode([String].self, from: data)) ?? []
+        }
+    }
+}
+
 // MARK: - Migration Plan
 
 enum RoboMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
         [RoboSchemaV1.self, RoboSchemaV2.self, RoboSchemaV3.self,
          RoboSchemaV4.self, RoboSchemaV5.self, RoboSchemaV6.self,
-         RoboSchemaV7.self, RoboSchemaV8.self, RoboSchemaV9.self]
+         RoboSchemaV7.self, RoboSchemaV8.self, RoboSchemaV9.self,
+         RoboSchemaV10.self]
     }
 
     static var stages: [MigrationStage] {
         [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5,
-         migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9]
+         migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9,
+         migrateV9toV10]
     }
 
     static let migrateV1toV2 = MigrationStage.lightweight(
@@ -667,14 +724,19 @@ enum RoboMigrationPlan: SchemaMigrationPlan {
         fromVersion: RoboSchemaV8.self,
         toVersion: RoboSchemaV9.self
     )
+
+    static let migrateV9toV10 = MigrationStage.lightweight(
+        fromVersion: RoboSchemaV9.self,
+        toVersion: RoboSchemaV10.self
+    )
 }
 
 // MARK: - Type Aliases (so the rest of the app uses simple names)
 
-typealias ScanRecord = RoboSchemaV9.ScanRecord
-typealias RoomScanRecord = RoboSchemaV9.RoomScanRecord
-typealias MotionRecord = RoboSchemaV9.MotionRecord
-typealias AgentCompletionRecord = RoboSchemaV9.AgentCompletionRecord
-typealias ProductCaptureRecord = RoboSchemaV9.ProductCaptureRecord
-typealias BeaconEventRecord = RoboSchemaV9.BeaconEventRecord
-typealias HealthRecord = RoboSchemaV9.HealthRecord
+typealias ScanRecord = RoboSchemaV10.ScanRecord
+typealias RoomScanRecord = RoboSchemaV10.RoomScanRecord
+typealias MotionRecord = RoboSchemaV10.MotionRecord
+typealias AgentCompletionRecord = RoboSchemaV10.AgentCompletionRecord
+typealias ProductCaptureRecord = RoboSchemaV10.ProductCaptureRecord
+typealias BeaconEventRecord = RoboSchemaV10.BeaconEventRecord
+typealias HealthRecord = RoboSchemaV10.HealthRecord

@@ -4,10 +4,13 @@ import SwiftData
 struct SettingsView: View {
     @Environment(DeviceService.self) private var deviceService
     @Environment(APIService.self) private var apiService
+    @Environment(CoindexService.self) private var coindexService
     @AppStorage("scanQuality") private var scanQuality: String = "balanced"
     @State private var copiedDeviceID = false
     @State private var copiedMCPToken = false
     @State private var showingReRegisterConfirm = false
+    @State private var showingUnlinkConfirm = false
+    @State private var coindexLinkError: String?
     @State private var isReRegistering = false
     @State private var lastMcpCallDate: Date?
     @State private var pollingTask: Task<Void, Never>?
@@ -149,6 +152,48 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Connected Accounts") {
+                    HStack(spacing: 12) {
+                        Image(systemName: "dollarsign.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.orange)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Coindex")
+                                .font(.headline)
+                            Text(coindexService.isAuthenticated ? "Connected" : "Not linked")
+                                .font(.caption)
+                                .foregroundStyle(coindexService.isAuthenticated ? .green : .secondary)
+                        }
+                        Spacer()
+                        if coindexService.isAuthenticated {
+                            Button("Unlink", role: .destructive) { showingUnlinkConfirm = true }
+                                .buttonStyle(.bordered)
+                        } else {
+                            Button("Link Account") { linkCoindex() }
+                                .buttonStyle(.borderedProminent)
+                        }
+                    }
+                }
+                .confirmationDialog(
+                    "Unlink Coindex?",
+                    isPresented: $showingUnlinkConfirm,
+                    titleVisibility: .visible
+                ) {
+                    Button("Unlink", role: .destructive) {
+                        coindexService.logout()
+                    }
+                } message: {
+                    Text("You can re-link your account at any time.")
+                }
+                .alert("Coindex Link Failed", isPresented: .init(
+                    get: { coindexLinkError != nil },
+                    set: { if !$0 { coindexLinkError = nil } }
+                )) {
+                    Button("OK") { coindexLinkError = nil }
+                } message: {
+                    Text(coindexLinkError ?? "")
+                }
+
                 #if DEBUG
                 Section("Developer") {
                     Toggle("Sync to Cloud", isOn: $debugSyncEnabled)
@@ -241,6 +286,20 @@ struct ShareSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
+// MARK: - Coindex Linking
+
+extension SettingsView {
+    func linkCoindex() {
+        Task {
+            do {
+                try await coindexService.authenticate()
+            } catch {
+                coindexLinkError = error.localizedDescription
+            }
+        }
+    }
+}
+
 // MARK: - MCP Status Polling
 
 extension SettingsView {
@@ -295,4 +354,5 @@ extension SettingsView {
     SettingsView()
         .environment(deviceService)
         .environment(APIService(deviceService: deviceService))
+        .environment(CoindexService())
 }

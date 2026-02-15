@@ -15,7 +15,7 @@ class CoindexService: NSObject {
     private static let baseURL = "https://coindex.app"
     private static let clientID = "robo_mobile_client"
     private static let callbackScheme = "robo"
-    private static let keychainService = "com.silv.Robo.coindex"
+    private static let keychainService = "com.silv.RoboCoindex.coindex"
     private static let keychainAccount = "access_token"
 
     private var accessToken: String? {

@@ -302,12 +302,19 @@ class CameraSessionController: UIViewController, AVCapturePhotoCaptureDelegate {
     private let captureSession = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
     private var previewLayer: AVCaptureVideoPreviewLayer?
+    private var captureDevice: AVCaptureDevice?
 
     private let shutterButton = UIButton(type: .system)
     private let counterLabel = UILabel()
     private let currentLabelView = UILabel()
     private let thumbnailStack = UIStackView()
     private let thumbnailScroll = UIScrollView()
+
+    // Zoom state
+    private var lastZoomFactor: CGFloat = 1.0
+
+    // Focus indicator
+    private let focusIndicator = UIView()
 
     var onPhotoCaptured: ((UIImage) -> Void)?
 
@@ -400,6 +407,8 @@ class CameraSessionController: UIViewController, AVCapturePhotoCaptureDelegate {
         guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
               let input = try? AVCaptureDeviceInput(device: camera) else { return }
 
+        captureDevice = camera
+
         if captureSession.canAddInput(input) {
             captureSession.addInput(input)
         }
@@ -419,6 +428,22 @@ class CameraSessionController: UIViewController, AVCapturePhotoCaptureDelegate {
     }
 
     private func setupUI() {
+        // Pinch-to-zoom gesture
+        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinchZoom(_:)))
+        view.addGestureRecognizer(pinch)
+
+        // Tap-to-focus gesture
+        let tap = UITapGestureRecognizer(target: self, action: #selector(handleTapFocus(_:)))
+        view.addGestureRecognizer(tap)
+
+        // Focus indicator (yellow square)
+        focusIndicator.frame = CGRect(x: 0, y: 0, width: 70, height: 70)
+        focusIndicator.layer.borderColor = UIColor.yellow.cgColor
+        focusIndicator.layer.borderWidth = 2
+        focusIndicator.backgroundColor = .clear
+        focusIndicator.isHidden = true
+        view.addSubview(focusIndicator)
+
         // Current label overlay (top)
         currentLabelView.textColor = .white
         currentLabelView.font = .systemFont(ofSize: 18, weight: .semibold)
@@ -514,6 +539,62 @@ class CameraSessionController: UIViewController, AVCapturePhotoCaptureDelegate {
                 guard let self else { return }
                 let offset = CGPoint(x: max(0, self.thumbnailScroll.contentSize.width - self.thumbnailScroll.bounds.width), y: 0)
                 self.thumbnailScroll.setContentOffset(offset, animated: true)
+            }
+        }
+    }
+
+    @objc private func handlePinchZoom(_ gesture: UIPinchGestureRecognizer) {
+        guard let device = captureDevice else { return }
+
+        switch gesture.state {
+        case .began:
+            gesture.scale = lastZoomFactor
+        case .changed:
+            let maxZoom = min(device.activeFormat.videoMaxZoomFactor, 10.0)
+            let newZoom = min(max(gesture.scale, 1.0), maxZoom)
+            do {
+                try device.lockForConfiguration()
+                device.videoZoomFactor = newZoom
+                device.unlockForConfiguration()
+            } catch {}
+        case .ended:
+            lastZoomFactor = device.videoZoomFactor
+        default:
+            break
+        }
+    }
+
+    @objc private func handleTapFocus(_ gesture: UITapGestureRecognizer) {
+        guard let device = captureDevice, let layer = previewLayer else { return }
+
+        let point = gesture.location(in: view)
+        let devicePoint = layer.captureDevicePointConverted(fromLayerPoint: point)
+
+        do {
+            try device.lockForConfiguration()
+            if device.isFocusPointOfInterestSupported {
+                device.focusPointOfInterest = devicePoint
+                device.focusMode = .autoFocus
+            }
+            if device.isExposurePointOfInterestSupported {
+                device.exposurePointOfInterest = devicePoint
+                device.exposureMode = .autoExpose
+            }
+            device.unlockForConfiguration()
+        } catch {}
+
+        // Show focus indicator animation
+        focusIndicator.center = point
+        focusIndicator.isHidden = false
+        focusIndicator.alpha = 1
+        focusIndicator.transform = CGAffineTransform(scaleX: 1.3, y: 1.3)
+        UIView.animate(withDuration: 0.25, animations: {
+            self.focusIndicator.transform = .identity
+        }) { _ in
+            UIView.animate(withDuration: 0.5, delay: 0.5, options: [], animations: {
+                self.focusIndicator.alpha = 0
+            }) { _ in
+                self.focusIndicator.isHidden = true
             }
         }
     }

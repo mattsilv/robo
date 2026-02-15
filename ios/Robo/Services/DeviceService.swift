@@ -67,6 +67,12 @@ class DeviceService {
     /// Clear local config and re-register to get a fresh device with MCP token.
     /// Use when the device was registered before auth existed.
     func reRegister(apiService: DeviceRegistering) async {
+        // Quick connectivity check before wiping config
+        if let api = apiService as? APIService, !(await api.checkHealth()) {
+            self.registrationError = "Cannot reach server. Check your internet connection and try again."
+            return
+        }
+
         let previousConfig = config
         let savedBaseURL = config.apiBaseURL
         config = DeviceConfig(

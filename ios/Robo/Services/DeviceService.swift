@@ -1,6 +1,13 @@
 import Foundation
 import UIKit
 
+/// Protocol for device registration — enables testing without network.
+protocol DeviceRegistering {
+    func registerDevice(name: String) async throws -> DeviceConfig
+}
+
+extension APIService: DeviceRegistering {}
+
 @Observable
 class DeviceService {
     private let userDefaultsKey = "deviceConfig"
@@ -17,9 +24,14 @@ class DeviceService {
         }
     }
 
+    /// Testable initializer — skips UserDefaults.
+    init(config: DeviceConfig) {
+        self.config = config
+    }
+
     var isRegistered: Bool { config.isRegistered }
 
-    func bootstrap(apiService: APIService) async {
+    func bootstrap(apiService: DeviceRegistering) async {
         guard !isRegistered else { return }
 
         var lastError: Error?
@@ -54,14 +66,21 @@ class DeviceService {
 
     /// Clear local config and re-register to get a fresh device with MCP token.
     /// Use when the device was registered before auth existed.
-    func reRegister(apiService: APIService) async {
+    func reRegister(apiService: DeviceRegistering) async {
+        let previousConfig = config
         let savedBaseURL = config.apiBaseURL
         config = DeviceConfig(
             id: DeviceConfig.unregisteredID,
             name: config.name,
             apiBaseURL: savedBaseURL
         )
-        save()
+        // Don't save yet — let bootstrap() save on success
         await bootstrap(apiService: apiService)
+
+        // If bootstrap failed, restore previous config
+        if !isRegistered {
+            config = previousConfig
+            save()
+        }
     }
 }

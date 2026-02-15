@@ -90,6 +90,12 @@ struct SettingsView: View {
                     } message: {
                         Text("This creates a new device ID and MCP token. Previous scan history will not carry over.")
                     }
+
+                    if let error = deviceService.registrationError {
+                        Text(error)
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                    }
                 }
 
                 Section("Scanner") {

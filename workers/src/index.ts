@@ -12,6 +12,8 @@ import { analyzeWithOpus } from './routes/opus';
 import { debugSync, debugList, debugGet, debugDownload } from './routes/debug';
 import { lookupNutrition } from './routes/nutrition';
 import { createHit, getHit, deleteHit, uploadHitPhoto, completeHit, listHits, listHitPhotos, respondToHit, listHitResponses } from './routes/hits';
+import { serveHitPage } from './routes/hitPage';
+import { serveOgImage } from './routes/ogImage';
 import { listAPIKeys, createAPIKey, deleteAPIKey } from './routes/apikeys';
 import { deviceAuth } from './middleware/deviceAuth';
 import { mcpTokenAuth } from './middleware/mcpTokenAuth';
@@ -58,6 +60,10 @@ app.patch('/api/hits/:id/complete', completeHit);
 app.get('/api/hits/:id/photos', listHitPhotos);
 app.post('/api/hits/:id/respond', respondToHit);
 app.get('/api/hits/:id/responses', listHitResponses);
+
+// HIT web page — served by Workers with dynamic OG tags (not Pages static files)
+app.get('/hit/:id/og.png', serveOgImage);
+app.get('/hit/:id', serveHitPage);
 
 // API Key management (requires MCP token auth)
 app.get('/api/keys', mcpTokenAuth, listAPIKeys);

@@ -23,5 +23,12 @@ custom_domain = true
 pattern = "mcp.robo.app"
 custom_domain = true
 
+# HIT pages served by Workers (dynamic OG tags + client-side rendering)
+# The robo.app domain is also on Cloudflare Pages for the landing page.
+# This route intercepts /hit/* so Workers handles it instead of Pages.
+[[routes]]
+pattern = "robo.app/hit/*"
+zone_name = "robo.app"
+
 [vars]
 ENVIRONMENT = "production"

@@ -30,11 +30,7 @@
 	<string>Robo reads your sleep, workout, and activity data to share with your AI agents.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Robo does not write health data, but HealthKit requires this description.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Robo needs background location access to detect beacons when the app is closed, triggering room-based automations.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Robo uses your location to detect nearby Bluetooth beacons for room-based automations.</string>
-	<key>NSMotionUsageDescription</key>
+<key>NSMotionUsageDescription</key>
 	<string>Robo needs motion access to capture step count, distance, and activity data for AI analysis</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Robo needs photo library access to save captured images</string>
@@ -59,7 +55,6 @@
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>location</string>
 		<string>bluetooth-central</string>
 		<string>remote-notification</string>
 	</array>

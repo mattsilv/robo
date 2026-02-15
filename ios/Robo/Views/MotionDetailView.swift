@@ -9,9 +9,9 @@ struct MotionDetailView: View {
         motion.distanceMeters * MotionService.metersToMiles
     }
 
-    private var activities: [[String: String]]? {
+    private var activities: [[String: Any]]? {
         guard let dict = try? JSONSerialization.jsonObject(with: motion.activityJSON) as? [String: Any],
-              let arr = dict["activities"] as? [[String: String]] else { return nil }
+              let arr = dict["activities"] as? [[String: Any]] else { return nil }
         return arr
     }
 
@@ -39,18 +39,27 @@ struct MotionDetailView: View {
             if let activities, !activities.isEmpty {
                 Section("Activity Periods (\(activities.count))") {
                     ForEach(Array(activities.enumerated()), id: \.offset) { _, period in
+                        let actType = period["activity_type"] as? String ?? "unknown"
+                        let durationMin = period["duration_minutes"] as? Int
                         HStack {
-                            Image(systemName: activityIcon(period["activity_type"] ?? ""))
+                            Image(systemName: activityIcon(actType))
                                 .foregroundStyle(.secondary)
                                 .frame(width: 24)
-                            Text((period["activity_type"] ?? "unknown").capitalized)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(actType.capitalized)
+                                if let time = period["start_time"] as? String {
+                                    Text(formatTime(time))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                             Spacer()
-                            if let time = period["start_time"] {
-                                Text(formatTime(time))
-                                    .font(.caption)
+                            if let mins = durationMin {
+                                Text(formatDuration(mins))
+                                    .font(.caption.monospacedDigit())
                                     .foregroundStyle(.secondary)
                             }
-                            Text(period["confidence"] ?? "")
+                            Text(period["confidence"] as? String ?? "")
                                 .font(.caption2)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
@@ -105,6 +114,13 @@ struct MotionDetailView: View {
         timeFormatter.dateStyle = .none
         timeFormatter.timeStyle = .short
         return timeFormatter.string(from: date)
+    }
+
+    private func formatDuration(_ minutes: Int) -> String {
+        if minutes < 60 { return "\(minutes)m" }
+        let hours = minutes / 60
+        let mins = minutes % 60
+        return mins > 0 ? "\(hours)h \(mins)m" : "\(hours)h"
     }
 
     private func formatBytes(_ bytes: Int) -> String {

@@ -19,8 +19,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Select Xcode 26
-        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
+      - name: Verify Xcode 26
+        run: |
+          XCODE_VERSION=$(xcodebuild -version | head -1)
+          echo "Using: $XCODE_VERSION"
+          if ! echo "$XCODE_VERSION" | grep -q "Xcode 26"; then
+            echo "::error::Expected Xcode 26, got: $XCODE_VERSION"
+            exit 1
+          fi
 
       - name: Install xcodegen
         run: command -v xcodegen || brew install xcodegen

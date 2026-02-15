@@ -30,10 +30,14 @@
 	<string>Robo reads your sleep, workout, and activity data to share with your AI agents.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Robo does not write health data, but HealthKit requires this description.</string>
-<key>NSMotionUsageDescription</key>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Robo needs microphone access for voice input in chat.</string>
+	<key>NSMotionUsageDescription</key>
 	<string>Robo needs motion access to capture step count, distance, and activity data for AI analysis</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Robo needs photo library access to save captured images</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Robo uses speech recognition to let you create tasks and polls using your voice.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -55,6 +59,7 @@
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
+		<string>location</string>
 		<string>bluetooth-central</string>
 		<string>remote-notification</string>
 	</array>

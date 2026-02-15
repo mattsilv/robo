@@ -4,13 +4,16 @@ import FoundationModels
 
 @available(iOS 26, *)
 struct ChatView: View {
+    @Environment(APIService.self) private var apiService
     @State private var chatService = ChatService()
     @State private var inputText = ""
+    @State private var speechService = SpeechRecognitionService()
+    @State private var copiedHitId: String?
     @FocusState private var isInputFocused: Bool
 
     private let suggestionChips = [
+        "Plan a ski trip with friends",
         "What agents are available?",
-        "What can the Interior Designer do?",
         "What sensors does Robo support?",
         "How do I scan a room?"
     ]
@@ -51,6 +54,7 @@ struct ChatView: View {
                 }
             }
             .onAppear {
+                chatService.configure(apiService: apiService)
                 chatService.prewarm()
             }
         }
@@ -105,10 +109,17 @@ struct ChatView: View {
     private var messageList: some View {
         LazyVStack(spacing: 12) {
             ForEach(chatService.messages) { message in
-                MessageBubble(
-                    message: message,
-                    isStreaming: chatService.isStreaming && message.id == chatService.messages.last?.id && message.role == .assistant
-                )
+                VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
+                    MessageBubble(
+                        message: message,
+                        isStreaming: chatService.isStreaming && message.id == chatService.messages.last?.id && message.role == .assistant
+                    )
+
+                    // Show copy-link buttons for HIT results
+                    if let results = chatService.hitResults[message.id] {
+                        HitResultButtons(results: results, copiedHitId: $copiedHitId)
+                    }
+                }
                 .id(message.id)
             }
         }
@@ -119,7 +130,17 @@ struct ChatView: View {
     // MARK: - Input Bar
 
     private var inputBar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
+            // Mic button
+            Button {
+                speechService.toggleRecording()
+            } label: {
+                Image(systemName: speechService.isRecording ? "mic.fill" : "mic")
+                    .font(.title3)
+                    .foregroundStyle(speechService.isRecording ? .red : .secondary)
+                    .symbolEffect(.pulse, isActive: speechService.isRecording)
+            }
+
             TextField("Message...", text: $inputText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...5)
@@ -148,6 +169,17 @@ struct ChatView: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(.bar)
+        .onChange(of: speechService.transcribedText) { _, newText in
+            if !newText.isEmpty {
+                inputText = newText
+            }
+        }
+        .onChange(of: speechService.isRecording) { wasRecording, isNow in
+            // Auto-send when recording stops and we have text
+            if wasRecording && !isNow && !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                sendMessage(inputText)
+            }
+        }
     }
 
     // MARK: - Helpers
@@ -212,6 +244,57 @@ private struct TypingCursor: View {
             .opacity(visible ? 1 : 0)
             .animation(.easeInOut(duration: 0.5).repeatForever(), value: visible)
             .onAppear { visible = false }
+    }
+}
+
+@available(iOS 26, *)
+struct HitResultButtons: View {
+    let results: [(name: String, url: String)]
+    @Binding var copiedHitId: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(results, id: \.url) { result in
+                Button {
+                    UIPasteboard.general.string = result.url
+                    copiedHitId = result.url
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+                    // Reset copied state after 2s
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        if copiedHitId == result.url {
+                            copiedHitId = nil
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: copiedHitId == result.url ? "checkmark.circle.fill" : "link")
+                            .foregroundStyle(copiedHitId == result.url ? .green : .blue)
+                        Text(result.name)
+                            .fontWeight(.medium)
+                        Spacer()
+                        Text(copiedHitId == result.url ? "Copied!" : "Copy Link")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+                .contextMenu {
+                    Button {
+                        UIPasteboard.general.string = result.url
+                    } label: {
+                        Label("Copy Link", systemImage: "doc.on.doc")
+                    }
+                    ShareLink(item: URL(string: result.url)!) {
+                        Label("Share Link", systemImage: "square.and.arrow.up")
+                    }
+                }
+            }
+        }
     }
 }
 

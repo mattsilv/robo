@@ -109,17 +109,32 @@ class APIService {
 
     // MARK: - HITs
 
-    func createHit(recipientName: String, taskDescription: String) async throws -> HitCreateResponse {
+    func createHit(
+        recipientName: String,
+        taskDescription: String,
+        hitType: String? = nil,
+        config: [String: Any]? = nil,
+        groupId: String? = nil
+    ) async throws -> HitCreateResponse {
         let url = try makeURL(path: "/api/hits")
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "recipient_name": recipientName,
             "task_description": taskDescription,
         ]
+        if let hitType { payload["hit_type"] = hitType }
+        if let config { payload["config"] = config }
+        if let groupId { payload["group_id"] = groupId }
         return try await post(url: url, body: payload)
     }
 
     func fetchHits() async throws -> [HitSummary] {
         let url = try makeURL(path: "/api/hits")
+        let response: HitListResponse = try await get(url: url)
+        return response.hits
+    }
+
+    func fetchHitsByGroup(groupId: String) async throws -> [HitSummary] {
+        let url = try makeURL(path: "/api/hits?group_id=\(groupId)")
         let response: HitListResponse = try await get(url: url)
         return response.hits
     }
@@ -133,6 +148,12 @@ class APIService {
         let url = try makeURL(path: "/api/hits/\(hitId)/photos")
         let response: HitPhotoListResponse = try await get(url: url)
         return response.photos
+    }
+
+    func fetchHitResponses(hitId: String) async throws -> [HitResponseItem] {
+        let url = try makeURL(path: "/api/hits/\(hitId)/responses")
+        let response: HitResponseListResponse = try await get(url: url)
+        return response.responses
     }
 
     // MARK: - Health Check
@@ -296,11 +317,15 @@ struct HitCreateResponse: Decodable {
     let recipientName: String
     let taskDescription: String
     let status: String
+    let hitType: String?
+    let groupId: String?
 
     enum CodingKeys: String, CodingKey {
         case id, url, status
         case recipientName = "recipient_name"
         case taskDescription = "task_description"
+        case hitType = "hit_type"
+        case groupId = "group_id"
     }
 }
 
@@ -314,6 +339,7 @@ struct HitSummary: Decodable, Identifiable {
     let createdAt: String
     let completedAt: String?
     let hitType: String?
+    let groupId: String?
 
     enum CodingKeys: String, CodingKey {
         case id, status
@@ -324,6 +350,7 @@ struct HitSummary: Decodable, Identifiable {
         case createdAt = "created_at"
         case completedAt = "completed_at"
         case hitType = "hit_type"
+        case groupId = "group_id"
     }
 }
 
@@ -350,5 +377,26 @@ private struct HitListResponse: Decodable {
 
 private struct HitPhotoListResponse: Decodable {
     let photos: [HitPhotoItem]
+    let count: Int
+}
+
+struct HitResponseItem: Decodable, Identifiable {
+    let id: String
+    let hitId: String
+    let respondentName: String
+    let responseData: [String: AnyCodable]
+    let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case hitId = "hit_id"
+        case respondentName = "respondent_name"
+        case responseData = "response_data"
+        case createdAt = "created_at"
+    }
+}
+
+private struct HitResponseListResponse: Decodable {
+    let responses: [HitResponseItem]
     let count: Int
 }

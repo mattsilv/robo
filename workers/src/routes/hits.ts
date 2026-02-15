@@ -29,7 +29,7 @@ export async function createHit(c: Context<{ Bindings: Env }>) {
     return c.json({ error: 'Invalid request body', issues: validated.error.issues }, 400);
   }
 
-  const { recipient_name, task_description, agent_name, hit_type, config } = validated.data;
+  const { recipient_name, task_description, agent_name, hit_type, config, group_id } = validated.data;
   const id = generateShortId();
   const now = new Date().toISOString();
 
@@ -38,10 +38,10 @@ export async function createHit(c: Context<{ Bindings: Env }>) {
 
   try {
     await c.env.DB.prepare(
-      `INSERT INTO hits (id, sender_name, recipient_name, task_description, agent_name, status, photo_count, created_at, device_id, hit_type, config)
-       VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?)`
+      `INSERT INTO hits (id, sender_name, recipient_name, task_description, agent_name, status, photo_count, created_at, device_id, hit_type, config, group_id)
+       VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?, ?)`
     )
-      .bind(id, DEFAULT_SENDER, recipient_name, task_description, agent_name || null, now, deviceId, hit_type || 'photo', config ? JSON.stringify(config) : null)
+      .bind(id, DEFAULT_SENDER, recipient_name, task_description, agent_name || null, now, deviceId, hit_type || 'photo', config ? JSON.stringify(config) : null, group_id || null)
       .run();
 
     return c.json(
@@ -55,6 +55,7 @@ export async function createHit(c: Context<{ Bindings: Env }>) {
         status: 'pending',
         photo_count: 0,
         created_at: now,
+        group_id: group_id || null,
       },
       201
     );
@@ -246,16 +247,24 @@ export async function completeHit(c: Context<{ Bindings: Env }>) {
  */
 export async function listHits(c: Context<{ Bindings: Env }>) {
   const deviceId = c.req.header('X-Device-ID');
+  const groupId = c.req.query('group_id');
 
   try {
-    // If no device ID, return all HITs (for CLI/demo use)
-    const query = deviceId
-      ? 'SELECT * FROM hits WHERE device_id = ? ORDER BY created_at DESC LIMIT 50'
-      : 'SELECT * FROM hits ORDER BY created_at DESC LIMIT 50';
-
-    const result = deviceId
-      ? await c.env.DB.prepare(query).bind(deviceId).all<Hit>()
-      : await c.env.DB.prepare(query).all<Hit>();
+    let result;
+    if (groupId) {
+      // Filter by group_id (cross-device, for aggregating group polls)
+      result = await c.env.DB.prepare(
+        'SELECT * FROM hits WHERE group_id = ? ORDER BY created_at DESC LIMIT 50'
+      ).bind(groupId).all<Hit>();
+    } else if (deviceId) {
+      result = await c.env.DB.prepare(
+        'SELECT * FROM hits WHERE device_id = ? ORDER BY created_at DESC LIMIT 50'
+      ).bind(deviceId).all<Hit>();
+    } else {
+      result = await c.env.DB.prepare(
+        'SELECT * FROM hits ORDER BY created_at DESC LIMIT 50'
+      ).all<Hit>();
+    }
 
     return c.json(
       {
@@ -346,6 +355,33 @@ export async function respondToHit(c: Context<{ Bindings: Env }>) {
       await c.env.DB.prepare("UPDATE hits SET status = 'in_progress', started_at = ? WHERE id = ? AND status = 'pending'")
         .bind(now, hitId)
         .run();
+    }
+
+    // Send push notification per response (fire-and-forget)
+    if (hit.device_id) {
+      c.executionCtx.waitUntil(
+        (async () => {
+          try {
+            const device = await c.env.DB.prepare(
+              'SELECT apns_token FROM devices WHERE id = ?'
+            ).bind(hit.device_id).first<{ apns_token: string | null }>();
+
+            if (device?.apns_token) {
+              const isAvailability = hit.hit_type === 'availability';
+              const body = isAvailability
+                ? `${respondent_name} responded to your availability poll`
+                : `${respondent_name} responded to your request`;
+
+              await sendPushNotification(c.env, device.apns_token, {
+                title: isAvailability ? 'New Availability Response' : 'HIT Response',
+                body,
+              }, { hit_id: hitId });
+            }
+          } catch (err) {
+            console.error('Push notification failed:', err);
+          }
+        })()
+      );
     }
 
     return c.json(

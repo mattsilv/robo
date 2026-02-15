@@ -190,8 +190,9 @@ struct HitDetailView: View {
             }
 
             // Bar chart
+            let winnerCount = tallies.filter { $0.count == maxVotes }.count
             ForEach(Array(tallies.enumerated()), id: \.element.slot) { index, tally in
-                let isWinner = index == 0 && tally.count == maxVotes
+                let isWinner = index == 0 && winnerCount == 1
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text(tally.slot)
@@ -427,7 +428,7 @@ struct HitDetailView: View {
 
         return slotVoters
             .map { SlotTally(slot: $0.key, count: $0.value.count, voters: $0.value) }
-            .sorted { $0.count > $1.count }
+            .sorted { $0.count != $1.count ? $0.count > $1.count : $0.slot < $1.slot }
     }
 
     private func computeSlotTallies() -> [SlotTally] {
@@ -446,7 +447,7 @@ struct HitDetailView: View {
 
         return slotVoters
             .map { SlotTally(slot: $0.key, count: $0.value.count, voters: $0.value) }
-            .sorted { $0.count > $1.count }
+            .sorted { $0.count != $1.count ? $0.count > $1.count : $0.slot < $1.slot }
     }
 
     private func formatDate(_ iso: String) -> String {

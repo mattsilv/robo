@@ -2,7 +2,11 @@ import type { Context } from 'hono';
 import type { Env } from '../types';
 
 function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function escapeJs(str: string): string {
+  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/</g, '\\x3c').replace(/>/g, '\\x3e').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
 }
 
 /**
@@ -220,7 +224,7 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
 (function() {
   var API_BASE = 'https://api.robo.app';
   var app = document.getElementById('app');
-  var hitId = '${escapeHtml(hitId)}';
+  var hitId = '${escapeJs(hitId)}';
 
   var topBar = '<div class="top-bar fi"><svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="120" rx="28" fill="#2563EB"/><circle cx="42" cy="48" r="14" fill="white"/><circle cx="78" cy="48" r="14" fill="white"/><circle cx="42" cy="48" r="7" fill="#1a4fc0"/><circle cx="78" cy="48" r="7" fill="#1a4fc0"/><path d="M 34 80 Q 60 102 86 80" fill="none" stroke="white" stroke-width="8" stroke-linecap="round"/></svg><div><span class="brand">ROBO<span class="dot">.</span>APP</span></div></div>';
 

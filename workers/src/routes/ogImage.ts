@@ -74,6 +74,9 @@ export async function serveOgImage(c: Context<{ Bindings: Env }>) {
     // Fall through to fallback
   }
 
+  // Don't cache fallback images for non-existent HITs (prevents unbounded R2 growth)
+  const hitExists = !!hit;
+
   if (!hit) {
     hit = {
       sender_name: 'Someone',
@@ -96,8 +99,10 @@ export async function serveOgImage(c: Context<{ Bindings: Env }>) {
     // Get the PNG bytes for R2 caching
     const pngBuffer = await imgResponse.arrayBuffer();
 
-    // Cache in R2 (fire-and-forget)
-    c.executionCtx.waitUntil(c.env.BUCKET.put(r2Key, pngBuffer));
+    // Only cache in R2 for real HITs (not fallback images for unknown IDs)
+    if (hitExists) {
+      c.executionCtx.waitUntil(c.env.BUCKET.put(r2Key, pngBuffer));
+    }
 
     return new Response(pngBuffer, {
       headers: {

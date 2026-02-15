@@ -29,6 +29,7 @@ function createRoboMcpServer(env: Env, deviceId: string) {
     }
   );
 
+  // @ts-expect-error - MCP SDK deep type instantiation
   server.tool(
     'list_captures',
     'List sensor captures for this device. Filter by sensor_type (barcode, camera, lidar, motion, beacon). Returns IDs and timestamps — use get_capture for full data.',
@@ -95,7 +96,7 @@ function createRoboMcpServer(env: Env, deviceId: string) {
         if (!result) {
           return { content: [{ type: 'text', text: 'No captures found. The user may not have scanned anything yet.' }] };
         }
-        const parsed = { ...result, data: JSON.parse(result.data as string) };
+        const parsed: Record<string, unknown> = { ...result, data: JSON.parse(result.data as string) };
 
         let hint = '';
         if (parsed.sensor_type === 'lidar') {
@@ -136,6 +137,7 @@ function createRoboMcpServer(env: Env, deviceId: string) {
     }
   );
 
+  // @ts-expect-error - MCP SDK deep type instantiation
   server.tool(
     'get_debug_payload',
     'Retrieve a debug payload from R2. For room scans, returns a compact summary with engineering guidance instead of raw JSON — use the download URL to get the full data locally.\n\nWHAT YOU CAN BUILD with room scan data:\n- Generate an interactive 3D viewer (Three.js) with labeled walls, doors, windows, and furniture\n- Compute paint/flooring estimates from wall areas and floor dimensions\n- Check if furniture with given dimensions fits against a specific wall\n- Create a dimensioned floor plan SVG for contractors\n- Calculate material costs (paint, flooring, trim) based on room geometry',

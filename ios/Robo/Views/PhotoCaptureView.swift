@@ -10,6 +10,7 @@ struct PhotoCaptureView: View {
     let agentName: String
     let checklist: [PhotoTask]
     @Binding var photoCapturedCount: Int
+    @Binding var capturedFilenames: [String]
 
     @State private var phase: CapturePhase = .instructions
     @State private var capturedPhotos: [CapturedPhoto] = []
@@ -29,11 +30,12 @@ struct PhotoCaptureView: View {
         let capturedAt: Date
     }
 
-    init(captureContext: CaptureContext? = nil, agentName: String, checklist: [PhotoTask], photoCapturedCount: Binding<Int> = .constant(0)) {
+    init(captureContext: CaptureContext? = nil, agentName: String, checklist: [PhotoTask], photoCapturedCount: Binding<Int> = .constant(0), capturedFilenames: Binding<[String]> = .constant([])) {
         self.captureContext = captureContext
         self.agentName = agentName
         self.checklist = checklist
         self._photoCapturedCount = photoCapturedCount
+        self._capturedFilenames = capturedFilenames
         self._checklistState = State(initialValue: checklist)
     }
 
@@ -167,6 +169,11 @@ struct PhotoCaptureView: View {
         let photo = CapturedPhoto(image: image, label: label, capturedAt: Date())
         capturedPhotos.append(photo)
         photoCapturedCount = capturedPhotos.count
+
+        // Persist to disk so filenames are available for upload tools
+        if let filename = PhotoStorageService.save(image) {
+            capturedFilenames.append(filename)
+        }
 
         // Haptic
         let generator = UIImpactFeedbackGenerator(style: .medium)

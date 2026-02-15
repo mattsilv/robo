@@ -15,6 +15,7 @@ struct ChatView: View {
     @State private var roomCountBeforeCapture = 0
     @State private var barcodeCountBeforeCapture = 0
     @State private var photoCapturedCount = 0
+    @State private var capturedFilenames: [String] = []
     @FocusState private var isInputFocused: Bool
 
     private let suggestionChips = [
@@ -92,7 +93,7 @@ struct ChatView: View {
             BarcodeScannerView()
                 .onAppear { recordCountsBefore() }
         case .photo:
-            PhotoCaptureView(agentName: "Chat Assistant", checklist: [], photoCapturedCount: $photoCapturedCount)
+            PhotoCaptureView(agentName: "Chat Assistant", checklist: [], photoCapturedCount: $photoCapturedCount, capturedFilenames: $capturedFilenames)
                 .onAppear { recordCountsBefore() }
         }
     }
@@ -131,13 +132,15 @@ struct ChatView: View {
             }
 
         case .photo:
-            if photoCapturedCount > 0 {
+            if !capturedFilenames.isEmpty {
+                let names = capturedFilenames.joined(separator: ", ")
                 captureCoordinator.completeCapture(
-                    result: "Photo capture completed. \(photoCapturedCount) photo\(photoCapturedCount == 1 ? "" : "s") saved."
+                    result: "Captured \(capturedFilenames.count) photos: \(names)"
                 )
             } else {
                 captureCoordinator.cancelCapture()
             }
+            capturedFilenames = []
             photoCapturedCount = 0
         }
     }

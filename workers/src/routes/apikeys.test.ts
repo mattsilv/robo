@@ -82,7 +82,7 @@ describe('POST /api/keys', () => {
 });
 
 describe('GET /api/keys (list with data)', () => {
-	it('returns masked keys, not full values', async () => {
+	it('returns masked keys with expiry, not full values', async () => {
 		const headers = {
 			'X-Device-ID': 'dev-1',
 			Authorization: 'Bearer token-abc-123',
@@ -92,10 +92,11 @@ describe('GET /api/keys (list with data)', () => {
 			method: 'POST', headers, body: JSON.stringify({ label: 'test' }),
 		});
 		const resp = await SELF.fetch('https://api.robo.app/api/keys', { headers });
-		const body = await resp.json() as { keys: Array<{ key_hint: string; key_value?: string }> };
+		const body = await resp.json() as { keys: Array<{ key_hint: string; key_value?: string; expires_at?: string }> };
 		expect(body.keys).toHaveLength(1);
 		expect(body.keys[0].key_hint).toContain('••••');
 		expect(body.keys[0]).not.toHaveProperty('key_value');
+		expect(body.keys[0].expires_at).toBeDefined();
 	});
 });
 

@@ -52,6 +52,11 @@ struct DeveloperPortalView: View {
                             Text(key.keyHint)
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
+                            if let days = key.daysRemaining {
+                                Text("Expires in \(days) day\(days == 1 ? "" : "s")")
+                                    .font(.caption2)
+                                    .foregroundStyle(days <= 7 ? .orange : .secondary)
+                            }
                         }
                         Spacer()
                         if isDeleting.contains(key.id) {
@@ -76,7 +81,7 @@ struct DeveloperPortalView: View {
         } header: {
             Text("API Keys")
         } footer: {
-            Text("Maximum 3 keys per device. Full key is shown only once on creation. Swipe to delete.")
+            Text("Maximum 3 keys per device. Keys expire after 30 days. Full key shown only once on creation. Swipe to delete.")
         }
         .alert("New API Key", isPresented: $showCreateAlert) {
             TextField("Label (optional)", text: $newKeyLabel)

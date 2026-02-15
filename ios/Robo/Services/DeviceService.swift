@@ -16,9 +16,15 @@ class DeviceService {
     var registrationErrorDetail: String?
 
     init() {
-        if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
-           var saved = try? JSONDecoder().decode(DeviceConfig.self, from: data) {
-            // Migrate stale API URLs (e.g. old workers.dev URLs) to current default
+        if var saved = KeychainHelper.load() {
+            // Keychain is primary — migrate stale API URLs
+            if saved.apiBaseURL != DeviceConfig.default.apiBaseURL {
+                saved.apiBaseURL = DeviceConfig.default.apiBaseURL
+            }
+            self.config = saved
+        } else if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
+                  var saved = try? JSONDecoder().decode(DeviceConfig.self, from: data) {
+            // Migrate from UserDefaults → Keychain (existing installs)
             if saved.apiBaseURL != DeviceConfig.default.apiBaseURL {
                 saved.apiBaseURL = DeviceConfig.default.apiBaseURL
             }
@@ -88,6 +94,8 @@ class DeviceService {
     }
 
     func save() {
+        KeychainHelper.save(config)
+        // Keep UserDefaults as fallback for older code paths
         if let encoded = try? JSONEncoder().encode(config) {
             UserDefaults.standard.set(encoded, forKey: userDefaultsKey)
         }

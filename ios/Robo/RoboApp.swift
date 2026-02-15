@@ -1,11 +1,13 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 import os
 
 private let logger = Logger(subsystem: "com.silv.Robo", category: "AppInit")
 
 @main
 struct RoboApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var deviceService = DeviceService()
     @State private var apiService: APIService
 
@@ -82,8 +84,32 @@ struct RoboApp: App {
                 .task {
                     SummaryMigrationService.migrateIfNeeded(container: modelContainer)
                     await deviceService.bootstrap(apiService: apiService)
+
+                    // Wire AppDelegate to services for push token registration
+                    appDelegate.apiService = apiService
+                    appDelegate.deviceService = deviceService
+
+                    // Request push notification permission
+                    await requestPushPermission()
                 }
         }
         .modelContainer(modelContainer)
+    }
+
+    private func requestPushPermission() async {
+        do {
+            let center = UNUserNotificationCenter.current()
+            let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
+            if granted {
+                await MainActor.run {
+                    UIApplication.shared.registerForRemoteNotifications()
+                }
+                logger.info("Push notification permission granted")
+            } else {
+                logger.info("Push notification permission denied")
+            }
+        } catch {
+            logger.error("Push permission request failed: \(error.localizedDescription)")
+        }
     }
 }

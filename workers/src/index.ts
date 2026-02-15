@@ -5,7 +5,7 @@ import { prettyJSON } from 'hono/pretty-json';
 import type { Env } from './types';
 
 // Import route handlers
-import { registerDevice, getDevice } from './routes/devices';
+import { registerDevice, getDevice, saveAPNsToken } from './routes/devices';
 import { submitSensorData } from './routes/sensors';
 import { getInbox, pushCard, respondToCard } from './routes/inbox';
 import { analyzeWithOpus } from './routes/opus';
@@ -30,6 +30,7 @@ app.get('/health', (c) => {
 // Device routes
 app.post('/api/devices/register', registerDevice);
 app.get('/api/devices/:device_id', getDevice);
+app.post('/api/devices/:device_id/apns-token', deviceAuth, saveAPNsToken);
 
 // Sensor routes (auth required)
 app.post('/api/sensors/data', deviceAuth, submitSensorData);
@@ -91,7 +92,7 @@ export default {
           },
         });
       }
-      return handleMcpRequest(request, env);
+      return handleMcpRequest(request, env, ctx);
     }
 
     // Everything else → existing Hono app

@@ -9,6 +9,8 @@ struct SettingsView: View {
     @State private var copiedMCPToken = false
     @State private var showingReRegisterConfirm = false
     @State private var isReRegistering = false
+    @State private var mcpStatus: MCPConnectionStatus = .unknown
+    @State private var pollingTask: Task<Void, Never>?
     #if DEBUG
     @AppStorage("dev.syncToCloud") private var debugSyncEnabled = false
     @Query(sort: \RoomScanRecord.capturedAt, order: .reverse) private var roomScans: [RoomScanRecord]
@@ -62,6 +64,22 @@ struct SettingsView: View {
                                 .font(.caption)
                         }
                     }
+
+                    HStack {
+                        Text("MCP Status")
+                        Spacer()
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(mcpStatus.color)
+                                .frame(width: 8, height: 8)
+                            Text(mcpStatus.label)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text("Updates when Claude Code uses MCP tools")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
 
                     Button {
                         showingReRegisterConfirm = true
@@ -165,6 +183,12 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .onAppear {
+                startPolling()
+            }
+            .onDisappear {
+                pollingTask?.cancel()
+            }
             #if DEBUG
             .sheet(item: $fixtureExportURL) { url in
                 ShareSheet(activityItems: [url])
@@ -174,7 +198,6 @@ struct SettingsView: View {
     }
 }
 
-#if DEBUG
 extension URL: @retroactive Identifiable {
     public var id: String { absoluteString }
 }
@@ -188,7 +211,72 @@ struct ShareSheet: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
-#endif
+
+// MARK: - MCP Status Polling
+
+extension SettingsView {
+    func startPolling() {
+        pollingTask?.cancel()
+        pollingTask = Task {
+            while !Task.isCancelled {
+                await pollMCPStatus()
+                try? await Task.sleep(for: .seconds(30))
+            }
+        }
+    }
+
+    func pollMCPStatus() async {
+        do {
+            let device = try await apiService.fetchDevice()
+            if let lastCall = device.lastMcpCallAt {
+                let formatter = ISO8601DateFormatter()
+                if let date = formatter.date(from: lastCall) {
+                    let elapsed = Date().timeIntervalSince(date)
+                    if elapsed < 60 {
+                        mcpStatus = .connected
+                    } else if elapsed < 300 {
+                        mcpStatus = .recent
+                    } else {
+                        mcpStatus = .notConnected
+                    }
+                } else {
+                    mcpStatus = .notConnected
+                }
+            } else {
+                mcpStatus = .notConnected
+            }
+        } catch {
+            // Keep last known state on network failure
+        }
+    }
+}
+
+// MARK: - MCP Connection Status
+
+enum MCPConnectionStatus {
+    case connected
+    case recent
+    case notConnected
+    case unknown
+
+    var label: String {
+        switch self {
+        case .connected: "Connected"
+        case .recent: "Recent"
+        case .notConnected: "Not connected"
+        case .unknown: "Not connected"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .connected: .green
+        case .recent: .yellow
+        case .notConnected: .gray
+        case .unknown: .gray
+        }
+    }
+}
 
 #Preview {
     let deviceService = DeviceService()

@@ -7,6 +7,9 @@ export type Env = {
   ENVIRONMENT: string;
   NUTRITIONIX_APP_ID: string;
   NUTRITIONIX_APP_KEY: string;
+  APNS_AUTH_KEY: string;
+  APNS_KEY_ID: string;
+  APNS_SANDBOX?: string;
 };
 
 // Nutrition lookup

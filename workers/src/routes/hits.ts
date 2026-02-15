@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { CreateHitSchema, HitResponseSchema, type Env, type Hit, type HitPhoto, type HitResponse } from '../types';
+import { sendPushNotification } from '../services/apns';
 
 // Default sender for CLI/API-created HITs
 const DEFAULT_SENDER = 'M. Silverman';
@@ -198,6 +199,32 @@ export async function completeHit(c: Context<{ Bindings: Env }>) {
     await c.env.DB.prepare("UPDATE hits SET status = 'completed', completed_at = ? WHERE id = ?")
       .bind(now, id)
       .run();
+
+    // Send push notification to the HIT creator (fire-and-forget)
+    if (hit.device_id) {
+      c.executionCtx.waitUntil(
+        (async () => {
+          try {
+            const device = await c.env.DB.prepare(
+              'SELECT apns_token FROM devices WHERE id = ?'
+            ).bind(hit.device_id).first<{ apns_token: string | null }>();
+
+            if (device?.apns_token) {
+              const body = hit.photo_count > 0
+                ? `${hit.recipient_name} sent ${hit.photo_count} photo${hit.photo_count === 1 ? '' : 's'}`
+                : `${hit.recipient_name} completed your request`;
+
+              await sendPushNotification(c.env, device.apns_token, {
+                title: 'HIT Completed',
+                body,
+              }, { hit_id: id });
+            }
+          } catch (err) {
+            console.error('Push notification failed:', err);
+          }
+        })()
+      );
+    }
 
     return c.json(
       {

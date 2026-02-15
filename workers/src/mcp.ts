@@ -179,7 +179,7 @@ function createRoboMcpServer(env: Env, deviceId: string) {
  * Handle an MCP request using stateless WebStandard transport.
  * Creates a new McpServer per request (SDK 1.26.0+ security requirement).
  */
-export async function handleMcpRequest(request: Request, env: Env): Promise<Response> {
+export async function handleMcpRequest(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
   // Extract and validate Bearer token
   const authHeader = request.headers.get('Authorization');
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -202,6 +202,14 @@ export async function handleMcpRequest(request: Request, env: Env): Promise<Resp
       error: { code: -32000, message: 'Invalid token' },
       id: null,
     }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  // Record heartbeat timestamp (fire-and-forget)
+  if (ctx) {
+    ctx.waitUntil(
+      env.DB.prepare('UPDATE devices SET last_mcp_call_at = ? WHERE id = ?')
+        .bind(new Date().toISOString(), device.id).run()
+    );
   }
 
   const server = createRoboMcpServer(env, device.id);

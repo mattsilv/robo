@@ -31,6 +31,7 @@ targets:
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access: []
         com.apple.developer.networking.wifi-info: true
+        aps-environment: development
     settings:
       base:
         INFOPLIST_FILE: Robo/Info.plist
@@ -72,6 +73,7 @@ targets:
         UIBackgroundModes:
           - location
           - bluetooth-central
+          - remote-notification
 
   RoboTests:
     type: bundle.unit-test

@@ -74,6 +74,8 @@ targets:
         NSHealthUpdateUsageDescription: "Robo does not write health data, but HealthKit requires this description."
         NSSpeechRecognitionUsageDescription: "Robo uses speech recognition to let you create tasks and polls using your voice."
         NSMicrophoneUsageDescription: "Robo needs microphone access for voice input in chat."
+        NSLocationWhenInUseUsageDescription: "Robo uses your location to tag sensor captures with where they were taken."
+        NSLocationAlwaysAndWhenInUseUsageDescription: "Robo uses your location to tag sensor captures with where they were taken."
         UIBackgroundModes:
           - location
           - bluetooth-central

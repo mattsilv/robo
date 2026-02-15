@@ -47,12 +47,6 @@ jobs:
 
       - name: Validate build prerequisites
         run: |
-          echo "DEBUG: git rev-parse HEAD = $(git rev-parse HEAD)"
-          echo "DEBUG: Info.plist location keys:"
-          grep "NSLocation" ios/Robo/Info.plist || echo "NO LOCATION KEYS FOUND"
-          echo "DEBUG: pwd = $(pwd)"
-          echo "DEBUG: ls ios/Robo/Info.plist"
-          ls -la ios/Robo/Info.plist
           FAIL=0
 
           # Encryption compliance

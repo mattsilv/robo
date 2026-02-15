@@ -16,6 +16,11 @@ struct ContentView: View {
                     Label(AppStrings.Tabs.history, systemImage: "archivebox")
                 }
 
+            HitListView()
+                .tabItem {
+                    Label("HITs", systemImage: "link.badge.plus")
+                }
+
             ChatTabView()
                 .tabItem {
                     Label(AppStrings.Tabs.chat, systemImage: "bubble.left.and.bubble.right")

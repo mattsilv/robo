@@ -77,6 +77,49 @@ class APIService {
         return try await get(url: url)
     }
 
+    // MARK: - APNs Token
+
+    func registerAPNsToken(_ token: String) async throws {
+        let url = try makeURL(path: "/api/devices/\(deviceId)/apns-token")
+        let payload = ["token": token]
+        let _: APNsTokenResponse = try await post(url: url, body: payload)
+    }
+
+    // MARK: - Device (with MCP status)
+
+    func fetchDevice() async throws -> DeviceStatusResponse {
+        let url = try makeURL(path: "/api/devices/\(deviceId)")
+        return try await get(url: url)
+    }
+
+    // MARK: - HITs
+
+    func createHit(recipientName: String, taskDescription: String) async throws -> HitCreateResponse {
+        let url = try makeURL(path: "/api/hits")
+        let payload: [String: Any] = [
+            "recipient_name": recipientName,
+            "task_description": taskDescription,
+        ]
+        return try await post(url: url, body: payload)
+    }
+
+    func fetchHits() async throws -> [HitSummary] {
+        let url = try makeURL(path: "/api/hits")
+        let response: HitListResponse = try await get(url: url)
+        return response.hits
+    }
+
+    func fetchHit(id: String) async throws -> HitSummary {
+        let url = try makeURL(path: "/api/hits/\(id)")
+        return try await get(url: url)
+    }
+
+    func fetchHitPhotos(hitId: String) async throws -> [HitPhotoItem] {
+        let url = try makeURL(path: "/api/hits/\(hitId)/photos")
+        let response: HitPhotoListResponse = try await get(url: url)
+        return response.photos
+    }
+
     // MARK: - HTTP Methods
 
     private func get<T: Decodable>(url: URL) async throws -> T {
@@ -174,5 +217,97 @@ private struct SensorDataResponse: Decodable {
 
 private struct InboxResponse: Decodable {
     let cards: [InboxCard]
+    let count: Int
+}
+
+private struct APNsTokenResponse: Decodable {
+    let status: String
+    let updatedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case updatedAt = "updated_at"
+    }
+}
+
+// MARK: - Device Status Response
+
+struct DeviceStatusResponse: Decodable {
+    let id: String
+    let name: String
+    let registeredAt: String
+    let lastSeenAt: String?
+    let lastMcpCallAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name
+        case registeredAt = "registered_at"
+        case lastSeenAt = "last_seen_at"
+        case lastMcpCallAt = "last_mcp_call_at"
+    }
+}
+
+// MARK: - HIT Response Models
+
+struct HitCreateResponse: Decodable {
+    let id: String
+    let url: String
+    let recipientName: String
+    let taskDescription: String
+    let status: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, url, status
+        case recipientName = "recipient_name"
+        case taskDescription = "task_description"
+    }
+}
+
+struct HitSummary: Decodable, Identifiable {
+    let id: String
+    let senderName: String?
+    let recipientName: String
+    let taskDescription: String
+    let status: String
+    let photoCount: Int
+    let createdAt: String
+    let completedAt: String?
+    let hitType: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, status
+        case senderName = "sender_name"
+        case recipientName = "recipient_name"
+        case taskDescription = "task_description"
+        case photoCount = "photo_count"
+        case createdAt = "created_at"
+        case completedAt = "completed_at"
+        case hitType = "hit_type"
+    }
+}
+
+struct HitPhotoItem: Decodable, Identifiable {
+    let id: String
+    let hitId: String
+    let r2Key: String
+    let fileSize: Int?
+    let uploadedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case hitId = "hit_id"
+        case r2Key = "r2_key"
+        case fileSize = "file_size"
+        case uploadedAt = "uploaded_at"
+    }
+}
+
+private struct HitListResponse: Decodable {
+    let hits: [HitSummary]
+    let count: Int
+}
+
+private struct HitPhotoListResponse: Decodable {
+    let photos: [HitPhotoItem]
     let count: Int
 }

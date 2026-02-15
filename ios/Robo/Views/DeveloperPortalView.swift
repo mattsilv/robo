@@ -44,25 +44,38 @@ struct DeveloperPortalView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(apiKeys) { key in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            if let label = key.label {
-                                Text(label).font(.subheadline.weight(.medium))
-                            }
-                            Text(key.keyHint)
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.secondary)
-                            if let days = key.daysRemaining {
-                                Text("Expires in \(days) day\(days == 1 ? "" : "s")")
-                                    .font(.caption2)
-                                    .foregroundStyle(days <= 7 ? .orange : .secondary)
-                            }
+                    Button {
+                        UIPasteboard.general.string = key.keyHint
+                        withAnimation { copiedId = key.id }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            if copiedId == key.id { copiedId = nil }
                         }
-                        Spacer()
-                        if isDeleting.contains(key.id) {
-                            ProgressView().controlSize(.small)
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                if let label = key.label {
+                                    Text(label).font(.subheadline.weight(.medium))
+                                }
+                                Text(key.keyHint)
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(.secondary)
+                                if let days = key.daysRemaining {
+                                    Text("Expires in \(days) day\(days == 1 ? "" : "s")")
+                                        .font(.caption2)
+                                        .foregroundStyle(days <= 7 ? .orange : .secondary)
+                                }
+                            }
+                            Spacer()
+                            if isDeleting.contains(key.id) {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: copiedId == key.id ? "checkmark" : "doc.on.doc")
+                                    .foregroundStyle(copiedId == key.id ? .green : .accentColor)
+                                    .font(.caption)
+                            }
                         }
                     }
+                    .tint(.primary)
                 }
                 .onDelete(perform: deleteKeys)
             }
@@ -81,7 +94,7 @@ struct DeveloperPortalView: View {
         } header: {
             Text("API Keys")
         } footer: {
-            Text("Maximum 3 keys per device. Keys expire after 30 days. Full key shown only once on creation. Swipe to delete.")
+            Text("Maximum 3 keys per device. Keys expire after 30 days. Full key is auto-copied on creation. Tap a key to copy. Swipe to delete.")
         }
         .alert("New API Key", isPresented: $showCreateAlert) {
             TextField("Label (optional)", text: $newKeyLabel)

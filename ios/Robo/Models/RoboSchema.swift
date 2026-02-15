@@ -556,18 +556,76 @@ enum RoboSchemaV8: VersionedSchema {
     }
 }
 
+// MARK: - Schema V9 (USDZ data for 3D room view)
+
+enum RoboSchemaV9: VersionedSchema {
+    static var versionIdentifier = Schema.Version(9, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [ScanRecord.self, RoomScanRecord.self, MotionRecord.self,
+         AgentCompletionRecord.self, ProductCaptureRecord.self,
+         BeaconEventRecord.self, HealthRecord.self]
+    }
+
+    // Re-export V8 models unchanged
+    typealias ScanRecord = RoboSchemaV4.ScanRecord
+    typealias MotionRecord = RoboSchemaV4.MotionRecord
+    typealias AgentCompletionRecord = RoboSchemaV5.AgentCompletionRecord
+    typealias ProductCaptureRecord = RoboSchemaV6.ProductCaptureRecord
+    typealias BeaconEventRecord = RoboSchemaV7.BeaconEventRecord
+    typealias HealthRecord = RoboSchemaV8.HealthRecord
+
+    @Model
+    final class RoomScanRecord {
+        var roomName: String
+        var capturedAt: Date
+        var wallCount: Int
+        var floorAreaSqM: Double
+        var ceilingHeightM: Double
+        var objectCount: Int
+        var summaryJSON: Data
+        var fullRoomDataJSON: Data
+
+        // Agent linkage (V4)
+        var agentId: String?
+        var agentName: String?
+
+        // USDZ 3D model data (V9)
+        var usdzData: Data?
+
+        init(
+            roomName: String,
+            wallCount: Int,
+            floorAreaSqM: Double,
+            ceilingHeightM: Double = 0,
+            objectCount: Int,
+            summaryJSON: Data,
+            fullRoomDataJSON: Data
+        ) {
+            self.roomName = roomName
+            self.capturedAt = Date()
+            self.wallCount = wallCount
+            self.floorAreaSqM = floorAreaSqM
+            self.ceilingHeightM = ceilingHeightM
+            self.objectCount = objectCount
+            self.summaryJSON = summaryJSON
+            self.fullRoomDataJSON = fullRoomDataJSON
+        }
+    }
+}
+
 // MARK: - Migration Plan
 
 enum RoboMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
         [RoboSchemaV1.self, RoboSchemaV2.self, RoboSchemaV3.self,
          RoboSchemaV4.self, RoboSchemaV5.self, RoboSchemaV6.self,
-         RoboSchemaV7.self, RoboSchemaV8.self]
+         RoboSchemaV7.self, RoboSchemaV8.self, RoboSchemaV9.self]
     }
 
     static var stages: [MigrationStage] {
         [migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5,
-         migrateV5toV6, migrateV6toV7, migrateV7toV8]
+         migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9]
     }
 
     static let migrateV1toV2 = MigrationStage.lightweight(
@@ -604,14 +662,19 @@ enum RoboMigrationPlan: SchemaMigrationPlan {
         fromVersion: RoboSchemaV7.self,
         toVersion: RoboSchemaV8.self
     )
+
+    static let migrateV8toV9 = MigrationStage.lightweight(
+        fromVersion: RoboSchemaV8.self,
+        toVersion: RoboSchemaV9.self
+    )
 }
 
 // MARK: - Type Aliases (so the rest of the app uses simple names)
 
-typealias ScanRecord = RoboSchemaV8.ScanRecord
-typealias RoomScanRecord = RoboSchemaV8.RoomScanRecord
-typealias MotionRecord = RoboSchemaV8.MotionRecord
-typealias AgentCompletionRecord = RoboSchemaV8.AgentCompletionRecord
-typealias ProductCaptureRecord = RoboSchemaV8.ProductCaptureRecord
-typealias BeaconEventRecord = RoboSchemaV8.BeaconEventRecord
-typealias HealthRecord = RoboSchemaV8.HealthRecord
+typealias ScanRecord = RoboSchemaV9.ScanRecord
+typealias RoomScanRecord = RoboSchemaV9.RoomScanRecord
+typealias MotionRecord = RoboSchemaV9.MotionRecord
+typealias AgentCompletionRecord = RoboSchemaV9.AgentCompletionRecord
+typealias ProductCaptureRecord = RoboSchemaV9.ProductCaptureRecord
+typealias BeaconEventRecord = RoboSchemaV9.BeaconEventRecord
+typealias HealthRecord = RoboSchemaV9.HealthRecord

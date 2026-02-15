@@ -275,6 +275,9 @@ struct RoomDetailView: View {
         Section("Data") {
             LabeledContent("Summary", value: formatBytes(room.summaryJSON.count))
             LabeledContent("Full Room Data", value: formatBytes(room.fullRoomDataJSON.count))
+            if let usdzData = room.usdzData {
+                LabeledContent("3D Model (USDZ)", value: formatBytes(usdzData.count))
+            }
         }
     }
 

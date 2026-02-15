@@ -186,16 +186,21 @@ jobs:
           API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_API_KEY_ID }}
           API_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_API_ISSUER_ID }}
         run: |
-          pip3 install --quiet PyJWT cryptography
-
-          # Generate JWT for App Store Connect API
-          TOKEN=$(python3 -c "
-          import jwt, time
-          with open('$HOME/private_keys/AuthKey_${API_KEY_ID}.p8') as f:
-              pk = f.read()
-          now = int(time.time())
-          print(jwt.encode({'iss': '${API_ISSUER_ID}', 'iat': now, 'exp': now + 1200, 'aud': 'appstoreconnect-v1'}, pk, algorithm='ES256', headers={'kid': '${API_KEY_ID}'}))
-          ")
+          # Generate JWT for App Store Connect API (Ruby — available on all macOS runners)
+          TOKEN=$(ruby -rjson -ropenssl -rbase64 -e '
+            key = OpenSSL::PKey::EC.new(File.read(ENV["HOME"] + "/private_keys/AuthKey_" + ENV["API_KEY_ID"] + ".p8"))
+            header = Base64.urlsafe_encode64({"alg":"ES256","kid":ENV["API_KEY_ID"],"typ":"JWT"}.to_json, padding: false)
+            now = Time.now.to_i
+            payload = Base64.urlsafe_encode64({"iss":ENV["API_ISSUER_ID"],"iat":now,"exp":now+1200,"aud":"appstoreconnect-v1"}.to_json, padding: false)
+            digest = OpenSSL::Digest::SHA256.new
+            sig_der = key.sign(digest, "#{header}.#{payload}")
+            # Convert DER to raw R||S (64 bytes) for ES256
+            asn1 = OpenSSL::ASN1.decode(sig_der)
+            r = asn1.value[0].value.to_s(2).rjust(32, "\x00")[-32..]
+            s = asn1.value[1].value.to_s(2).rjust(32, "\x00")[-32..]
+            sig = Base64.urlsafe_encode64(r + s, padding: false)
+            puts "#{header}.#{payload}.#{sig}"
+          ')
 
           APP_ID="6759011077"
           BETA_GROUP_ID="fde90361-3c30-4cae-99a3-5450ccba5378"
@@ -208,11 +213,11 @@ jobs:
               --data-urlencode "filter[version]=$BUILD_NUMBER" \
               --data-urlencode "fields[builds]=processingState" \
               "https://api.appstoreconnect.apple.com/v1/builds")
-            STATE=$(echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['data'][0]['attributes']['processingState'] if d['data'] else 'NOT_FOUND')" 2>/dev/null || echo "ERROR")
+            STATE=$(echo "$RESPONSE" | jq -r 'if (.data | length) > 0 then .data[0].attributes.processingState else "NOT_FOUND" end' 2>/dev/null || echo "ERROR")
 
             echo "  Attempt $i: $STATE"
             if [ "$STATE" = "VALID" ]; then
-              BUILD_ID=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['data'][0]['id'])")
+              BUILD_ID=$(echo "$RESPONSE" | jq -r '.data[0].id')
               echo "Build ID: $BUILD_ID"
               break
             fi

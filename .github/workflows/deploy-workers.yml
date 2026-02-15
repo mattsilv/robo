@@ -32,7 +32,7 @@ jobs:
 
       - name: TypeScript check
         working-directory: workers
-        run: npx tsc --noEmit
+        run: NODE_OPTIONS="--max-old-space-size=4096" npx tsc --noEmit
 
   deploy:
     runs-on: ubuntu-latest

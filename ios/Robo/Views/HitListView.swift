@@ -26,18 +26,24 @@ struct HitListView: View {
                             .tint(Color(red: 0.15, green: 0.39, blue: 0.92))
                     }
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(hits) { hit in
-                                NavigationLink(value: hit.id) {
-                                    HitCard(hit: hit)
+                    List {
+                        ForEach(hits) { hit in
+                            NavigationLink(value: hit.id) {
+                                HitCard(hit: hit)
+                            }
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    Task { await deleteHit(hit) }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
                     }
+                    .listStyle(.plain)
                     .refreshable { await loadHits() }
                 }
             }
@@ -65,6 +71,16 @@ struct HitListView: View {
                     deepLinkHitId = nil
                 }
             }
+        }
+    }
+
+    private func deleteHit(_ hit: HitSummary) async {
+        do {
+            try await apiService.deleteHit(id: hit.id)
+            withAnimation { hits.removeAll { $0.id == hit.id } }
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        } catch {
+            // Silently fail — user can retry
         }
     }
 
@@ -192,6 +208,20 @@ private struct HitCard: View {
                             .font(.caption.bold())
                     }
                     .foregroundStyle(.secondary)
+                }
+
+                // Response progress for group polls
+                if let responseCount = hit.responseCount, responseCount > 0 {
+                    let config = hit.config != nil ? (try? JSONSerialization.jsonObject(with: Data((hit.config ?? "{}").utf8)) as? [String: Any]) ?? [:] : [:]
+                    let participants = config["participants"] as? [String] ?? []
+                    let total = participants.isEmpty ? responseCount : participants.count
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.2.fill")
+                            .font(.caption2)
+                        Text("\(responseCount)/\(total) responded")
+                            .font(.caption.bold())
+                    }
+                    .foregroundStyle(responseCount >= total ? .green : .orange)
                 }
 
                 // Short ID

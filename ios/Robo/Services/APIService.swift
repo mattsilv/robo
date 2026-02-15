@@ -156,6 +156,11 @@ class APIService {
         return response.responses
     }
 
+    func deleteHit(id: String) async throws {
+        let url = try makeURL(path: "/api/hits/\(id)")
+        let _: DeleteResponse = try await delete(url: url)
+    }
+
     // MARK: - API Keys (require MCP token auth)
 
     func fetchAPIKeys() async throws -> [APIKeyMeta] {
@@ -410,6 +415,7 @@ struct HitSummary: Decodable, Identifiable {
     let hitType: String?
     let groupId: String?
     let config: String?
+    let responseCount: Int?
 
     enum CodingKeys: String, CodingKey {
         case id, status, config
@@ -421,6 +427,7 @@ struct HitSummary: Decodable, Identifiable {
         case completedAt = "completed_at"
         case hitType = "hit_type"
         case groupId = "group_id"
+        case responseCount = "response_count"
     }
 }
 

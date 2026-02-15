@@ -6,6 +6,7 @@ struct ContentView: View {
 
     @State private var selectedTab = 0
     @State private var deepLinkHitId: String?
+    @State private var hitBadgeCount = 0
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -26,6 +27,7 @@ struct ContentView: View {
                     Label("HITs", systemImage: "link.badge.plus")
                 }
                 .tag(2)
+                .badge(hitBadgeCount)
 
             ChatTabView()
                 .tabItem {
@@ -43,7 +45,16 @@ struct ContentView: View {
             if let hitId = notification.userInfo?["hit_id"] as? String {
                 deepLinkHitId = hitId
                 selectedTab = 2
+                hitBadgeCount = 0
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .hitResponseNotification)) { _ in
+            if selectedTab != 2 {
+                hitBadgeCount += 1
+            }
+        }
+        .onChange(of: selectedTab) { _, newTab in
+            if newTab == 2 { hitBadgeCount = 0 }
         }
     }
 }

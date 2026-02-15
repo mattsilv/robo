@@ -254,16 +254,16 @@ export async function listHits(c: Context<{ Bindings: Env }>) {
     if (groupId) {
       // Filter by group_id (cross-device, for aggregating group polls)
       result = await c.env.DB.prepare(
-        'SELECT * FROM hits WHERE group_id = ? ORDER BY created_at DESC LIMIT 50'
-      ).bind(groupId).all<Hit>();
+        'SELECT h.*, (SELECT COUNT(*) FROM hit_responses WHERE hit_id = h.id) as response_count FROM hits h WHERE h.group_id = ? ORDER BY h.created_at DESC LIMIT 50'
+      ).bind(groupId).all<Hit & { response_count: number }>();
     } else if (deviceId) {
       result = await c.env.DB.prepare(
-        'SELECT * FROM hits WHERE device_id = ? ORDER BY created_at DESC LIMIT 50'
-      ).bind(deviceId).all<Hit>();
+        'SELECT h.*, (SELECT COUNT(*) FROM hit_responses WHERE hit_id = h.id) as response_count FROM hits h WHERE h.device_id = ? ORDER BY h.created_at DESC LIMIT 50'
+      ).bind(deviceId).all<Hit & { response_count: number }>();
     } else {
       result = await c.env.DB.prepare(
-        'SELECT * FROM hits ORDER BY created_at DESC LIMIT 50'
-      ).all<Hit>();
+        'SELECT h.*, (SELECT COUNT(*) FROM hit_responses WHERE hit_id = h.id) as response_count FROM hits h ORDER BY h.created_at DESC LIMIT 50'
+      ).all<Hit & { response_count: number }>();
     }
 
     return c.json(

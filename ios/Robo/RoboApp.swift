@@ -24,7 +24,7 @@ struct RoboApp: App {
     /// Attempts to create a ModelContainer with migration, falling back to a
     /// backup-and-recreate strategy. NEVER deletes the store without backing up first.
     private static func createResilientContainer() -> ModelContainer {
-        let schema = Schema(versionedSchema: RoboSchemaV8.self)
+        let schema = Schema(versionedSchema: RoboSchemaV9.self)
         let config = ModelConfiguration(schema: schema)
 
         // Attempt 1: Normal migration

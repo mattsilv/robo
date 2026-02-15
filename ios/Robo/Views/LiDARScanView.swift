@@ -182,6 +182,18 @@ struct LiDARScanView: View {
                 name = roomName
             }
 
+            // Export USDZ from CapturedRoom for native 3D viewing
+            var usdzData: Data?
+            do {
+                let usdzURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("\(UUID().uuidString).usdz")
+                try room.export(to: usdzURL, exportOptions: .model)
+                usdzData = try Data(contentsOf: usdzURL)
+                try? FileManager.default.removeItem(at: usdzURL)
+            } catch {
+                // USDZ export is best-effort; 3D view will fall back
+            }
+
             let record = RoomScanRecord(
                 roomName: name,
                 wallCount: room.walls.count,
@@ -191,6 +203,7 @@ struct LiDARScanView: View {
                 summaryJSON: summaryData,
                 fullRoomDataJSON: fullData
             )
+            record.usdzData = usdzData
             record.agentId = captureContext?.agentId
             record.agentName = captureContext?.agentName
             modelContext.insert(record)

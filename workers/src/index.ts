@@ -12,6 +12,7 @@ import { analyzeWithOpus } from './routes/opus';
 import { debugSync, debugList, debugGet, debugDownload } from './routes/debug';
 import { lookupNutrition } from './routes/nutrition';
 import { createHit, getHit, deleteHit, uploadHitPhoto, completeHit, listHits, listHitPhotos, respondToHit, listHitResponses } from './routes/hits';
+import { listAPIKeys, createAPIKey, deleteAPIKey } from './routes/apikeys';
 import { deviceAuth } from './middleware/deviceAuth';
 import { handleMcpRequest } from './mcp';
 
@@ -56,6 +57,11 @@ app.patch('/api/hits/:id/complete', completeHit);
 app.get('/api/hits/:id/photos', listHitPhotos);
 app.post('/api/hits/:id/respond', respondToHit);
 app.get('/api/hits/:id/responses', listHitResponses);
+
+// API Key management (auth required)
+app.get('/api/keys', deviceAuth, listAPIKeys);
+app.post('/api/keys', deviceAuth, createAPIKey);
+app.delete('/api/keys/:key_id', deviceAuth, deleteAPIKey);
 
 // Debug sync (stores scan data in R2 for developer debugging)
 app.post('/api/debug/sync', debugSync);

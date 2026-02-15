@@ -156,6 +156,26 @@ class APIService {
         return response.responses
     }
 
+    // MARK: - API Keys
+
+    func fetchAPIKeys() async throws -> [APIKey] {
+        let url = try makeURL(path: "/api/keys")
+        let response: APIKeyListResponse = try await get(url: url)
+        return response.keys
+    }
+
+    func createAPIKey(label: String?) async throws -> APIKey {
+        let url = try makeURL(path: "/api/keys")
+        var payload: [String: Any] = [:]
+        if let label { payload["label"] = label }
+        return try await post(url: url, body: payload)
+    }
+
+    func deleteAPIKey(id: String) async throws {
+        let url = try makeURL(path: "/api/keys/\(id)")
+        let _: DeleteResponse = try await delete(url: url)
+    }
+
     // MARK: - Health Check
 
     func checkHealth() async -> Bool {
@@ -186,6 +206,15 @@ class APIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(deviceId, forHTTPHeaderField: "X-Device-ID")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        return try await performRequest(request)
+    }
+
+    private func delete<T: Decodable>(url: URL) async throws -> T {
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(deviceId, forHTTPHeaderField: "X-Device-ID")
 
         return try await performRequest(request)
     }
@@ -399,4 +428,8 @@ struct HitResponseItem: Decodable, Identifiable {
 private struct HitResponseListResponse: Decodable {
     let responses: [HitResponseItem]
     let count: Int
+}
+
+private struct DeleteResponse: Decodable {
+    let deleted: Bool
 }

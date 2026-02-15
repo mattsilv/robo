@@ -97,6 +97,7 @@ export const CreateHitSchema = z.object({
   agent_name: z.string().max(100).optional(),
   hit_type: z.enum(['photo', 'poll', 'availability']).optional(),
   config: z.record(z.any()).optional(),
+  group_id: z.string().max(100).optional(),
 });
 
 export const HitResponseSchema = z.object({
@@ -120,6 +121,7 @@ export type Hit = {
   device_id: string | null;
   hit_type: string | null;
   config: string | null;
+  group_id: string | null;
 };
 
 export type HitResponse = {

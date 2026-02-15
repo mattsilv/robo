@@ -8,6 +8,7 @@ struct HitDetailView: View {
     @State private var hit: HitSummary?
     @State private var photos: [HitPhotoItem] = []
     @State private var responses: [HitResponseItem] = []
+    @State private var groupHits: [HitSummary] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var copiedUrl: String?
@@ -104,7 +105,7 @@ struct HitDetailView: View {
     // MARK: - Availability Results
 
     private var availabilityResultsSection: some View {
-        Section("Responses (\(responses.count))") {
+        Section(groupHits.count > 1 ? "Group Responses (\(responses.count) from \(groupHits.count) participants)" : "Responses (\(responses.count))") {
             // Tally votes per slot
             let tallies = computeSlotTallies()
 
@@ -188,7 +189,18 @@ struct HitDetailView: View {
                     photos = try await apiService.fetchHitPhotos(hitId: hitId)
                 }
                 if hit.hitType == "availability" {
-                    responses = try await apiService.fetchHitResponses(hitId: hitId)
+                    // If part of a group, fetch ALL group responses
+                    if let groupId = hit.groupId {
+                        groupHits = try await apiService.fetchHitsByGroup(groupId: groupId)
+                        var allResponses: [HitResponseItem] = []
+                        for groupHit in groupHits {
+                            let hitResponses = try await apiService.fetchHitResponses(hitId: groupHit.id)
+                            allResponses.append(contentsOf: hitResponses)
+                        }
+                        responses = allResponses
+                    } else {
+                        responses = try await apiService.fetchHitResponses(hitId: hitId)
+                    }
                 }
             }
         } catch {

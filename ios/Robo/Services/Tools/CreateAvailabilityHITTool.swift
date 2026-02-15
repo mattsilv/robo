@@ -54,6 +54,7 @@ struct CreateAvailabilityHITTool: Tool {
         ]
 
         var results: [(name: String, url: String)] = []
+        let groupId = UUID().uuidString
 
         for name in names {
             do {
@@ -61,7 +62,8 @@ struct CreateAvailabilityHITTool: Tool {
                     recipientName: name,
                     taskDescription: "When are you free for: \(arguments.eventTitle)?",
                     hitType: "availability",
-                    config: config
+                    config: config,
+                    groupId: groupId
                 )
                 results.append((name: name, url: response.url))
             } catch {
@@ -78,4 +80,5 @@ struct CreateAvailabilityHITTool: Tool {
         return output
     }
 }
+extension APIService: @unchecked Sendable {}
 #endif

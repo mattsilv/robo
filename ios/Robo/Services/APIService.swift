@@ -113,7 +113,8 @@ class APIService {
         recipientName: String,
         taskDescription: String,
         hitType: String? = nil,
-        config: [String: Any]? = nil
+        config: [String: Any]? = nil,
+        groupId: String? = nil
     ) async throws -> HitCreateResponse {
         let url = try makeURL(path: "/api/hits")
         var payload: [String: Any] = [
@@ -122,11 +123,18 @@ class APIService {
         ]
         if let hitType { payload["hit_type"] = hitType }
         if let config { payload["config"] = config }
+        if let groupId { payload["group_id"] = groupId }
         return try await post(url: url, body: payload)
     }
 
     func fetchHits() async throws -> [HitSummary] {
         let url = try makeURL(path: "/api/hits")
+        let response: HitListResponse = try await get(url: url)
+        return response.hits
+    }
+
+    func fetchHitsByGroup(groupId: String) async throws -> [HitSummary] {
+        let url = try makeURL(path: "/api/hits?group_id=\(groupId)")
         let response: HitListResponse = try await get(url: url)
         return response.hits
     }
@@ -310,12 +318,14 @@ struct HitCreateResponse: Decodable {
     let taskDescription: String
     let status: String
     let hitType: String?
+    let groupId: String?
 
     enum CodingKeys: String, CodingKey {
         case id, url, status
         case recipientName = "recipient_name"
         case taskDescription = "task_description"
         case hitType = "hit_type"
+        case groupId = "group_id"
     }
 }
 
@@ -329,6 +339,7 @@ struct HitSummary: Decodable, Identifiable {
     let createdAt: String
     let completedAt: String?
     let hitType: String?
+    let groupId: String?
 
     enum CodingKeys: String, CodingKey {
         case id, status
@@ -339,6 +350,7 @@ struct HitSummary: Decodable, Identifiable {
         case createdAt = "created_at"
         case completedAt = "completed_at"
         case hitType = "hit_type"
+        case groupId = "group_id"
     }
 }
 

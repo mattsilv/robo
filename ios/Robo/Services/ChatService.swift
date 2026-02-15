@@ -25,6 +25,7 @@ class ChatService {
     init() {}
 
     func configure(apiService: APIService) {
+        guard self.apiService == nil else { return }
         self.apiService = apiService
         resetSession()
     }

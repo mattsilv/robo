@@ -30,10 +30,6 @@
 	<string>Robo reads your sleep, workout, and activity data to share with your AI agents.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Robo does not write health data, but HealthKit requires this description.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Robo needs background location access to detect beacons when the app is closed, triggering room-based automations.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Robo uses your location to detect nearby Bluetooth beacons for room-based automations.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Robo needs microphone access for voice input in chat.</string>
 	<key>NSMotionUsageDescription</key>

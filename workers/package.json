@@ -8,7 +8,8 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:migrate": "wrangler d1 migrations apply robo-db",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "keywords": [
     "cloudflare",
@@ -26,8 +27,10 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.12",
     "@cloudflare/workers-types": "^4.20250110.0",
     "typescript": "^5.7.2",
+    "vitest": "^3.2.4",
     "wrangler": "^3.101.0"
   }
 }

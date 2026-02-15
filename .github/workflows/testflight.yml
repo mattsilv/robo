@@ -178,7 +178,8 @@ jobs:
           API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_API_KEY_ID }}
           API_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_API_ISSUER_ID }}
         run: |
-          xcodebuild -exportArchive \
+          # Strip Homebrew from PATH — its rsync breaks Xcode exportArchive
+          PATH="/usr/bin:/bin:/usr/sbin:/sbin" xcodebuild -exportArchive \
             -archivePath /tmp/Robo.xcarchive \
             -exportPath /tmp/RoboExport \
             -exportOptionsPlist ios/ExportOptions.plist \

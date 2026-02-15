@@ -50,9 +50,11 @@ enum DebugSyncService {
         guard let url = URL(string: apiBaseURL + "/api/debug/sync") else { return }
         guard let body = try? JSONSerialization.data(withJSONObject: payload) else { return }
 
+        let config = deviceConfig
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(config.id, forHTTPHeaderField: "X-Device-ID")
         request.httpBody = body
 
         URLSession.shared.dataTask(with: request).resume()

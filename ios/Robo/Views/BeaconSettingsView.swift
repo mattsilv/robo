@@ -329,13 +329,7 @@ private struct AddBeaconSheet: View {
 
             case .ready:
                 provisioningForm
-                    .onAppear {
-                        if provisioner.hasWiFiScanSupport {
-                            provisioner.scanWiFiNetworks()
-                        } else {
-                            fetchCurrentSSID()
-                        }
-                    }
+                    .onAppear { fetchCurrentSSID() }
 
             case .writing:
                 HStack(spacing: 12) {
@@ -502,47 +496,19 @@ private struct AddBeaconSheet: View {
 
         // Optional WiFi provisioning
         DisclosureGroup("WiFi Configuration (Optional)") {
-            // SSID: sensor-scanned picker or manual entry
-            if !provisioner.wifiNetworks.isEmpty {
-                Picker("Network", selection: $wifiSSID) {
-                    Text("Select a network").tag("")
-                    ForEach(provisioner.wifiNetworks) { network in
-                        HStack {
-                            Text(network.ssid)
-                            Spacer()
-                            Text(wifiSignalIcon(rssi: network.rssi))
-                        }
-                        .tag(network.ssid)
+            HStack {
+                TextField("WiFi Network (SSID)", text: $wifiSSID)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                if wifiSSID.isEmpty {
+                    Button {
+                        fetchCurrentSSID()
+                    } label: {
+                        Image(systemName: "wifi")
+                            .font(.caption)
+                            .foregroundStyle(.tint)
                     }
-                }
-                .pickerStyle(.menu)
-            } else {
-                HStack {
-                    TextField("WiFi Network (SSID)", text: $wifiSSID)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    if provisioner.isScannningWiFi {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                    } else if provisioner.hasWiFiScanSupport {
-                        Button {
-                            provisioner.scanWiFiNetworks()
-                        } label: {
-                            Image(systemName: "wifi")
-                                .font(.caption)
-                                .foregroundStyle(.tint)
-                        }
-                        .buttonStyle(.plain)
-                    } else if wifiSSID.isEmpty {
-                        Button {
-                            fetchCurrentSSID()
-                        } label: {
-                            Image(systemName: "wifi")
-                                .font(.caption)
-                                .foregroundStyle(.tint)
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    .buttonStyle(.plain)
                 }
             }
 
@@ -592,13 +558,6 @@ private struct AddBeaconSheet: View {
                 }
             }
         }
-    }
-
-    private func wifiSignalIcon(rssi: Int) -> String {
-        if rssi >= -50 { return "▂▄▆█" }
-        if rssi >= -65 { return "▂▄▆░" }
-        if rssi >= -80 { return "▂▄░░" }
-        return "▂░░░"
     }
 
     // MARK: - Saved View

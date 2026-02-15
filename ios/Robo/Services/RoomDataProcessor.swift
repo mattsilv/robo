@@ -255,6 +255,11 @@ enum RoomDataProcessor {
         return try encoder.encode(room)
     }
 
+    /// Decodes a CapturedRoom from JSON data.
+    static func decodeFullRoom(_ data: Data) throws -> CapturedRoom {
+        return try JSONDecoder().decode(CapturedRoom.self, from: data)
+    }
+
     /// Encodes the summary dictionary to JSON Data.
     static func encodeSummary(_ summary: [String: Any]) throws -> Data {
         return try JSONSerialization.data(withJSONObject: summary, options: [.prettyPrinted, .sortedKeys])

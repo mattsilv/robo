@@ -11,6 +11,7 @@ struct LiDARScanView: View {
 
     @State private var phase: ScanPhase = .instructions
     @State private var capturedRoom: CapturedRoom?
+    @State private var compassHeading: Double?
     @State private var error: String?
     @State private var stopRequested = false
     @State private var roomName = ""
@@ -146,13 +147,14 @@ struct LiDARScanView: View {
     private var scanningView: some View {
         RoomCaptureViewWrapper(
             stopRequested: $stopRequested,
-            onCaptureComplete: { room in
+            onCaptureComplete: { room, heading in
                 // Haptic feedback
                 let generator = UINotificationFeedbackGenerator()
                 generator.notificationOccurred(.success)
                 AudioServicesPlaySystemSound(1057)
 
                 capturedRoom = room
+                compassHeading = heading
                 phase = .results
             },
             onCaptureError: { err in
@@ -167,7 +169,10 @@ struct LiDARScanView: View {
     private func saveRoom() {
         guard let room = capturedRoom else { return }
 
-        let summary = RoomDataProcessor.summarizeRoom(room)
+        var summary = RoomDataProcessor.summarizeRoom(room)
+        if let heading = compassHeading {
+            summary["magnetic_heading_degrees"] = (heading * 100).rounded() / 100
+        }
 
         do {
             let summaryData = try RoomDataProcessor.encodeSummary(summary)
@@ -182,6 +187,18 @@ struct LiDARScanView: View {
                 name = roomName
             }
 
+            // Export USDZ from CapturedRoom for native 3D viewing
+            var usdzData: Data?
+            do {
+                let usdzURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("\(UUID().uuidString).usdz")
+                try room.export(to: usdzURL, exportOptions: .model)
+                usdzData = try Data(contentsOf: usdzURL)
+                try? FileManager.default.removeItem(at: usdzURL)
+            } catch {
+                // USDZ export is best-effort; 3D view will fall back
+            }
+
             let record = RoomScanRecord(
                 roomName: name,
                 wallCount: room.walls.count,
@@ -191,6 +208,7 @@ struct LiDARScanView: View {
                 summaryJSON: summaryData,
                 fullRoomDataJSON: fullData
             )
+            record.usdzData = usdzData
             record.agentId = captureContext?.agentId
             record.agentName = captureContext?.agentName
             modelContext.insert(record)

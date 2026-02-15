@@ -166,6 +166,77 @@ struct RoomDetailView: View {
             context.stroke(path, with: .color(.accentColor), lineWidth: 2)
             context.fill(path, with: .color(.accentColor.opacity(0.08)))
 
+            // Compass rose (bottom-right corner)
+            if let heading = summary?["magnetic_heading_degrees"] as? Double {
+                let compassRadius: CGFloat = 24
+                let compassCenter = CGPoint(
+                    x: size.width - compassRadius - 12,
+                    y: size.height - compassRadius - 12
+                )
+                let angleRad = -heading * .pi / 180
+
+                // Background circle
+                let circlePath = Path(ellipseIn: CGRect(
+                    x: compassCenter.x - compassRadius,
+                    y: compassCenter.y - compassRadius,
+                    width: compassRadius * 2,
+                    height: compassRadius * 2
+                ))
+                context.fill(circlePath, with: .color(.secondary.opacity(0.12)))
+                context.stroke(circlePath, with: .color(.secondary.opacity(0.3)), lineWidth: 1)
+
+                // N pointer (red triangle)
+                let nTip = CGPoint(
+                    x: compassCenter.x + CGFloat(sin(angleRad)) * (compassRadius - 4),
+                    y: compassCenter.y - CGFloat(cos(angleRad)) * (compassRadius - 4)
+                )
+                let nBase1 = CGPoint(
+                    x: compassCenter.x + CGFloat(sin(angleRad + 0.3)) * 6,
+                    y: compassCenter.y - CGFloat(cos(angleRad + 0.3)) * 6
+                )
+                let nBase2 = CGPoint(
+                    x: compassCenter.x + CGFloat(sin(angleRad - 0.3)) * 6,
+                    y: compassCenter.y - CGFloat(cos(angleRad - 0.3)) * 6
+                )
+                var nPath = Path()
+                nPath.move(to: nTip)
+                nPath.addLine(to: nBase1)
+                nPath.addLine(to: nBase2)
+                nPath.closeSubpath()
+                context.fill(nPath, with: .color(.red))
+
+                // S pointer (gray)
+                let sTip = CGPoint(
+                    x: compassCenter.x - CGFloat(sin(angleRad)) * (compassRadius - 4),
+                    y: compassCenter.y + CGFloat(cos(angleRad)) * (compassRadius - 4)
+                )
+                let sBase1 = CGPoint(
+                    x: compassCenter.x - CGFloat(sin(angleRad + 0.3)) * 6,
+                    y: compassCenter.y + CGFloat(cos(angleRad + 0.3)) * 6
+                )
+                let sBase2 = CGPoint(
+                    x: compassCenter.x - CGFloat(sin(angleRad - 0.3)) * 6,
+                    y: compassCenter.y + CGFloat(cos(angleRad - 0.3)) * 6
+                )
+                var sPath = Path()
+                sPath.move(to: sTip)
+                sPath.addLine(to: sBase1)
+                sPath.addLine(to: sBase2)
+                sPath.closeSubpath()
+                context.fill(sPath, with: .color(.secondary.opacity(0.4)))
+
+                // "N" label
+                let nLabelOffset: CGFloat = compassRadius + 8
+                let nLabelPos = CGPoint(
+                    x: compassCenter.x + CGFloat(sin(angleRad)) * nLabelOffset,
+                    y: compassCenter.y - CGFloat(cos(angleRad)) * nLabelOffset
+                )
+                context.draw(
+                    Text("N").font(.system(size: 10, weight: .bold)).foregroundColor(.red),
+                    at: nLabelPos
+                )
+            }
+
             // Edge dimension labels
             let cx = points.reduce(0.0) { $0 + $1.x } / Double(points.count)
             let cy = points.reduce(0.0) { $0 + $1.y } / Double(points.count)
@@ -234,6 +305,12 @@ struct RoomDetailView: View {
         }
     }
 
+    private func formatHeading(_ degrees: Double) -> String {
+        let dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+        let idx = Int((degrees + 22.5).truncatingRemainder(dividingBy: 360) / 45)
+        return String(format: "%.0f° %@", degrees, dirs[idx])
+    }
+
     private func formatFeetInches(_ feet: Double) -> String {
         let wholeFeet = Int(feet)
         let inches = Int((feet - Double(wholeFeet)) * 12.0 + 0.5)
@@ -265,6 +342,9 @@ struct RoomDetailView: View {
             if let shape = dict["room_shape"] as? String {
                 LabeledContent("Shape", value: shape.capitalized)
             }
+            if let heading = dict["magnetic_heading_degrees"] as? Double {
+                LabeledContent("Orientation", value: formatHeading(heading))
+            }
         }
     }
 
@@ -275,6 +355,9 @@ struct RoomDetailView: View {
         Section("Data") {
             LabeledContent("Summary", value: formatBytes(room.summaryJSON.count))
             LabeledContent("Full Room Data", value: formatBytes(room.fullRoomDataJSON.count))
+            if let usdzData = room.usdzData {
+                LabeledContent("3D Model (USDZ)", value: formatBytes(usdzData.count))
+            }
         }
     }
 

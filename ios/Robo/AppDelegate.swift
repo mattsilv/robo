@@ -56,6 +56,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        // Post notification for badge updates
+        let userInfo = notification.request.content.userInfo
+        if userInfo["hit_id"] != nil {
+            NotificationCenter.default.post(name: .hitResponseNotification, object: nil)
+        }
         completionHandler([.banner, .sound])
     }
 
@@ -80,4 +85,5 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 
 extension Notification.Name {
     static let hitCompletedNotification = Notification.Name("hitCompletedNotification")
+    static let hitResponseNotification = Notification.Name("hitResponseNotification")
 }

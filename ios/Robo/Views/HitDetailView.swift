@@ -1,22 +1,28 @@
 import SwiftUI
+@preconcurrency import FoundationModels
 
 struct HitDetailView: View {
     @Environment(APIService.self) private var apiService
 
     let hitId: String
     private let roboBlue = Color(red: 0.15, green: 0.39, blue: 0.92)
+    @Environment(\.dismiss) private var dismiss
 
     @State private var hit: HitSummary?
     @State private var photos: [HitPhotoItem] = []
     @State private var responses: [HitResponseItem] = []
     @State private var groupHits: [HitSummary] = []
     @State private var isLoading = true
+    @State private var isInitialLoad = true
     @State private var errorMessage: String?
     @State private var copiedText: String?
+    @State private var showDeleteConfirm = false
+    @State private var summaryText: String?
+    @State private var isSummarizing = false
 
     var body: some View {
         Group {
-            if isLoading {
+            if isLoading && isInitialLoad {
                 ProgressView("Loading...")
             } else if let hit {
                 ScrollView {
@@ -26,6 +32,13 @@ struct HitDetailView: View {
 
                         // Actions row
                         actionsRow(hit)
+
+                        // Apple Intelligence summary
+                        if !responses.isEmpty {
+                            if #available(iOS 26, *) {
+                                summarizeCard(hit)
+                            }
+                        }
 
                         // Poll results (group_poll)
                         if hit.hitType == "group_poll" && !responses.isEmpty {
@@ -46,6 +59,27 @@ struct HitDetailView: View {
                         if hit.hitType != "group_poll" && hit.hitType != "availability" && !responses.isEmpty {
                             responsesCard
                         }
+
+                        // Empty state when no responses yet
+                        if responses.isEmpty && hit.status != "completed" {
+                            VStack(spacing: 12) {
+                                Image(systemName: "clock")
+                                    .font(.largeTitle)
+                                    .foregroundStyle(.secondary)
+                                Text("Waiting for responses...")
+                                    .font(.headline)
+                                    .foregroundStyle(.secondary)
+                                Text("Share the link and responses will appear here")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.tertiary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 32)
+                            .padding(.horizontal, 16)
+                            .background(Color(.secondarySystemGroupedBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
                     }
                     .padding()
                 }
@@ -65,6 +99,25 @@ struct HitDetailView: View {
         }
         .navigationTitle(hit?.recipientName ?? "HIT")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if hit != nil {
+                ToolbarItem(placement: .destructiveAction) {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+        }
+        .confirmationDialog("Delete this HIT?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                Task { await deleteHitAndPop() }
+            }
+        } message: {
+            Text("This will permanently delete this HIT and all its responses.")
+        }
         .refreshable { await loadHit() }
         .task { await loadHit() }
         .overlay(alignment: .top) {
@@ -138,10 +191,15 @@ struct HitDetailView: View {
                 showCopied("link")
             }
 
-            // Share
+            // Share (includes results text when available)
             ActionButton(icon: "square.and.arrow.up", label: "Share", color: roboBlue) {
                 let url = "https://robo.app/hit/\(hit.id)"
-                let activityVC = UIActivityViewController(activityItems: [URL(string: url)!], applicationActivities: nil)
+                var items: [Any] = [URL(string: url)!]
+                if !responses.isEmpty {
+                    let summary = buildResultsSummary(hit)
+                    items.append(summary)
+                }
+                let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
                 if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                    let root = windowScene.windows.first?.rootViewController {
                     root.present(activityVC, animated: true)
@@ -478,6 +536,77 @@ struct HitDetailView: View {
         return lines.joined(separator: "\n")
     }
 
+    // MARK: - Summarize Card
+
+    @available(iOS 26, *)
+    private func summarizeCard(_ hit: HitSummary) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let summary = summaryText {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(.purple)
+                    Text("AI Summary")
+                        .font(.caption.bold())
+                        .foregroundStyle(.purple)
+                }
+                Text(summary)
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+            } else {
+                Button {
+                    Task { await summarizeResults(hit) }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isSummarizing {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "sparkles")
+                        }
+                        Text(isSummarizing ? "Summarizing..." : "Summarize with Apple Intelligence")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.purple.opacity(0.08))
+                    .foregroundStyle(.purple)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .disabled(isSummarizing)
+            }
+        }
+        .padding(16)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    @available(iOS 26, *)
+    private func summarizeResults(_ hit: HitSummary) async {
+        isSummarizing = true
+        defer { isSummarizing = false }
+
+        let resultsText = buildResultsSummary(hit)
+        let prompt = "Summarize these poll/survey results concisely in 2-3 sentences. Focus on the key takeaway and any consensus: \(resultsText)"
+
+        do {
+            let session = LanguageModelSession()
+            let response = try await session.respond(to: prompt)
+            withAnimation { summaryText = response.content }
+        } catch {
+            summaryText = "Could not generate summary. Apple Intelligence may not be available on this device."
+        }
+    }
+
+    private func deleteHitAndPop() async {
+        do {
+            try await apiService.deleteHit(id: hitId)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            dismiss()
+        } catch {
+            errorMessage = "Failed to delete: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Data Loading
 
     private func loadHit() async {
@@ -488,25 +617,24 @@ struct HitDetailView: View {
                 if hit.photoCount > 0 {
                     photos = try await apiService.fetchHitPhotos(hitId: hitId)
                 }
-                // Load responses for polls and availability
-                if hit.hitType == "availability" || hit.hitType == "group_poll" {
-                    if let groupId = hit.groupId {
-                        groupHits = try await apiService.fetchHitsByGroup(groupId: groupId)
-                        var allResponses: [HitResponseItem] = []
-                        for groupHit in groupHits {
-                            let hitResponses = try await apiService.fetchHitResponses(hitId: groupHit.id)
-                            allResponses.append(contentsOf: hitResponses)
-                        }
-                        responses = allResponses
-                    } else {
-                        responses = try await apiService.fetchHitResponses(hitId: hitId)
+                // Load responses for all HIT types
+                if let groupId = hit.groupId {
+                    groupHits = try await apiService.fetchHitsByGroup(groupId: groupId)
+                    var allResponses: [HitResponseItem] = []
+                    for groupHit in groupHits {
+                        let hitResponses = try await apiService.fetchHitResponses(hitId: groupHit.id)
+                        allResponses.append(contentsOf: hitResponses)
                     }
+                    responses = allResponses
+                } else {
+                    responses = try await apiService.fetchHitResponses(hitId: hitId)
                 }
             }
         } catch {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+        isInitialLoad = false
     }
 }
 

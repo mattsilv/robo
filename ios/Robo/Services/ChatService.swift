@@ -53,9 +53,10 @@ class ChatService {
             tools.append(ScanRoomTool(captureCoordinator: captureCoordinator))
             tools.append(ScanBarcodeTool(captureCoordinator: captureCoordinator))
             tools.append(TakePhotoTool(captureCoordinator: captureCoordinator))
-            if let coindexService {
-                tools.append(UploadCoinsToCoindexTool(coindexService: coindexService, captureCoordinator: captureCoordinator))
-            }
+            // Coindex upload disabled — see GitHub issue #167 for reactivation plan
+            // if let coindexService {
+            //     tools.append(UploadCoinsToCoindexTool(coindexService: coindexService, captureCoordinator: captureCoordinator))
+            // }
         }
 
         if tools.isEmpty {
@@ -199,9 +200,6 @@ class ChatService {
         - take_photo: Launches the camera to capture photos. Use when user says "take a photo", \
         "photograph my desk", "capture the label", etc.
         - create_availability_poll: Creates a group availability poll with shareable links.
-        - upload_coins_to_coindex: Uploads coin photos to the user's Coindex (coindex.app) collection. \
-        Use when user says "upload coins to coindex", "add to my collection", "send coins to coindex", etc. \
-        Handles OAuth login, photo capture, EXIF stripping, and upload automatically.
 
         When the user asks to scan, photograph, or capture something, call the appropriate tool \
         immediately. Do NOT tell them to go to the Capture tab — you can do it directly.

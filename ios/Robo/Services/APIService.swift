@@ -1,11 +1,26 @@
 import Foundation
 
-enum APIError: Error {
+enum APIError: Error, LocalizedError {
     case invalidURL
     case requestFailed(Error)
     case invalidResponse
     case decodingError(Error)
     case httpError(statusCode: Int, message: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            return "Invalid server URL. Check your API settings."
+        case .requestFailed(let error):
+            return "Connection failed: \(error.localizedDescription)"
+        case .invalidResponse:
+            return "Unexpected server response. Please try again."
+        case .decodingError:
+            return "Could not read server response. The app may need updating."
+        case .httpError(let code, let message):
+            return "Server error (\(code)): \(message)"
+        }
+    }
 }
 
 @Observable
@@ -120,6 +135,19 @@ class APIService {
         return response.photos
     }
 
+    // MARK: - Health Check
+
+    func checkHealth() async -> Bool {
+        guard let url = try? makeURL(path: "/health") else { return false }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 5
+        guard let (_, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse,
+              http.statusCode == 200 else { return false }
+        return true
+    }
+
     // MARK: - HTTP Methods
 
     private func get<T: Decodable>(url: URL) async throws -> T {
@@ -146,11 +174,18 @@ class APIService {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
+                #if DEBUG
+                let body = String(data: data, encoding: .utf8) ?? "<non-UTF8>"
+                print("[APIService] invalidResponse — URL: \(request.url?.absoluteString ?? "nil"), body preview: \(String(body.prefix(200)))")
+                #endif
                 throw APIError.invalidResponse
             }
 
             guard (200...299).contains(httpResponse.statusCode) else {
                 let message = String(data: data, encoding: .utf8) ?? "Unknown error"
+                #if DEBUG
+                print("[APIService] httpError — \(httpResponse.statusCode) for \(request.url?.absoluteString ?? "nil"): \(String(message.prefix(200)))")
+                #endif
                 throw APIError.httpError(statusCode: httpResponse.statusCode, message: message)
             }
 
@@ -158,10 +193,16 @@ class APIService {
             decoder.dateDecodingStrategy = .iso8601
             return try decoder.decode(T.self, from: data)
         } catch let error as DecodingError {
+            #if DEBUG
+            print("[APIService] decodingError for \(request.url?.absoluteString ?? "nil") — \(error)")
+            #endif
             throw APIError.decodingError(error)
         } catch let error as APIError {
             throw error
         } catch {
+            #if DEBUG
+            print("[APIService] requestFailed for \(request.url?.absoluteString ?? "nil") — \(error)")
+            #endif
             throw APIError.requestFailed(error)
         }
     }

@@ -13,6 +13,7 @@ class DeviceService {
     private let userDefaultsKey = "deviceConfig"
     var config: DeviceConfig
     var registrationError: String?
+    var registrationErrorDetail: String?
 
     init() {
         if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
@@ -40,6 +41,7 @@ class DeviceService {
                 let registered = try await apiService.registerDevice(name: UIDevice.current.name)
                 self.config = registered
                 self.registrationError = nil
+                self.registrationErrorDetail = nil
                 save()
                 return
             } catch {
@@ -51,6 +53,34 @@ class DeviceService {
         }
 
         self.registrationError = "Registration failed: \(lastError?.localizedDescription ?? "Unknown error")"
+        self.registrationErrorDetail = buildErrorDetail(lastError, baseURL: config.apiBaseURL)
+    }
+
+    private func buildErrorDetail(_ error: Error?, baseURL: String) -> String {
+        guard let error else { return "No error captured" }
+        var lines = [
+            "URL: \(baseURL)/api/devices/register",
+            "Error type: \(type(of: error))",
+            "Description: \(error.localizedDescription)",
+        ]
+        if let apiError = error as? APIError {
+            switch apiError {
+            case .httpError(let code, let message):
+                lines.append("HTTP status: \(code)")
+                lines.append("Response: \(String(message.prefix(500)))")
+            case .requestFailed(let underlying):
+                lines.append("Underlying: \(type(of: underlying)) — \(underlying.localizedDescription)")
+                lines.append("Debug: \(String(describing: underlying))")
+            case .decodingError(let underlying):
+                lines.append("Decoding: \(underlying)")
+            default:
+                break
+            }
+        } else {
+            lines.append("Raw: \(String(describing: error))")
+        }
+        lines.append("Time: \(ISO8601DateFormatter().string(from: Date()))")
+        return lines.joined(separator: "\n")
     }
 
     func save() {
@@ -67,12 +97,8 @@ class DeviceService {
     /// Clear local config and re-register to get a fresh device with MCP token.
     /// Use when the device was registered before auth existed.
     func reRegister(apiService: DeviceRegistering) async {
-        // Quick connectivity check before wiping config
-        if let api = apiService as? APIService, !(await api.checkHealth()) {
-            self.registrationError = "Cannot reach server. Check your internet connection and try again."
-            return
-        }
-
+        self.registrationError = nil
+        self.registrationErrorDetail = nil
         let previousConfig = config
         let savedBaseURL = config.apiBaseURL
         config = DeviceConfig(

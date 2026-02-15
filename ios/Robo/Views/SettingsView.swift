@@ -113,6 +113,15 @@ struct SettingsView: View {
                         Text(error)
                             .foregroundStyle(.red)
                             .font(.caption)
+
+                        if let detail = deviceService.registrationErrorDetail {
+                            Button {
+                                UIPasteboard.general.string = detail
+                            } label: {
+                                Label("Copy Error Details", systemImage: "doc.on.clipboard")
+                                    .font(.caption)
+                            }
+                        }
                     }
                 }
 

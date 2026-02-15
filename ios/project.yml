@@ -70,6 +70,8 @@ targets:
         NSBluetoothAlwaysUsageDescription: "Robo uses Bluetooth to detect nearby iBeacon devices for room-aware automations."
         NSHealthShareUsageDescription: "Robo reads your sleep, workout, and activity data to share with your AI agents."
         NSHealthUpdateUsageDescription: "Robo does not write health data, but HealthKit requires this description."
+        NSSpeechRecognitionUsageDescription: "Robo uses speech recognition to let you create tasks and polls using your voice."
+        NSMicrophoneUsageDescription: "Robo needs microphone access for voice input in chat."
         UIBackgroundModes:
           - location
           - bluetooth-central

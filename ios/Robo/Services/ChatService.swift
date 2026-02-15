@@ -14,11 +14,18 @@ class ChatService {
     var isStreaming = false
     private(set) var currentStreamingText = ""
 
+    /// HIT results from tool calls — maps message ID to array of (name, url)
+    var hitResults: [UUID: [(name: String, url: String)]] = [:]
+
     private var session: LanguageModelSession?
     private var streamTask: Task<Void, Never>?
     private var activeAssistantMessageId: UUID?
+    private var apiService: APIService?
 
-    init() {
+    init() {}
+
+    func configure(apiService: APIService) {
+        self.apiService = apiService
         resetSession()
     }
 
@@ -29,10 +36,19 @@ class ChatService {
         currentStreamingText = ""
         activeAssistantMessageId = nil
         messages = []
+        hitResults = [:]
 
         let prompt = Self.buildSystemPrompt()
-        session = LanguageModelSession {
-            prompt
+
+        if let apiService {
+            let tool = CreateAvailabilityHITTool(apiService: apiService)
+            session = LanguageModelSession(tools: [tool]) {
+                prompt
+            }
+        } else {
+            session = LanguageModelSession {
+                prompt
+            }
         }
     }
 
@@ -58,19 +74,34 @@ class ChatService {
 
         streamTask = Task { [weak self] in
             guard let self, let session else { return }
+
             do {
-                let stream = session.streamResponse(to: text)
-                for try await partial in stream {
-                    guard !Task.isCancelled else { break }
-                    guard self.activeAssistantMessageId == targetId else { break }
-                    let text = partial.content
-                    self.currentStreamingText = text
-                    self.updateMessage(id: targetId, content: text)
+                if self.apiService != nil {
+                    // Use non-streaming respond() for tool calling support
+                    let response = try await session.respond(to: text)
+                    guard !Task.isCancelled else { return }
+                    guard self.activeAssistantMessageId == targetId else { return }
+
+                    let content = response.content
+                    self.updateMessage(id: targetId, content: content)
+
+                    // Check if the response contains HIT URLs (tool was called)
+                    self.parseHitResults(content: content, messageId: targetId)
+                } else {
+                    // Fallback: stream without tools
+                    let stream = session.streamResponse(to: text)
+                    for try await partial in stream {
+                        guard !Task.isCancelled else { break }
+                        guard self.activeAssistantMessageId == targetId else { break }
+                        let text = partial.content
+                        self.currentStreamingText = text
+                        self.updateMessage(id: targetId, content: text)
+                    }
                 }
             } catch is CancellationError {
                 logger.debug("Stream cancelled")
             } catch {
-                logger.error("Stream error: \(error.localizedDescription)")
+                logger.error("Chat error: \(error.localizedDescription)")
                 if self.activeAssistantMessageId == targetId {
                     let existing = self.messageContent(for: targetId)
                     if existing.isEmpty {
@@ -109,35 +140,45 @@ class ChatService {
         messages.first(where: { $0.id == id })?.content ?? ""
     }
 
-    static func buildSystemPrompt() -> String {
-        let agents = MockAgentService.loadAgents()
-        let agentDescriptions = agents.map { agent in
-            var line = "- \(agent.name): \(agent.description)"
-            if let request = agent.pendingRequest {
-                let skill = String(describing: request.skillType)
-                line += " [Sensor: \(skill)]"
-            }
-            return line
-        }.joined(separator: "\n")
+    /// Parse HIT URLs from tool output embedded in assistant response
+    private func parseHitResults(content: String, messageId: UUID) {
+        // Look for lines like "• Name: https://robo.app/hit/XXXX"
+        let lines = content.components(separatedBy: "\n")
+        var results: [(name: String, url: String)] = []
 
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            // Match "• Name: https://robo.app/hit/..."
+            if trimmed.hasPrefix("•"),
+               let colonRange = trimmed.range(of: ": https://robo.app/hit/") {
+                let name = String(trimmed[trimmed.index(trimmed.startIndex, offsetBy: 2)..<colonRange.lowerBound])
+                let url = String(trimmed[colonRange.lowerBound..<trimmed.endIndex]).dropFirst(2) // drop ": "
+                results.append((name: name.trimmingCharacters(in: .whitespaces), url: String(url)))
+            }
+        }
+
+        if !results.isEmpty {
+            hitResults[messageId] = results
+        }
+    }
+
+    static func buildSystemPrompt() -> String {
         return """
         You are Robo's on-device assistant. Robo is an iOS app that turns phone sensors \
-        (LiDAR, camera, barcode scanner, Bluetooth beacons, motion, health) into APIs for AI agents.
+        (LiDAR, camera, barcode scanner) into APIs for AI agents.
 
-        Available agents:
-        \(agentDescriptions)
+        You can help users create Group Think availability polls using the create_availability_poll tool. \
+        When a user wants to plan something with friends (trip, dinner, meetup), guide them through:
+        1. Ask who's coming (participant names)
+        2. Ask for date options (suggest specific dates if they say things like "weekends in May")
+        3. Ask for time slot preferences
+        Then call the tool to create the poll and share links.
 
-        Robo's sensors: LiDAR (room scanning), Camera (photos), Barcode Scanner, \
-        Bluetooth Beacons (proximity), Motion (steps, activity), Health (sleep, workouts).
+        When the user mentions dates loosely (e.g. "weekends in May"), convert them to specific ISO dates. \
+        For time slots, default to evening times (5 PM, 6 PM, 7 PM, 8 PM) unless the user specifies otherwise.
 
-        You help users understand what Robo can do and how to use each agent. \
-        You CANNOT perform actions like scanning or capturing. When asked to perform an action, \
-        explain how the user can do it themselves using the Capture tab. \
-        Action capabilities are coming in a future update.
-
-        IMPORTANT: Keep responses very short — 1-2 sentences max. \
-        Only give longer answers if the user explicitly asks for detail. \
-        Never use bullet points or lists unless asked. Be direct and conversational.
+        IMPORTANT: Keep responses short — 1-2 sentences. Be conversational and friendly. \
+        When you have enough info, call the tool immediately without asking for confirmation.
         """
     }
 }

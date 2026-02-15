@@ -34,10 +34,14 @@
 	<string>Robo needs background location access to detect beacons when the app is closed, triggering room-based automations.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Robo uses your location to detect nearby Bluetooth beacons for room-based automations.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Robo needs microphone access for voice input in chat.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Robo needs motion access to capture step count, distance, and activity data for AI analysis</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Robo needs photo library access to save captured images</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Robo uses speech recognition to let you create tasks and polls using your voice.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

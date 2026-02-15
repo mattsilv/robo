@@ -348,6 +348,33 @@ export async function respondToHit(c: Context<{ Bindings: Env }>) {
         .run();
     }
 
+    // Send push notification per response (fire-and-forget)
+    if (hit.device_id) {
+      c.executionCtx.waitUntil(
+        (async () => {
+          try {
+            const device = await c.env.DB.prepare(
+              'SELECT apns_token FROM devices WHERE id = ?'
+            ).bind(hit.device_id).first<{ apns_token: string | null }>();
+
+            if (device?.apns_token) {
+              const isAvailability = hit.hit_type === 'availability';
+              const body = isAvailability
+                ? `${respondent_name} responded to your availability poll`
+                : `${respondent_name} responded to your request`;
+
+              await sendPushNotification(c.env, device.apns_token, {
+                title: isAvailability ? 'New Availability Response' : 'HIT Response',
+                body,
+              }, { hit_id: hitId });
+            }
+          } catch (err) {
+            console.error('Push notification failed:', err);
+          }
+        })()
+      );
+    }
+
     return c.json(
       {
         id: responseId,

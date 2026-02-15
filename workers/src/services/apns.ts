@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 
-const APNS_HOST = 'https://api.push.apple.com';
+const APNS_PRODUCTION_HOST = 'https://api.push.apple.com';
+const APNS_SANDBOX_HOST = 'https://api.sandbox.push.apple.com';
 const TEAM_ID = 'R3Z5CY34Q5';
 const BUNDLE_ID = 'com.silv.Robo';
 
@@ -120,7 +121,10 @@ export async function sendPushNotification(
       ...data,
     };
 
-    const response = await fetch(`${APNS_HOST}/3/device/${deviceToken}`, {
+    // Use sandbox for development builds, production for App Store
+    const host = env.APNS_SANDBOX === 'true' ? APNS_SANDBOX_HOST : APNS_PRODUCTION_HOST;
+
+    const response = await fetch(`${host}/3/device/${deviceToken}`, {
       method: 'POST',
       headers: {
         'authorization': `bearer ${jwt}`,

@@ -63,7 +63,8 @@ export const getDevice = async (c: Context<{ Bindings: Env }>) => {
  * POST /api/devices/:device_id/apns-token — Save APNs push token
  */
 export const saveAPNsToken = async (c: Context<{ Bindings: Env }>) => {
-  const deviceId = c.req.param('device_id');
+  // Use authenticated device ID from header, not path param (prevents cross-device overwrite)
+  const deviceId = c.req.header('X-Device-ID')!;
 
   const body = await c.req.json().catch(() => null);
   if (!body) {

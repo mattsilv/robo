@@ -3,12 +3,15 @@ import SwiftUI
 struct HitListView: View {
     @Environment(APIService.self) private var apiService
 
+    @Binding var deepLinkHitId: String?
+
     @State private var hits: [HitSummary] = []
     @State private var isLoading = false
     @State private var showingCreate = false
+    @State private var navigationPath = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             Group {
                 if isLoading && hits.isEmpty {
                     ProgressView("Loading HITs...")
@@ -47,6 +50,12 @@ struct HitListView: View {
                 CreateHitView()
             }
             .task { await loadHits() }
+            .onChange(of: deepLinkHitId) { _, hitId in
+                if let hitId {
+                    navigationPath.append(hitId)
+                    deepLinkHitId = nil
+                }
+            }
         }
     }
 

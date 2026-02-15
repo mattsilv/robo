@@ -9,7 +9,7 @@ import { registerDevice, getDevice, saveAPNsToken } from './routes/devices';
 import { submitSensorData } from './routes/sensors';
 import { getInbox, pushCard, respondToCard } from './routes/inbox';
 import { analyzeWithOpus } from './routes/opus';
-import { debugSync, debugList, debugGet } from './routes/debug';
+import { debugSync, debugList, debugGet, debugDownload } from './routes/debug';
 import { lookupNutrition } from './routes/nutrition';
 import { createHit, getHit, uploadHitPhoto, completeHit, listHits, listHitPhotos, respondToHit, listHitResponses } from './routes/hits';
 import { deviceAuth } from './middleware/deviceAuth';
@@ -60,6 +60,7 @@ app.get('/api/hits/:id/responses', listHitResponses);
 app.post('/api/debug/sync', debugSync);
 app.get('/api/debug/sync/:device_id', debugList);
 app.get('/api/debug/sync/:device_id/:key{.+}', debugGet);
+app.get('/api/debug/download/:key{.+}', debugDownload);
 
 // Error handling
 app.onError((err, c) => {

@@ -3,7 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { z } from 'zod';
 import type { Env } from './types';
 
-const MAX_R2_PAYLOAD_BYTES = 500_000; // 500 KB safety limit
+const MAX_SAMPLE_BYTES = 5_000; // 5 KB structural sample for room scan context
 
 function createRoboMcpServer(env: Env, deviceId: string) {
   const server = new McpServer({
@@ -138,7 +138,7 @@ function createRoboMcpServer(env: Env, deviceId: string) {
 
   server.tool(
     'get_debug_payload',
-    'Retrieve a debug payload from R2 (full room scan JSON, etc.). Large payloads (>500KB) are truncated to fit in context.',
+    'Retrieve a debug payload from R2. For room scans, returns a compact summary with engineering guidance instead of raw JSON — use the download URL to get the full data locally.\n\nWHAT YOU CAN BUILD with room scan data:\n- Generate an interactive 3D viewer (Three.js) with labeled walls, doors, windows, and furniture\n- Compute paint/flooring estimates from wall areas and floor dimensions\n- Check if furniture with given dimensions fits against a specific wall\n- Create a dimensioned floor plan SVG for contractors\n- Calculate material costs (paint, flooring, trim) based on room geometry',
     {
       key: z.string().describe('R2 object key from list_debug_payloads'),
     },
@@ -156,12 +156,94 @@ function createRoboMcpServer(env: Env, deviceId: string) {
           return { content: [{ type: 'text', text: 'Payload not found' }] };
         }
         const text = await obj.text();
-        if (text.length > MAX_R2_PAYLOAD_BYTES) {
-          const truncated = text.substring(0, MAX_R2_PAYLOAD_BYTES);
+        let parsed: any;
+        try { parsed = JSON.parse(text); } catch { parsed = null; }
+
+        // Room scan: return summary + guidance instead of raw JSON
+        if (parsed && (parsed.walls || parsed.floors)) {
+          const walls = parsed.walls || [];
+          const floors = parsed.floors || [];
+          const doors = parsed.doors || [];
+          const windows = parsed.windows || [];
+          const objects = parsed.objects || [];
+
+          const totalWallArea = walls.reduce((sum: number, w: any) => {
+            const d = w.dimensions || {};
+            return sum + (d.x || 0) * (d.y || 0);
+          }, 0);
+
+          const totalFloorArea = floors.reduce((sum: number, f: any) => {
+            const d = f.dimensions || {};
+            return sum + (d.x || 0) * (d.z || 0);
+          }, 0);
+
+          let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+          for (const f of floors) {
+            for (const c of (f.polygonCorners || [])) {
+              if (c.x < minX) minX = c.x;
+              if (c.x > maxX) maxX = c.x;
+              if (c.z < minZ) minZ = c.z;
+              if (c.z > maxZ) maxZ = c.z;
+            }
+          }
+
+          const toFt = (m: number) => +(m * 3.28084).toFixed(1);
+          const sample: any = {};
+          if (walls.length) sample.walls_sample = [walls[0]];
+          if (floors.length) sample.floors_sample = [floors[0]];
+          if (objects.length) sample.objects_sample = [objects[0]];
+
+          const summary = {
+            type: 'room_scan_summary',
+            stats: {
+              walls: walls.length,
+              floors: floors.length,
+              doors: doors.length,
+              windows: windows.length,
+              objects: objects.length,
+              object_categories: [...new Set(objects.map((o: any) => o.category))],
+              total_wall_area_sqft: +(totalWallArea * 10.7639).toFixed(1),
+              total_floor_area_sqft: +(totalFloorArea * 10.7639).toFixed(1),
+              room_dimensions_ft: `${toFt(maxX - minX)} x ${toFt(maxZ - minZ)}`,
+              payload_size_bytes: text.length,
+              payload_size_human: text.length > 1_000_000
+                ? `${(text.length / 1_000_000).toFixed(1)} MB`
+                : `${(text.length / 1_000).toFixed(1)} KB`,
+            },
+            download_url: `/api/debug/download/${encodeURIComponent(key)}`,
+            download_instructions: 'Use this URL with your Bearer token to download the full JSON to a local file. Do NOT load it into context — save to disk and process programmatically.',
+            viewer_template_url: '/static/room-viewer.html',
+            viewer_instructions: 'Fetch the HTML template, replace {{ROOM_DATA}} with the downloaded JSON, save as a local .html file, and open in browser.',
+            schema: {
+              walls: '{ dimensions: {x: width, y: height, z: depth}, transform: {columns: [[4x4 col-major]]} }',
+              floors: '{ polygonCorners: [{x,y,z}], dimensions, transform }',
+              doors: '{ dimensions, transform }',
+              windows: '{ dimensions, transform }',
+              objects: '{ category: string, dimensions, transform }',
+              coordinate_system: 'Apple RoomPlan Y-up (same as Three.js). Transforms are column-major 4x4. Position = columns[3].',
+            },
+            engineering_guidance: [
+              '1. DOWNLOAD: fetch download_url with Bearer token, save to local .json file',
+              '2. 3D VIEWER: fetch viewer_template_url, replace {{ROOM_DATA}} with JSON, save as .html, open in browser',
+              '3. PAINT ESTIMATE: total_wall_area_sqft / 350 = gallons (one coat). Subtract doors (~21 sqft) and windows (~15 sqft each)',
+              '4. FURNITURE FIT: find target wall by index, compare wall dimensions.x (width) vs furniture width',
+              '5. FLOOR PLAN SVG: use floor polygonCorners for outline, add wall segments and door arcs',
+              '6. FLOORING: total_floor_area_sqft + 10% waste factor for ordering',
+            ],
+            structural_sample: sample,
+          };
+
+          return {
+            content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+          };
+        }
+
+        // Non-room-scan: return directly if small, summary if large
+        if (text.length > 50_000) {
           return {
             content: [{
               type: 'text',
-              text: `[TRUNCATED: ${text.length} bytes total, showing first ${MAX_R2_PAYLOAD_BYTES} bytes]\n\n${truncated}`,
+              text: `[LARGE PAYLOAD: ${text.length} bytes — download via /api/debug/download/${encodeURIComponent(key)}]\n\n${text.substring(0, MAX_SAMPLE_BYTES)}...`,
             }],
           };
         }

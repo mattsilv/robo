@@ -30,6 +30,10 @@ jobs:
         working-directory: workers
         run: npm ci
 
+      - name: Run tests
+        working-directory: workers
+        run: npm test
+
       - name: Apply D1 migrations
         uses: cloudflare/wrangler-action@v3
         with:
@@ -45,3 +49,20 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
           workingDirectory: workers
+
+      - name: Smoke test deployed API
+        run: |
+          sleep 5
+          echo "Testing /health..."
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' https://api.robo.app/health)
+          if [ "$STATUS" != "200" ]; then echo "FAIL: /health returned $STATUS"; exit 1; fi
+
+          echo "Testing /api/keys (auth required)..."
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' -H 'X-Device-ID: smoke-test' -H 'Authorization: Bearer fake' https://api.robo.app/api/keys)
+          if [ "$STATUS" = "404" ]; then echo "FAIL: /api/keys returned 404 — routes not registered"; exit 1; fi
+
+          echo "Testing /api/devices/register exists..."
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' https://api.robo.app/api/devices/register)
+          if [ "$STATUS" = "404" ]; then echo "FAIL: /api/devices/register returned 404"; exit 1; fi
+
+          echo "All smoke tests passed"

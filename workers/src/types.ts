@@ -95,7 +95,7 @@ export const CreateHitSchema = z.object({
   recipient_name: z.string().min(1).max(50),
   task_description: z.string().min(1).max(500),
   agent_name: z.string().max(100).optional(),
-  hit_type: z.enum(['photo', 'poll', 'availability']).optional(),
+  hit_type: z.enum(['photo', 'poll', 'availability', 'group_poll']).optional(),
   config: z.record(z.any()).optional(),
   group_id: z.string().max(100).optional(),
 });

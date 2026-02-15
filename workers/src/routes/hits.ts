@@ -341,6 +341,23 @@ export async function respondToHit(c: Context<{ Bindings: Env }>) {
       return c.json({ error: `HIT is ${hit.status}` }, 400);
     }
 
+    // For group_poll: validate respondent is in participant list and hasn't already responded
+    if (hit.hit_type === 'group_poll') {
+      const config = hit.config ? JSON.parse(hit.config) : {};
+      const participants: string[] = config.participants || [];
+      if (participants.length > 0 && !participants.includes(respondent_name)) {
+        return c.json({ error: 'Name not in participant list' }, 400);
+      }
+
+      // Check for duplicate response
+      const existing = await c.env.DB.prepare(
+        'SELECT id FROM hit_responses WHERE hit_id = ? AND respondent_name = ?'
+      ).bind(hitId, respondent_name).first();
+      if (existing) {
+        return c.json({ error: 'You have already responded' }, 409);
+      }
+    }
+
     const responseId = crypto.randomUUID();
     const now = new Date().toISOString();
 
@@ -367,13 +384,16 @@ export async function respondToHit(c: Context<{ Bindings: Env }>) {
             ).bind(hit.device_id).first<{ apns_token: string | null }>();
 
             if (device?.apns_token) {
+              const isGroupPoll = hit.hit_type === 'group_poll';
               const isAvailability = hit.hit_type === 'availability';
-              const body = isAvailability
+              const body = isGroupPoll
+                ? `${respondent_name} voted in your group poll`
+                : isAvailability
                 ? `${respondent_name} responded to your availability poll`
                 : `${respondent_name} responded to your request`;
 
               await sendPushNotification(c.env, device.apns_token, {
-                title: isAvailability ? 'New Availability Response' : 'HIT Response',
+                title: isGroupPoll ? 'New Group Poll Vote' : isAvailability ? 'New Availability Response' : 'HIT Response',
                 body,
               }, { hit_id: hitId });
             }
@@ -397,6 +417,40 @@ export async function respondToHit(c: Context<{ Bindings: Env }>) {
   } catch (error) {
     console.error('Failed to submit HIT response:', error);
     return c.json({ error: 'Failed to submit response' }, 500);
+  }
+}
+
+/**
+ * DELETE /api/hits/:id — Delete a HIT and its responses/photos
+ */
+export async function deleteHit(c: Context<{ Bindings: Env }>) {
+  const hitId = c.req.param('id');
+
+  try {
+    const hit = await c.env.DB.prepare('SELECT * FROM hits WHERE id = ?').bind(hitId).first<Hit>();
+
+    if (!hit) {
+      return c.json({ error: 'HIT not found' }, 404);
+    }
+
+    // Delete associated photos from R2
+    const photos = await c.env.DB.prepare('SELECT r2_key FROM hit_photos WHERE hit_id = ?')
+      .bind(hitId)
+      .all<{ r2_key: string }>();
+
+    for (const photo of photos.results) {
+      await c.env.BUCKET.delete(photo.r2_key).catch(() => {});
+    }
+
+    // Delete in order: responses, photos, then hit
+    await c.env.DB.prepare('DELETE FROM hit_responses WHERE hit_id = ?').bind(hitId).run();
+    await c.env.DB.prepare('DELETE FROM hit_photos WHERE hit_id = ?').bind(hitId).run();
+    await c.env.DB.prepare('DELETE FROM hits WHERE id = ?').bind(hitId).run();
+
+    return c.json({ deleted: true, id: hitId }, 200);
+  } catch (error) {
+    console.error('Failed to delete HIT:', error);
+    return c.json({ error: 'Failed to delete HIT' }, 500);
   }
 }
 

@@ -1,9 +1,10 @@
 import SwiftUI
 import RoomPlan
+import CoreLocation
 
 struct RoomCaptureViewWrapper: UIViewRepresentable {
     @Binding var stopRequested: Bool
-    let onCaptureComplete: (CapturedRoom) -> Void
+    let onCaptureComplete: (CapturedRoom, Double?) -> Void
     let onCaptureError: (Error) -> Void
 
     func makeUIView(context: Context) -> RoomCaptureView {
@@ -11,6 +12,7 @@ struct RoomCaptureViewWrapper: UIViewRepresentable {
         captureView.captureSession.delegate = context.coordinator
         captureView.delegate = context.coordinator
         captureView.captureSession.run(configuration: .init())
+        context.coordinator.startHeading()
         return captureView
     }
 
@@ -25,6 +27,7 @@ struct RoomCaptureViewWrapper: UIViewRepresentable {
 
     static func dismantleUIView(_ uiView: RoomCaptureView, coordinator: Coordinator) {
         uiView.captureSession.stop()
+        coordinator.stopHeading()
     }
 
     func makeCoordinator() -> Coordinator {
@@ -32,16 +35,38 @@ struct RoomCaptureViewWrapper: UIViewRepresentable {
     }
 
     @objc(RoboRoomCaptureCoordinator)
-    class Coordinator: NSObject, RoomCaptureSessionDelegate, RoomCaptureViewDelegate, NSCoding {
-        let onCaptureComplete: (CapturedRoom) -> Void
+    class Coordinator: NSObject, RoomCaptureSessionDelegate, RoomCaptureViewDelegate, NSCoding, CLLocationManagerDelegate {
+        let onCaptureComplete: (CapturedRoom, Double?) -> Void
         let onCaptureError: (Error) -> Void
+        private let locationManager = CLLocationManager()
+        private var latestHeading: Double?
 
         init(
-            onCaptureComplete: @escaping (CapturedRoom) -> Void,
+            onCaptureComplete: @escaping (CapturedRoom, Double?) -> Void,
             onCaptureError: @escaping (Error) -> Void
         ) {
             self.onCaptureComplete = onCaptureComplete
             self.onCaptureError = onCaptureError
+            super.init()
+            locationManager.delegate = self
+        }
+
+        func startHeading() {
+            if CLLocationManager.headingAvailable() {
+                locationManager.startUpdatingHeading()
+            }
+        }
+
+        func stopHeading() {
+            locationManager.stopUpdatingHeading()
+        }
+
+        // MARK: - CLLocationManagerDelegate
+
+        func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+            if newHeading.headingAccuracy >= 0 {
+                latestHeading = newHeading.magneticHeading
+            }
         }
 
         // MARK: - NSCoding (required by RoomCaptureViewDelegate)
@@ -70,7 +95,7 @@ struct RoomCaptureViewWrapper: UIViewRepresentable {
                 onCaptureError(error)
                 return
             }
-            onCaptureComplete(processedResult)
+            onCaptureComplete(processedResult, latestHeading)
         }
     }
 }

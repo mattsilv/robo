@@ -3,12 +3,13 @@ import SwiftUI
 struct DeveloperPortalView: View {
     @Environment(DeviceService.self) private var deviceService
     @Environment(APIService.self) private var apiService
-    @State private var apiKeys: [APIKey] = []
+    @State private var apiKeys: [APIKeyMeta] = []
     @State private var isLoading = false
     @State private var error: String?
     @State private var showCreateAlert = false
     @State private var newKeyLabel = ""
     @State private var copiedId: String?
+    @State private var isDeleting: Set<String> = []
 
     var body: some View {
         Form {
@@ -48,23 +49,14 @@ struct DeveloperPortalView: View {
                             if let label = key.label {
                                 Text(label).font(.subheadline.weight(.medium))
                             }
-                            Text(key.maskedValue)
+                            Text(key.keyHint)
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button {
-                            UIPasteboard.general.string = key.keyValue
-                            withAnimation { copiedId = key.id }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                if copiedId == key.id { copiedId = nil }
-                            }
-                        } label: {
-                            Image(systemName: copiedId == key.id ? "checkmark" : "doc.on.doc")
-                                .foregroundStyle(copiedId == key.id ? .green : .accentColor)
-                                .font(.caption)
+                        if isDeleting.contains(key.id) {
+                            ProgressView().controlSize(.small)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .onDelete(perform: deleteKeys)
@@ -84,7 +76,7 @@ struct DeveloperPortalView: View {
         } header: {
             Text("API Keys")
         } footer: {
-            Text("Maximum 3 keys per device. Swipe to delete.")
+            Text("Maximum 3 keys per device. Full key is shown only once on creation. Swipe to delete.")
         }
         .alert("New API Key", isPresented: $showCreateAlert) {
             TextField("Label (optional)", text: $newKeyLabel)
@@ -172,13 +164,15 @@ struct DeveloperPortalView: View {
         error = nil
         do {
             let label = newKeyLabel.isEmpty ? nil : newKeyLabel
-            let key = try await apiService.createAPIKey(label: label)
-            apiKeys.insert(key, at: 0)
-            UIPasteboard.general.string = key.keyValue
-            withAnimation { copiedId = key.id }
+            let created = try await apiService.createAPIKey(label: label)
+            // Copy the full key — this is the only time it's visible
+            UIPasteboard.general.string = created.keyValue
+            withAnimation { copiedId = created.id }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                if copiedId == key.id { copiedId = nil }
+                if copiedId == created.id { copiedId = nil }
             }
+            // Reload to get masked list
+            await loadKeys()
         } catch {
             self.error = error.localizedDescription
         }
@@ -187,15 +181,17 @@ struct DeveloperPortalView: View {
     private func deleteKeys(at offsets: IndexSet) {
         for index in offsets {
             let key = apiKeys[index]
+            isDeleting.insert(key.id)
             Task {
                 do {
                     try await apiService.deleteAPIKey(id: key.id)
+                    apiKeys.removeAll { $0.id == key.id }
                 } catch {
                     self.error = error.localizedDescription
                 }
+                isDeleting.remove(key.id)
             }
         }
-        apiKeys.remove(atOffsets: offsets)
     }
 }
 

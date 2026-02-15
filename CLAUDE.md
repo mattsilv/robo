@@ -76,6 +76,9 @@ Agents are defined in `ios/Robo/Services/MockAgentService.swift` and skills in `
 5. **Build in your worktree**: `cd /tmp/robo-<feature>/ios && xcodegen generate && xcodebuild ...`
 6. **Clean up worktrees** when done: `git worktree remove /tmp/robo-<feature>`
 
+## Design Rule
+**ALWAYS invoke the `frontend-design` skill when doing any frontend/UI design work.** This includes HIT pages, OG images, landing pages, iOS SwiftUI views, and any visual component.
+
 ## Coding Conventions
 
 ### Swift Style

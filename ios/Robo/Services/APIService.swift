@@ -409,9 +409,10 @@ struct HitSummary: Decodable, Identifiable {
     let completedAt: String?
     let hitType: String?
     let groupId: String?
+    let config: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, status
+        case id, status, config
         case senderName = "sender_name"
         case recipientName = "recipient_name"
         case taskDescription = "task_description"

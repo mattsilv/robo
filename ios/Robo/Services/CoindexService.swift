@@ -21,6 +21,7 @@ class CoindexService: NSObject {
     private var accessToken: String? {
         didSet { isAuthenticated = accessToken != nil }
     }
+    private var authSession: ASWebAuthenticationSession?
 
     override init() {
         super.init()
@@ -37,7 +38,8 @@ class CoindexService: NSObject {
         let authURL = URL(string: "\(Self.baseURL)/oauth/authorize?client_id=\(Self.clientID)&response_type=code&code_challenge=\(challenge)&code_challenge_method=S256&redirect_uri=robo://oauth/callback")!
 
         let code = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: Self.callbackScheme) { url, error in
+            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: Self.callbackScheme) { [weak self] url, error in
+                self?.authSession = nil
                 if let error {
                     continuation.resume(throwing: error)
                     return
@@ -52,6 +54,7 @@ class CoindexService: NSObject {
             }
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = false
+            self.authSession = session
             session.start()
         }
 

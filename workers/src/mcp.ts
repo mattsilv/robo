@@ -65,16 +65,58 @@ function createRoboMcpServer(env: Env, deviceId: string) {
 
   server.tool(
     'get_device_info',
-    'Get info about the authenticated Robo device',
+    'Get info about the authenticated Robo device and verify the MCP connection is healthy. If the connection is broken (e.g., screenshots not showing up), this will detect it.',
     {},
     async () => {
       try {
-        const result = await env.DB.prepare(
-          'SELECT id, name, registered_at, last_seen_at FROM devices WHERE id = ?'
-        ).bind(deviceId).first();
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        const device = await env.DB.prepare(
+          'SELECT id, name, vendor_id, registered_at, last_seen_at FROM devices WHERE id = ?'
+        ).bind(deviceId).first<any>();
+
+        if (!device) {
+          return { content: [{ type: 'text', text: 'ERROR: Device not found. MCP token may be orphaned. Ask the user to re-register in Robo Settings.' }], isError: true };
+        }
+
+        // Check for duplicate devices with same vendor_id (split device problem)
+        let healthWarnings: string[] = [];
+        if (device.vendor_id) {
+          const dupes = await env.DB.prepare(
+            'SELECT id FROM devices WHERE vendor_id = ? AND id != ?'
+          ).bind(device.vendor_id, deviceId).all();
+          if (dupes.results.length > 0) {
+            healthWarnings.push(`WARNING: ${dupes.results.length} duplicate device(s) found with same vendor_id. This can cause screenshots to upload to the wrong device. Device IDs: ${dupes.results.map((d: any) => d.id).join(', ')}`);
+          }
+        } else {
+          healthWarnings.push('WARNING: No vendor_id set. This device was registered before the identity migration. Screenshots may upload to a different device record.');
+        }
+
+        // Check for recent screenshots
+        const recentScreenshot = await env.DB.prepare(
+          "SELECT captured_at FROM sensor_data WHERE device_id = ? AND sensor_type = 'camera' ORDER BY captured_at DESC LIMIT 1"
+        ).bind(deviceId).first<{ captured_at: string }>();
+
+        const recentCapture = await env.DB.prepare(
+          'SELECT captured_at FROM sensor_data WHERE device_id = ? ORDER BY captured_at DESC LIMIT 1'
+        ).bind(deviceId).first<{ captured_at: string }>();
+
+        const info = {
+          device_id: device.id,
+          name: device.name,
+          vendor_id: device.vendor_id || 'NOT SET',
+          registered_at: device.registered_at,
+          last_seen_at: device.last_seen_at,
+          last_screenshot: recentScreenshot?.captured_at || 'never',
+          last_any_capture: recentCapture?.captured_at || 'never',
+          health: healthWarnings.length === 0 ? 'OK' : 'ISSUES DETECTED',
+          warnings: healthWarnings,
         };
+
+        let text = JSON.stringify(info, null, 2);
+        if (healthWarnings.length > 0) {
+          text = 'HEALTH CHECK: ISSUES DETECTED\n\n' + healthWarnings.join('\n') + '\n\n' + text;
+        }
+
+        return { content: [{ type: 'text', text }] };
       } catch (err: any) {
         return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
       }

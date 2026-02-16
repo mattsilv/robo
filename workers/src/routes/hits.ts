@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import { CreateHitSchema, HitResponseSchema, type Env, type Hit, type HitPhoto, type HitResponse } from '../types';
+import { CreateHitSchema, HitResponseSchema, HIT_DISTRIBUTION_MODES, type DistributionMode, type Env, type Hit, type HitPhoto, type HitResponse } from '../types';
 import { sendPushNotification } from '../services/apns';
 
 // Default sender when no name can be resolved
@@ -16,7 +16,31 @@ function generateShortId(): string {
 }
 
 /**
+ * Detect distribution mode from existing HIT fields (backward compat).
+ */
+export function detectDistributionMode(hit: Hit): DistributionMode {
+  if (hit.group_id && hit.recipient_name !== 'Group' && hit.recipient_name !== 'Anyone') {
+    return 'individual';
+  }
+  const config = hit.config ? JSON.parse(hit.config) : {};
+  if (config.participants && config.participants.length > 0) {
+    return 'group';
+  }
+  if (hit.recipient_name === 'Anyone') {
+    return 'open';
+  }
+  // Legacy HITs with a specific recipient name are individual-style
+  return 'individual';
+}
+
+/**
  * POST /api/hits — Create a new HIT
+ *
+ * Supports three distribution modes:
+ * - individual: Creates N HITs (one per participant) with shared group_id
+ * - group: Creates 1 HIT with participants in config
+ * - open: Creates 1 HIT with recipient_name="Anyone"
+ * - (no mode): Legacy behavior, creates 1 HIT with recipient_name
  */
 export async function createHit(c: Context<{ Bindings: Env }>) {
   const body = await c.req.json().catch(() => null);
@@ -29,17 +53,111 @@ export async function createHit(c: Context<{ Bindings: Env }>) {
     return c.json({ error: 'Invalid request body', issues: validated.error.issues }, 400);
   }
 
-  const { recipient_name, task_description, agent_name, hit_type, config, group_id, sender_name } = validated.data;
-  const id = generateShortId();
+  const { task_description, agent_name, hit_type, config, sender_name, distribution_mode, participants } = validated.data;
+  let { recipient_name, group_id } = validated.data;
   const now = new Date().toISOString();
-
-  // Get device_id from auth header if present
   const deviceId = c.req.header('X-Device-ID') || null;
-
-  // Only use explicit sender_name from the request — never leak device names into public HIT links
   const resolvedSender = sender_name || DEFAULT_SENDER;
 
+  // Validate mode-specific requirements
+  if (distribution_mode === 'individual' || distribution_mode === 'group') {
+    if (!participants || participants.length === 0) {
+      return c.json({ error: `Distribution mode '${distribution_mode}' requires participants array` }, 400);
+    }
+  }
+
   try {
+    // === Individual mode: create N HITs with shared group_id ===
+    if (distribution_mode === 'individual') {
+      const sharedGroupId = group_id || `grp_${generateShortId()}`;
+      const results: { name: string; id: string; url: string }[] = [];
+
+      for (const name of participants!) {
+        const id = generateShortId();
+        await c.env.DB.prepare(
+          `INSERT INTO hits (id, sender_name, recipient_name, task_description, agent_name, status, photo_count, created_at, device_id, hit_type, config, group_id)
+           VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?, ?)`
+        )
+          .bind(id, resolvedSender, name, task_description, agent_name || null, now, deviceId, hit_type || 'photo', config ? JSON.stringify(config) : null, sharedGroupId)
+          .run();
+
+        results.push({ name, id, url: `https://robo.app/hit/${id}` });
+      }
+
+      return c.json(
+        {
+          distribution_mode: 'individual',
+          group_id: sharedGroupId,
+          hits: results,
+          count: results.length,
+          sender_name: resolvedSender,
+          task_description,
+          created_at: now,
+        },
+        201
+      );
+    }
+
+    // === Group mode: 1 HIT with participants in config ===
+    if (distribution_mode === 'group') {
+      const id = generateShortId();
+      const mergedConfig = { ...(config || {}), participants };
+
+      await c.env.DB.prepare(
+        `INSERT INTO hits (id, sender_name, recipient_name, task_description, agent_name, status, photo_count, created_at, device_id, hit_type, config, group_id)
+         VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?, ?)`
+      )
+        .bind(id, resolvedSender, 'Group', task_description, agent_name || null, now, deviceId, hit_type || 'photo', JSON.stringify(mergedConfig), group_id || null)
+        .run();
+
+      return c.json(
+        {
+          distribution_mode: 'group',
+          id,
+          url: `https://robo.app/hit/${id}`,
+          sender_name: resolvedSender,
+          recipient_name: 'Group',
+          task_description,
+          status: 'pending',
+          participants,
+          created_at: now,
+        },
+        201
+      );
+    }
+
+    // === Open mode: 1 HIT with recipient_name="Anyone" ===
+    if (distribution_mode === 'open') {
+      const id = generateShortId();
+
+      await c.env.DB.prepare(
+        `INSERT INTO hits (id, sender_name, recipient_name, task_description, agent_name, status, photo_count, created_at, device_id, hit_type, config, group_id)
+         VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?, ?)`
+      )
+        .bind(id, resolvedSender, 'Anyone', task_description, agent_name || null, now, deviceId, hit_type || 'photo', config ? JSON.stringify(config) : null, group_id || null)
+        .run();
+
+      return c.json(
+        {
+          distribution_mode: 'open',
+          id,
+          url: `https://robo.app/hit/${id}`,
+          sender_name: resolvedSender,
+          recipient_name: 'Anyone',
+          task_description,
+          status: 'pending',
+          created_at: now,
+        },
+        201
+      );
+    }
+
+    // === Legacy (no distribution_mode): single HIT with recipient_name ===
+    if (!recipient_name) {
+      return c.json({ error: 'recipient_name is required when distribution_mode is not set' }, 400);
+    }
+
+    const id = generateShortId();
     await c.env.DB.prepare(
       `INSERT INTO hits (id, sender_name, recipient_name, task_description, agent_name, status, photo_count, created_at, device_id, hit_type, config, group_id)
        VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?, ?)`

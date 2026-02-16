@@ -1,8 +1,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
+import { HIT_DISTRIBUTION_MODES, type DistributionMode } from './types';
 import type { Env } from './types';
 import { logEvent } from './services/eventLogger';
+import { detectDistributionMode } from './routes/hits';
 
 const MAX_SAMPLE_BYTES = 5_000; // 5 KB structural sample for room scan context
 
@@ -388,6 +390,69 @@ function createRoboMcpServer(env: Env, deviceId: string) {
 
   // @ts-expect-error - MCP SDK deep type instantiation
   server.tool(
+    'create_hit',
+    `Create a HIT (Human Intelligence Task) link to collect data from people. Three distribution modes:
+- individual: Separate link per person (name baked in). Best for close friends, zero friction.
+- group: Single link, pick name from dropdown (~10 people).
+- open: Single link, type your name (large groups, public).`,
+    {
+      task_description: z.string().describe('What you need from them'),
+      distribution_mode: z.enum(['individual', 'group', 'open']).describe('How to distribute the link'),
+      participants: z.array(z.string()).optional().describe('Names of participants (required for individual and group modes)'),
+      sender_name: z.string().optional().describe('Your display name on the HIT page'),
+      hit_type: z.enum(['photo', 'poll', 'availability', 'group_poll']).optional().describe('Type of HIT'),
+      config: z.record(z.any()).optional().describe('Additional config (e.g. date_options, time_slots)'),
+    },
+    async ({ task_description, distribution_mode, participants, sender_name, hit_type, config }) => {
+      try {
+        // Validate mode requirements
+        if ((distribution_mode === 'individual' || distribution_mode === 'group') && (!participants || participants.length === 0)) {
+          return { content: [{ type: 'text', text: `Error: '${distribution_mode}' mode requires participants array.` }], isError: true };
+        }
+
+        const now = new Date().toISOString();
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        const genId = () => { const b = new Uint8Array(8); crypto.getRandomValues(b); return Array.from(b, (v) => chars[v % chars.length]).join(''); };
+        const resolvedSender = sender_name || 'Someone';
+
+        if (distribution_mode === 'individual') {
+          const groupId = `grp_${genId()}`;
+          const results: { name: string; url: string }[] = [];
+          for (const name of participants!) {
+            const id = genId();
+            await env.DB.prepare(
+              `INSERT INTO hits (id, sender_name, recipient_name, task_description, agent_name, status, photo_count, created_at, device_id, hit_type, config, group_id) VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?, ?)`
+            ).bind(id, resolvedSender, name, task_description, null, now, deviceId, hit_type || 'photo', config ? JSON.stringify(config) : null, groupId).run();
+            results.push({ name, url: `https://robo.app/hit/${id}` });
+          }
+          let text = `Created ${results.length} individual HIT links (group: ${groupId}):\n`;
+          for (const r of results) text += `  ${r.name}: ${r.url}\n`;
+          return { content: [{ type: 'text', text }] };
+        }
+
+        if (distribution_mode === 'group') {
+          const id = genId();
+          const mergedConfig = { ...(config || {}), participants };
+          await env.DB.prepare(
+            `INSERT INTO hits (id, sender_name, recipient_name, task_description, agent_name, status, photo_count, created_at, device_id, hit_type, config, group_id) VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?, ?)`
+          ).bind(id, resolvedSender, 'Group', task_description, null, now, deviceId, hit_type || 'photo', JSON.stringify(mergedConfig), null).run();
+          return { content: [{ type: 'text', text: `Created group HIT: https://robo.app/hit/${id}\nParticipants: ${participants!.join(', ')}\nRecipients pick their name from a dropdown.` }] };
+        }
+
+        // open mode
+        const id = genId();
+        await env.DB.prepare(
+          `INSERT INTO hits (id, sender_name, recipient_name, task_description, agent_name, status, photo_count, created_at, device_id, hit_type, config, group_id) VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?, ?)`
+        ).bind(id, resolvedSender, 'Anyone', task_description, null, now, deviceId, hit_type || 'photo', config ? JSON.stringify(config) : null, null).run();
+        return { content: [{ type: 'text', text: `Created open HIT: https://robo.app/hit/${id}\nAnyone can respond — they type their name on the page.` }] };
+      } catch (err: any) {
+        return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+      }
+    }
+  );
+
+  // @ts-expect-error - MCP SDK deep type instantiation
+  server.tool(
     'check_hit_status',
     'Check the status of recent HITs (Human Intelligence Tasks) — availability polls, group polls, etc. Returns the most recent HITs with response details so you can see who has responded and what they said. If no hit_id is provided, returns the 3 most recent HITs.',
     {
@@ -425,6 +490,7 @@ function createRoboMcpServer(env: Env, deviceId: string) {
           enriched.push({
             id: hit.id,
             type: hit.hit_type,
+            distribution_mode: detectDistributionMode(hit as any),
             title: config.title || hit.task_description,
             status: hit.status,
             created_at: hit.created_at,

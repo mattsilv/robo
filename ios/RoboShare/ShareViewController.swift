@@ -139,6 +139,9 @@ class ShareViewController: UIViewController {
         request.httpMethod = "POST"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue(config.id, forHTTPHeaderField: "X-Device-ID")
+        if let token = config.mcpToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         request.timeoutInterval = 15
 
         var body = Data()

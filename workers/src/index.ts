@@ -19,6 +19,7 @@ import { listAPIKeys, createAPIKey, deleteAPIKey } from './routes/apikeys';
 import { chatProxy } from './routes/chat';
 import { deviceAuth } from './middleware/deviceAuth';
 import { mcpTokenAuth } from './middleware/mcpTokenAuth';
+import { rateLimit } from './middleware/rateLimit';
 import { handleMcpRequest } from './mcp';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -52,8 +53,8 @@ app.get('/api/nutrition/lookup', deviceAuth, lookupNutrition);
 // Opus integration
 app.post('/api/opus/analyze', analyzeWithOpus);
 
-// Chat proxy (OpenRouter) — auth required
-app.post('/api/chat', deviceAuth, chatProxy);
+// Chat proxy (OpenRouter) — auth required, rate limited
+app.post('/api/chat', deviceAuth, rateLimit({ endpoint: 'chat', maxRequests: 20, windowSeconds: 300 }), chatProxy);
 
 // HIT owner routes (auth required)
 app.post('/api/hits', deviceAuth, createHit);

@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { ImageResponse } from 'workers-og';
 import type { Env } from '../types';
+import { logEvent } from '../services/eventLogger';
 
 type HitData = {
   sender_name: string;
@@ -56,6 +57,10 @@ export async function serveOgImage(c: Context<{ Bindings: Env }>) {
   try {
     const cached = await c.env.BUCKET.get(r2Key);
     if (cached) {
+      logEvent(c.env, c.executionCtx, {
+        type: 'og_generate', endpoint: '/hit/:id/og.png', status: 'success',
+        metadata: { hit_id: id, cache_hit: true },
+      });
       return new Response(cached.body, {
         headers: {
           'Content-Type': 'image/png',
@@ -109,6 +114,11 @@ export async function serveOgImage(c: Context<{ Bindings: Env }>) {
       c.executionCtx.waitUntil(c.env.BUCKET.put(r2Key, pngBuffer));
     }
 
+    logEvent(c.env, c.executionCtx, {
+      type: 'og_generate', endpoint: '/hit/:id/og.png', status: 'success',
+      metadata: { hit_id: id, cache_hit: false },
+    });
+
     return new Response(pngBuffer, {
       headers: {
         'Content-Type': 'image/png',
@@ -117,6 +127,10 @@ export async function serveOgImage(c: Context<{ Bindings: Env }>) {
     });
   } catch (err) {
     console.error('OG image generation failed:', err);
+    logEvent(c.env, c.executionCtx, {
+      type: 'og_generate', endpoint: '/hit/:id/og.png', status: 'error',
+      metadata: { hit_id: id },
+    });
     return c.redirect('https://robo.app/og-image.png', 302);
   }
 }

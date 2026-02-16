@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import type { Env } from '../types';
 import { z } from 'zod';
+import { logEvent } from '../services/eventLogger';
 
 const ChatRequestSchema = z.object({
   messages: z.array(z.object({
@@ -162,6 +163,7 @@ function contentToSSE(content: string, hitResults?: HitResult[]): Response {
 }
 
 export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response> {
+  const startTime = Date.now();
   const body = await c.req.json();
   const parsed = ChatRequestSchema.safeParse(body);
 
@@ -170,7 +172,7 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
   }
 
   const model = parsed.data.model || c.env.OPENROUTER_MODEL || DEFAULT_MODEL;
-  const deviceId = c.req.header('X-Device-ID') || '';
+  const deviceId = c.get('resolvedDeviceId') || c.req.header('X-Device-ID') || '';
 
   // Inject timezone into system message if provided
   const messages = parsed.data.messages.map((msg) => {
@@ -198,6 +200,11 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
 
   if (!initialResponse.ok) {
     const text = await initialResponse.text();
+    logEvent(c.env, c.executionCtx, {
+      type: 'chat_request', device_id: deviceId, endpoint: '/api/chat',
+      status: 'error', duration_ms: Date.now() - startTime,
+      metadata: { model, error_status: initialResponse.status },
+    });
     return c.json({ error: 'OpenRouter request failed', status: initialResponse.status, details: text }, 502);
   }
 
@@ -263,6 +270,11 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
     if (!followUp.ok) {
       const text = await followUp.text();
       console.error('Follow-up request failed:', text);
+      logEvent(c.env, c.executionCtx, {
+        type: 'chat_request', device_id: deviceId, endpoint: '/api/chat',
+        status: 'error', duration_ms: Date.now() - startTime,
+        metadata: { model, error_status: followUp.status, phase: 'tool_followup' },
+      });
       // Fall back to returning tool result directly
       const fallbackContent = toolResults.map((r) => r.content).join('\n');
       return contentToSSE(fallbackContent, allHitResults.length > 0 ? allHitResults : undefined);
@@ -270,10 +282,20 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
 
     const followUpResult = await followUp.json() as any;
     const modelSummary = followUpResult.choices?.[0]?.message?.content || 'Done!';
+    logEvent(c.env, c.executionCtx, {
+      type: 'chat_request', device_id: deviceId, endpoint: '/api/chat',
+      status: 'success', duration_ms: Date.now() - startTime,
+      metadata: { model, tool_calls_count: choice.message.tool_calls.length, has_tools: true },
+    });
     return contentToSSE(modelSummary, allHitResults.length > 0 ? allHitResults : undefined);
   } else {
     // No tool calls — return content as SSE
     const content = choice?.message?.content || '';
+    logEvent(c.env, c.executionCtx, {
+      type: 'chat_request', device_id: deviceId, endpoint: '/api/chat',
+      status: 'success', duration_ms: Date.now() - startTime,
+      metadata: { model, has_tools: false },
+    });
     return contentToSSE(content);
   }
 }

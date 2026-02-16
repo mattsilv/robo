@@ -6,6 +6,7 @@ import Security
 enum KeychainHelper {
     private static let service = "com.silv.Robo"
     private static let account = "deviceConfig"
+    // Team ID prefix must match DEVELOPMENT_TEAM in project.yml
     private static let accessGroup = "R3Z5CY34Q5.group.com.silv.Robo"
 
     static func save(_ config: DeviceConfig) {

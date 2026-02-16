@@ -263,7 +263,7 @@ function createRoboMcpServer(env: Env, deviceId: string) {
     async () => {
       try {
         const row = await env.DB.prepare(
-          "SELECT * FROM sensor_data WHERE device_id = ? AND sensor_type = 'camera' ORDER BY captured_at DESC LIMIT 1"
+          "SELECT * FROM sensor_data WHERE device_id = ? AND sensor_type = 'camera' AND data LIKE '%share_extension%' ORDER BY captured_at DESC LIMIT 1"
         ).bind(deviceId).first();
 
         if (!row) {

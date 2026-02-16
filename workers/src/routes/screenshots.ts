@@ -16,8 +16,8 @@ export async function uploadScreenshot(c: Context<{ Bindings: Env }>) {
     return c.json({ error: 'Expected multipart/form-data with an "image" field' }, 400);
   }
 
-  const imageFile = formData.get('image');
-  if (!imageFile || !(imageFile instanceof File)) {
+  const imageFile = formData.get('image') as File | null;
+  if (!imageFile || typeof imageFile === 'string') {
     return c.json({ error: 'Missing "image" file field' }, 400);
   }
 

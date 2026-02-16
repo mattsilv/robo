@@ -19,7 +19,7 @@ struct ChatView: View {
     @FocusState private var isInputFocused: Bool
 
     private let suggestionChips = [
-        "Plan something with friends"
+        "Plan a weekend with friends"
     ]
 
     var body: some View {

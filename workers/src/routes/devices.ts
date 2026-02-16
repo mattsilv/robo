@@ -14,17 +14,51 @@ export const registerDevice = async (c: Context<{ Bindings: Env }>) => {
     return c.json({ error: 'Invalid request body', issues: validated.error.issues }, 400);
   }
 
-  const { name } = validated.data;
-  const deviceId = crypto.randomUUID();
-  const mcpToken = [...crypto.getRandomValues(new Uint8Array(24))]
-    .map(b => b.toString(16).padStart(2, '0')).join('');
+  const { name, vendor_id, regenerate_token } = validated.data;
   const now = new Date().toISOString();
 
   try {
+    // If vendor_id provided, check for existing device (idempotent registration)
+    if (vendor_id) {
+      const existing = await c.env.DB.prepare(
+        'SELECT id, name, mcp_token, registered_at, last_seen_at FROM devices WHERE vendor_id = ?'
+      ).bind(vendor_id).first<Device & { mcp_token: string }>();
+
+      if (existing) {
+        let mcpToken = existing.mcp_token;
+
+        if (regenerate_token) {
+          // Re-register: new MCP token, same device identity
+          mcpToken = [...crypto.getRandomValues(new Uint8Array(24))]
+            .map(b => b.toString(16).padStart(2, '0')).join('');
+          await c.env.DB.prepare(
+            'UPDATE devices SET name = ?, mcp_token = ?, last_seen_at = ? WHERE id = ?'
+          ).bind(name, mcpToken, now, existing.id).run();
+        } else {
+          await c.env.DB.prepare(
+            'UPDATE devices SET name = ?, last_seen_at = ? WHERE id = ?'
+          ).bind(name, now, existing.id).run();
+        }
+
+        return c.json({
+          id: existing.id,
+          name,
+          mcp_token: mcpToken,
+          registered_at: existing.registered_at,
+          last_seen_at: now,
+        }, 200);
+      }
+    }
+
+    // New device — create fresh record
+    const deviceId = crypto.randomUUID();
+    const mcpToken = [...crypto.getRandomValues(new Uint8Array(24))]
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+
     await c.env.DB.prepare(
-      'INSERT INTO devices (id, name, mcp_token, registered_at) VALUES (?, ?, ?, ?)'
+      'INSERT INTO devices (id, name, mcp_token, vendor_id, registered_at) VALUES (?, ?, ?, ?, ?)'
     )
-      .bind(deviceId, name, mcpToken, now)
+      .bind(deviceId, name, mcpToken, vendor_id ?? null, now)
       .run();
 
     return c.json({

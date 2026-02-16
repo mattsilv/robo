@@ -41,9 +41,11 @@ class APIService {
 
     // MARK: - Device Registration
 
-    func registerDevice(name: String) async throws -> DeviceConfig {
+    func registerDevice(name: String, vendorId: String?, regenerateToken: Bool = false) async throws -> DeviceConfig {
         let url = try makeURL(path: "/api/devices/register")
-        let payload = ["name": name]
+        var payload: [String: Any] = ["name": name]
+        if let vendorId { payload["vendor_id"] = vendorId }
+        if regenerateToken { payload["regenerate_token"] = true }
 
         let response: RegisterResponse = try await post(url: url, body: payload)
         return DeviceConfig(

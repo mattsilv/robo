@@ -216,8 +216,19 @@ class ChatService {
                 guard activeAssistantMessageId == targetId else { return }
 
                 let content = response.content
-                updateMessage(id: targetId, content: content)
+                logger.debug("Chat response content: \(content)")
+
+                // Parse HIT results before cleaning content
                 parseHitResults(content: content, messageId: targetId)
+
+                // If we found HIT results, clean the markdown mess from the bubble
+                let displayContent: String
+                if hitResults[targetId] != nil {
+                    displayContent = Self.cleanHitContent(content)
+                } else {
+                    displayContent = content
+                }
+                updateMessage(id: targetId, content: displayContent)
             } else {
                 let stream = session.streamResponse(to: text)
                 for try await partial in stream {
@@ -271,6 +282,25 @@ class ChatService {
 
     // MARK: - Private Helpers
 
+    /// Strip ugly markdown link lines from HIT responses so the bubble is clean.
+    /// The actual links are shown as interactive cards below the bubble.
+    static func cleanHitContent(_ content: String) -> String {
+        let lines = content.components(separatedBy: "\n")
+        var cleaned: [String] = []
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            // Skip lines that are just HIT links (bullet + name + URL)
+            if trimmed.contains("robo.app/hit/") { continue }
+            cleaned.append(line)
+        }
+
+        // Collapse multiple blank lines
+        return cleaned.joined(separator: "\n")
+            .replacingOccurrences(of: "\n\n\n", with: "\n\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func updateMessage(id: UUID, content: String) {
         guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
         messages[index].content = content
@@ -280,27 +310,71 @@ class ChatService {
         messages.first(where: { $0.id == id })?.content ?? ""
     }
 
-    /// Parse HIT URLs from tool output embedded in assistant response
+    /// Parse HIT URLs from tool output embedded in assistant response.
+    /// Apple Intelligence may reformat tool output into markdown links like:
+    ///   `• Vince: [Link](https://robo.app/hit/IbATsszG)`
+    /// or keep the raw format:
+    ///   `• Vince: https://robo.app/hit/IbATsszG`
     private func parseHitResults(content: String, messageId: UUID) {
-        let lines = content.components(separatedBy: "\n")
-        var results: [(name: String, url: String)] = []
+        logger.debug("Parsing HIT results from content: \(content.prefix(500))")
 
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("•"),
-               let colonRange = trimmed.range(of: ": https://robo.app/hit/") {
-                let name = String(trimmed[trimmed.index(trimmed.startIndex, offsetBy: 2)..<colonRange.lowerBound])
-                let url = String(trimmed[colonRange.lowerBound..<trimmed.endIndex]).dropFirst(2)
-                results.append((name: name.trimmingCharacters(in: .whitespaces), url: String(url)))
+        var results: [(name: String, url: String)] = []
+        let nsContent = content as NSString
+
+        // Strategy 1: Markdown link format — "• Name: [Link](https://robo.app/hit/XXX)"
+        let mdPattern = "(?:•|\\-|\\*)\\s*([^:\\n]+):\\s*\\[[^\\]]*\\]\\((https://robo\\.app/hit/[a-zA-Z0-9\\-]+)\\)"
+        if let regex = try? NSRegularExpression(pattern: mdPattern, options: []) {
+            let matches = regex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+            for match in matches where match.numberOfRanges == 3 {
+                let nameRange = match.range(at: 1)
+                let urlRange = match.range(at: 2)
+                if nameRange.location != NSNotFound, urlRange.location != NSNotFound {
+                    let name = nsContent.substring(with: nameRange).trimmingCharacters(in: .whitespaces)
+                    let url = nsContent.substring(with: urlRange)
+                    results.append((name: name, url: url))
+                    logger.debug("Matched markdown link: name=\(name), url=\(url)")
+                }
             }
         }
 
+        // Strategy 2: Plain URL format — "• Name: https://robo.app/hit/XXX"
+        if results.isEmpty {
+            let plainPattern = "(?:•|\\-|\\*|\\d+\\.)\\s*([^:\\n]+):\\s*(https://robo\\.app/hit/[a-zA-Z0-9\\-]+)"
+            if let regex = try? NSRegularExpression(pattern: plainPattern, options: []) {
+                let matches = regex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+                for match in matches where match.numberOfRanges == 3 {
+                    let nameRange = match.range(at: 1)
+                    let urlRange = match.range(at: 2)
+                    if nameRange.location != NSNotFound, urlRange.location != NSNotFound {
+                        let name = nsContent.substring(with: nameRange).trimmingCharacters(in: .whitespaces)
+                        let url = nsContent.substring(with: urlRange)
+                        results.append((name: name, url: url))
+                        logger.debug("Matched plain URL: name=\(name), url=\(url)")
+                    }
+                }
+            }
+        }
+
+        // Strategy 3: Last resort — find any robo.app/hit URLs anywhere
+        if results.isEmpty {
+            let urlPattern = "https://robo\\.app/hit/[a-zA-Z0-9\\-]+"
+            if let urlRegex = try? NSRegularExpression(pattern: urlPattern, options: []) {
+                let urlMatches = urlRegex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+                for (i, urlMatch) in urlMatches.enumerated() {
+                    let url = nsContent.substring(with: urlMatch.range)
+                    results.append((name: "Person \(i + 1)", url: url))
+                    logger.debug("Fallback extraction: url=\(url)")
+                }
+            }
+        }
+
+        logger.debug("Found \(results.count) HIT results")
         if !results.isEmpty {
             hitResults[messageId] = results
         }
     }
 
-    static func buildSystemPrompt() -> String {
+    static func buildSystemPrompt(includingTools: Bool = true) -> String {
         let sensorSkills = FeatureRegistry.activeSkills
             .filter { $0.category == .sensor || $0.category == .workflow }
             .map { "- \($0.name): \($0.tagline)" }
@@ -310,7 +384,7 @@ class ChatService {
             .map { $0.name }
             .joined(separator: ", ")
 
-        return """
+        var prompt = """
         You are \(AppCopy.App.name)'s assistant. \(AppCopy.App.name) is an iOS app that turns phone sensors \
         (LiDAR, camera, barcode scanner) into APIs for AI agents.
 
@@ -318,25 +392,35 @@ class ChatService {
         \(sensorSkills)
 
         Coming soon: \(comingSoon)
+        """
 
-        You have these tools — use them when the user asks:
-        - scan_room: Launches LiDAR to scan and measure a room. Use when user says "scan my room", \
-        "measure the kitchen", "map the bedroom", etc.
-        - scan_barcode: Launches the barcode scanner. Use when user says "scan a barcode", \
-        "look up this product", "scan a QR code", etc.
-        - take_photo: Launches the camera to capture photos. Use when user says "take a photo", \
-        "photograph my desk", "capture the label", etc.
-        - create_availability_poll: Creates a group availability poll with shareable links.
+        if includingTools {
+            prompt += """
 
-        When the user asks to scan, photograph, or capture something, call the appropriate tool \
-        immediately. Do NOT tell them to go to the Capture tab — you can do it directly.
+            You have these tools — use them when the user asks:
+            - scan_room: Launches LiDAR to scan and measure a room. Use when user says "scan my room", \
+            "measure the kitchen", "map the bedroom", etc.
+            - scan_barcode: Launches the barcode scanner. Use when user says "scan a barcode", \
+            "look up this product", "scan a QR code", etc.
+            - take_photo: Launches the camera to capture photos. Use when user says "take a photo", \
+            "photograph my desk", "capture the label", etc.
+            - create_availability_poll: Creates a group availability poll with shareable links.
 
-        After a room scan, you'll receive dimensions and details. Use this to answer follow-up \
-        questions like "could a queen bed fit?" or "how much paint do I need?".
+            When the user asks to scan, photograph, or capture something, call the appropriate tool \
+            immediately. Do NOT tell them to go to the Capture tab — you can do it directly.
+
+            After a room scan, you'll receive dimensions and details. Use this to answer follow-up \
+            questions like "could a queen bed fit?" or "how much paint do I need?".
+            """
+        }
+
+        prompt += """
 
         IMPORTANT: Keep responses short — 1-2 sentences. Be conversational and friendly. \
-        When you have enough info, call the tool immediately without asking for confirmation.
+        Never output raw tool calls or code blocks. Just respond naturally.
         """
+
+        return prompt
     }
 }
 

@@ -86,4 +86,5 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 extension Notification.Name {
     static let hitCompletedNotification = Notification.Name("hitCompletedNotification")
     static let hitResponseNotification = Notification.Name("hitResponseNotification")
+    static let chatPrefillNotification = Notification.Name("chatPrefillNotification")
 }

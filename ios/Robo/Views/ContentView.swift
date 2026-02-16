@@ -10,7 +10,15 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            CaptureHomeView(switchToMyData: { selectedTab = 1 })
+            CaptureHomeView(
+                switchToMyData: { selectedTab = 1 },
+                switchToChat: { prefill in
+                    selectedTab = 3
+                    if let prefill {
+                        NotificationCenter.default.post(name: .chatPrefillNotification, object: nil, userInfo: ["message": prefill])
+                    }
+                }
+            )
                 .tabItem {
                     Label(AppStrings.Tabs.capture, systemImage: "sensor.fill")
                 }

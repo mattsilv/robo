@@ -7,6 +7,14 @@ private let logger = Logger(subsystem: "com.silv.Robo", category: "ChatService")
 import FoundationModels
 
 @available(iOS 26, *)
+struct HitParticipant: Identifiable {
+    let id: String       // HIT ID extracted from URL
+    let name: String
+    let url: String
+    var hasResponded: Bool = false
+}
+
+@available(iOS 26, *)
 @MainActor
 @Observable
 class ChatService {
@@ -14,8 +22,8 @@ class ChatService {
     var isStreaming = false
     private(set) var currentStreamingText = ""
 
-    /// HIT results from tool calls — maps message ID to array of (name, url)
-    var hitResults: [UUID: [(name: String, url: String)]] = [:]
+    /// HIT results from tool calls — maps message ID to array of participants
+    var hitResults: [UUID: [HitParticipant]] = [:]
 
     private var session: LanguageModelSession?
     private var streamTask: Task<Void, Never>?
@@ -199,16 +207,20 @@ class ChatService {
                 if let hitData = jsonStr.data(using: .utf8),
                    let hitJson = try? JSONSerialization.jsonObject(with: hitData) as? [String: Any],
                    let hitResultsArray = hitJson["hit_results"] as? [[String: Any]] {
-                    var results: [(name: String, url: String)] = []
+                    var participants: [HitParticipant] = []
                     for hit in hitResultsArray {
                         if let name = hit["name"] as? String,
                            let url = hit["url"] as? String {
-                            results.append((name: name, url: url))
+                            participants.append(HitParticipant(
+                                id: Self.extractHitId(from: url),
+                                name: name,
+                                url: url
+                            ))
                         }
                     }
-                    if !results.isEmpty {
-                        hitResults[targetId] = results
-                        logger.debug("Parsed \(results.count) structured HIT results")
+                    if !participants.isEmpty {
+                        hitResults[targetId] = participants
+                        logger.debug("Parsed \(participants.count) structured HIT results")
                     }
                 }
             }
@@ -310,6 +322,24 @@ class ChatService {
         session?.prewarm()
     }
 
+    func pollHitStatuses(for messageId: UUID) {
+        guard let participants = hitResults[messageId], let apiService else { return }
+        Task {
+            var updated = participants
+            for (i, participant) in participants.enumerated() {
+                do {
+                    let responses = try await apiService.fetchHitResponses(hitId: participant.id)
+                    if !responses.isEmpty {
+                        updated[i].hasResponded = true
+                    }
+                } catch {
+                    logger.debug("Failed to poll HIT \(participant.id): \(error.localizedDescription)")
+                }
+            }
+            hitResults[messageId] = updated
+        }
+    }
+
     // MARK: - Private Helpers
 
     /// Strip ugly markdown link lines from HIT responses so the bubble is clean.
@@ -345,6 +375,14 @@ class ChatService {
     ///   `• Vince: [Link](https://robo.app/hit/IbATsszG)`
     /// or keep the raw format:
     ///   `• Vince: https://robo.app/hit/IbATsszG`
+    private static func extractHitId(from url: String) -> String {
+        // Extract ID from URL like "https://robo.app/hit/IbATsszG"
+        if let lastComponent = URL(string: url)?.lastPathComponent, !lastComponent.isEmpty {
+            return lastComponent
+        }
+        return url
+    }
+
     private func parseHitResults(content: String, messageId: UUID) {
         logger.debug("Parsing HIT results from content: \(content.prefix(500))")
 
@@ -400,7 +438,13 @@ class ChatService {
 
         logger.debug("Found \(results.count) HIT results")
         if !results.isEmpty {
-            hitResults[messageId] = results
+            hitResults[messageId] = results.map { result in
+                HitParticipant(
+                    id: Self.extractHitId(from: result.url),
+                    name: result.name,
+                    url: result.url
+                )
+            }
         }
     }
 

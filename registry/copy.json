@@ -3,7 +3,8 @@
     "name": "Robo",
     "tagline": "The Context Collector",
     "og_title": "Robo — Phone Sensors as APIs for AI Agents",
-    "og_description": "Open-source iOS app that turns your phone's sensors into APIs any AI agent can use. LiDAR, camera, barcodes — no iOS development required."
+    "og_description": "Open-source iOS app that turns your phone's sensors into APIs any AI agent can use. LiDAR, camera, barcodes — no iOS development required.",
+    "description": "Robo collects what they see. Robo helps you share them with your favorite AI agents."
   },
   "hero": {
     "headline": "Your phone's sensors,<br>any AI agent.",

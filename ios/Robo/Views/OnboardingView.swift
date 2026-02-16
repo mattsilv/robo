@@ -64,7 +64,7 @@ struct OnboardingView: View {
                         .padding(.bottom, 24)
 
                     // Description
-                    Text("Your phone has incredible sensors. Robo collects what they see — for you, for your team, or for your AI agent.")
+                    Text(AppCopy.App.description)
                         .font(.body)
                         .foregroundStyle(.white.opacity(0.7))
                         .multilineTextAlignment(.center)
@@ -74,7 +74,7 @@ struct OnboardingView: View {
 
                     // Feature pills — driven by FeatureRegistry
                     VStack(spacing: 12) {
-                        ForEach(FeatureRegistry.activeSkills) { skill in
+                        ForEach(FeatureRegistry.featuredSkills) { skill in
                             featureRow(
                                 icon: Self.iconForSkill(skill.id),
                                 text: "\(skill.name) — \(skill.tagline)",

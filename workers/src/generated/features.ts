@@ -25,9 +25,10 @@ export interface Agent {
 export const skills: Skill[] = [
   {
     "id": "lidar",
-    "name": "LiDAR Floor Plans",
-    "tagline": "3D room scans with Apple RoomPlan",
+    "name": "Share Floor Plans with Claude",
+    "tagline": "LiDAR room scans you can share with any AI",
     "status": "active",
+    "featured": true,
     "skillType": "lidar",
     "category": "sensor"
   },
@@ -36,6 +37,7 @@ export const skills: Skill[] = [
     "name": "Barcode Scanning",
     "tagline": "Instant barcode and QR code capture",
     "status": "active",
+    "featured": false,
     "skillType": "barcode",
     "category": "sensor"
   },
@@ -44,6 +46,7 @@ export const skills: Skill[] = [
     "name": "Guided Photos",
     "tagline": "Checklist-driven photo capture for agents",
     "status": "active",
+    "featured": true,
     "skillType": "camera",
     "category": "sensor"
   },
@@ -52,6 +55,7 @@ export const skills: Skill[] = [
     "name": "Product Scanner",
     "tagline": "Barcode + photos for product analysis",
     "status": "active",
+    "featured": true,
     "skillType": "productScan",
     "category": "workflow"
   },
@@ -60,6 +64,7 @@ export const skills: Skill[] = [
     "name": "BLE Beacons",
     "tagline": "Bluetooth Low Energy beacon detection",
     "status": "coming_soon",
+    "featured": false,
     "skillType": "beacon",
     "category": "sensor"
   },
@@ -68,6 +73,7 @@ export const skills: Skill[] = [
     "name": "HIT Links",
     "tagline": "Get data from anyone via shareable links",
     "status": "active",
+    "featured": false,
     "skillType": null,
     "category": "platform"
   },
@@ -76,6 +82,7 @@ export const skills: Skill[] = [
     "name": "MCP Bridge",
     "tagline": "Connect phone sensors to Claude Code",
     "status": "active",
+    "featured": false,
     "skillType": null,
     "category": "platform"
   },
@@ -84,6 +91,7 @@ export const skills: Skill[] = [
     "name": "Share Screenshot to Claude",
     "tagline": "iOS Share Extension for instant context",
     "status": "active",
+    "featured": false,
     "skillType": null,
     "category": "platform"
   },
@@ -92,6 +100,7 @@ export const skills: Skill[] = [
     "name": "Motion Capture",
     "tagline": "Accelerometer and gyroscope data",
     "status": "coming_soon",
+    "featured": false,
     "skillType": "motion",
     "category": "sensor"
   },
@@ -100,6 +109,7 @@ export const skills: Skill[] = [
     "name": "HealthKit Data",
     "tagline": "Health and fitness metrics",
     "status": "coming_soon",
+    "featured": false,
     "skillType": "health",
     "category": "sensor"
   }
@@ -141,7 +151,8 @@ export const copy = {
     "name": "Robo",
     "tagline": "The Context Collector",
     "og_title": "Robo — Phone Sensors as APIs for AI Agents",
-    "og_description": "Open-source iOS app that turns your phone's sensors into APIs any AI agent can use. LiDAR, camera, barcodes — no iOS development required."
+    "og_description": "Open-source iOS app that turns your phone's sensors into APIs any AI agent can use. LiDAR, camera, barcodes — no iOS development required.",
+    "description": "Robo collects what they see. Robo helps you share them with your favorite AI agents."
   },
   "hero": {
     "headline": "Your phone's sensors,<br>any AI agent.",

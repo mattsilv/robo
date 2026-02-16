@@ -32,6 +32,7 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
       model,
       messages: parsed.data.messages,
       stream: true,
+      reasoning: { effort: 'low' },
     }),
   });
 

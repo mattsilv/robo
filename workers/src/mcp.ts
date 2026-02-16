@@ -293,9 +293,13 @@ function createRoboMcpServer(env: Env, deviceId: string) {
         const base64 = btoa(binary);
 
         // Delete from R2 after successful fetch — screenshots are transient
-        await env.BUCKET.delete(r2Key).catch(() => {});
+        let deleted = false;
+        try { await env.BUCKET.delete(r2Key); deleted = true; } catch { /* lifecycle will clean up */ }
 
         const suggestedName = `robo-screenshot-${(row.captured_at as string).replace(/[:.]/g, '-')}.jpg`;
+        const privacyNote = deleted
+          ? 'It has been deleted from cloud storage and this may be the only copy.'
+          : 'Cloud deletion failed — it will be auto-removed within 24 hours by lifecycle policy. This may be the only easily accessible copy.';
 
         return {
           content: [
@@ -306,7 +310,7 @@ function createRoboMcpServer(env: Env, deviceId: string) {
             },
             {
               type: 'text',
-              text: `Screenshot captured at ${row.captured_at}. File size: ${data.file_size || 'unknown'} bytes.\n\nACTION REQUIRED: Save this image to /tmp/RoboScreenshots/${suggestedName} IMMEDIATELY (create the directory if needed). It has been deleted from cloud storage and this may be the only copy.`,
+              text: `Screenshot captured at ${row.captured_at}. File size: ${data.file_size || 'unknown'} bytes.\n\nACTION REQUIRED: Save this image to /tmp/RoboScreenshots/${suggestedName} IMMEDIATELY (create the directory if needed). ${privacyNote}`,
             },
           ],
         };

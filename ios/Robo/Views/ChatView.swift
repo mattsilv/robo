@@ -12,6 +12,7 @@ struct ChatView: View {
     @State private var inputText = ""
     @State private var speechService = SpeechRecognitionService()
     @State private var copiedHitId: String?
+    @State private var safariUrl: URL?
     @State private var roomCountBeforeCapture = 0
     @State private var barcodeCountBeforeCapture = 0
     @State private var photoCapturedCount = 0
@@ -67,6 +68,28 @@ struct ChatView: View {
             }
             .fullScreenCover(item: captureBinding) { capture in
                 captureView(for: capture)
+            }
+            .sheet(isPresented: Binding(
+                get: { safariUrl != nil },
+                set: { if !$0 { safariUrl = nil } }
+            )) {
+                // Poll HIT statuses when Safari dismisses
+                for messageId in chatService.hitResults.keys {
+                    chatService.pollHitStatuses(for: messageId)
+                }
+            } content: {
+                if let url = safariUrl {
+                    SafariView(url: url)
+                        .ignoresSafeArea()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .chatPrefillNotification)) { notification in
+                if let message = notification.userInfo?["message"] as? String {
+                    // Small delay to let the tab switch complete
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        sendMessage(message)
+                    }
+                }
             }
             .onChange(of: captureCoordinator.pendingCapture != nil) { _, isPresenting in
                 if isPresenting { speechService.stopRecording() }
@@ -231,8 +254,8 @@ struct ChatView: View {
                     )
 
                     // Show copy-link buttons for HIT results
-                    if let results = chatService.hitResults[message.id] {
-                        HitResultButtons(results: results, copiedHitId: $copiedHitId)
+                    if let participants = chatService.hitResults[message.id] {
+                        HitResultButtons(participants: participants, copiedHitId: $copiedHitId, safariUrl: $safariUrl)
                     }
                 }
                 .id(message.id)
@@ -425,48 +448,72 @@ private struct TypingCursor: View {
 
 @available(iOS 26, *)
 struct HitResultButtons: View {
-    let results: [(name: String, url: String)]
+    let participants: [HitParticipant]
     @Binding var copiedHitId: String?
+    @Binding var safariUrl: URL?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ForEach(results, id: \.url) { result in
-                Button {
-                    UIPasteboard.general.string = result.url
-                    copiedHitId = result.url
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            ForEach(participants) { participant in
+                HStack(spacing: 12) {
+                    // Status icon
+                    Image(systemName: participant.hasResponded ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(participant.hasResponded ? .green : .secondary)
+                        .font(.title3)
 
-                    // Reset copied state after 2s
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        if copiedHitId == result.url {
-                            copiedHitId = nil
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: copiedHitId == result.url ? "checkmark.circle.fill" : "link")
-                            .foregroundStyle(copiedHitId == result.url ? .green : .blue)
-                        Text(result.name)
-                            .fontWeight(.medium)
-                        Spacer()
-                        Text(copiedHitId == result.url ? "Copied!" : "Copy Link")
+                    // Name + status
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(participant.name)
+                            .fontWeight(.semibold)
+                            .font(.subheadline)
+                        Text(participant.hasResponded ? "Responded" : "Pending")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                    Spacer()
+
+                    // Copy button
+                    Button {
+                        UIPasteboard.general.string = participant.url
+                        copiedHitId = participant.url
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            if copiedHitId == participant.url {
+                                copiedHitId = nil
+                            }
+                        }
+                    } label: {
+                        Image(systemName: copiedHitId == participant.url ? "checkmark" : "doc.on.doc")
+                            .font(.title3)
+                            .foregroundStyle(copiedHitId == participant.url ? .green : .blue)
+                    }
+
+                    // Open in Safari button
+                    Button {
+                        if let url = URL(string: participant.url) {
+                            safariUrl = url
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.right.square")
+                            .font(.title3)
+                            .foregroundStyle(.blue)
+                    }
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color(.systemGray6))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
                 .contextMenu {
                     Button {
-                        UIPasteboard.general.string = result.url
+                        UIPasteboard.general.string = participant.url
                     } label: {
                         Label("Copy Link", systemImage: "doc.on.doc")
                     }
-                    ShareLink(item: URL(string: result.url)!) {
-                        Label("Share Link", systemImage: "square.and.arrow.up")
+                    if let url = URL(string: participant.url) {
+                        ShareLink(item: url) {
+                            Label("Share Link", systemImage: "square.and.arrow.up")
+                        }
                     }
                 }
             }

@@ -29,10 +29,17 @@ struct CreateAvailabilityHITTool: Tool {
     let apiService: APIService
 
     func call(arguments: Arguments) async throws -> String {
-        let names = arguments.participants
+        var names = arguments.participants
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+
+        // Include the creator as a participant if they have a name set
+        if let creatorName = UserDefaults.standard.string(forKey: "firstName"),
+           !creatorName.isEmpty,
+           !names.contains(where: { $0.localizedCaseInsensitiveCompare(creatorName) == .orderedSame }) {
+            names.insert(creatorName, at: 0)
+        }
 
         let dates = arguments.dateOptions
             .split(separator: ",")

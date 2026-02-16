@@ -3,8 +3,9 @@ import SwiftData
 import AudioToolbox
 
 struct CaptureHomeView: View {
-    @AppStorage("userName") private var userName = ""
+    @AppStorage("firstName") private var userName = ""
     var switchToMyData: (() -> Void)?
+    var switchToChat: ((String?) -> Void)?
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \RoomScanRecord.capturedAt, order: .reverse) private var roomScans: [RoomScanRecord]
     @Query(sort: \ScanRecord.capturedAt, order: .reverse) private var scans: [ScanRecord]
@@ -125,11 +126,44 @@ struct CaptureHomeView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
 
-            // Interior Designer agent banner (if pending)
+            // HIT link shortcut
+            Button {
+                switchToChat?("Plan a weekend with friends")
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "link.badge.plus")
+                        .font(.title3)
+                        .foregroundStyle(.indigo)
+                        .frame(width: 36, height: 36)
+                        .background(.indigo.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Plan a Weekend Trip with Friends")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text("Use HIT links to send a micro-survey to your group")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(12)
+                .background(.secondary.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+
+            // Agent request banners (if pending)
             let pendingAgents = agents.filter { $0.name != "Claude Code" && $0.pendingRequest != nil && $0.status != .syncing }
             if !pendingAgents.isEmpty {
                 HStack {
-                    Text("Agent Requests")
+                    Text("Shortcuts")
                         .font(.headline)
                     Spacer()
                     Text("\(pendingAgents.count)")

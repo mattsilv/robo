@@ -69,12 +69,13 @@ Agents are defined in `ios/Robo/Services/MockAgentService.swift` and skills in `
 
 **Multiple AI agents work on this repo simultaneously. This is mandatory, not optional.**
 
-1. **ALWAYS use a git worktree** for ALL work: `git worktree add /tmp/robo-<feature> -b feat/<feature> main`
-2. **NEVER edit files in the main worktree** (`/Users/m/gh/hackathon-cc-2026/robo/`) — another agent may be using it
+1. **Use a git worktree for multi-file features:** `git worktree add /tmp/robo-<feature> -b feat/<feature> main`
+2. **Minor patches (1-2 files) may be done on main** — but MUST be committed to a feature branch and pushed as a PR (never push directly to main)
 3. **NEVER commit or push directly to main** — always create a PR from your feature branch
 4. **NEVER deploy the backend (`wrangler deploy`) from a feature branch** — only deploy from `main` after merge
 5. **Build in your worktree**: `cd /tmp/robo-<feature>/ios && xcodegen generate && xcodebuild ...`
 6. **Clean up worktrees** when done: `git worktree remove /tmp/robo-<feature>`
+7. **NEVER leave unmerged work on a worktree** — always push the branch, create a PR, and notify the user. If a worktree branch exists that hasn't been merged, alert the user before moving on.
 
 ## Design Rule
 **ALWAYS invoke the `frontend-design` skill when doing any frontend/UI design work.** This includes HIT pages, OG images, landing pages, iOS SwiftUI views, and any visual component.

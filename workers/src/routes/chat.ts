@@ -234,7 +234,7 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
     if (allHitResults.length > 0) {
       followUpMessages.push({
         role: 'system' as const,
-        content: 'A single shared poll link was created. All participants use the same link and select their name when they open it. Do NOT include any URLs in your response — the app displays them as a card.',
+        content: 'A single shared poll link was created. Do NOT include any URLs in your response — the app displays them as a tappable card with a copy button. In your response, tell the user to copy the link and send it to their group chat or text thread with their friends. Keep it casual and brief, like "Copy the link below and send it to your group chat — everyone picks their name and marks their availability."',
       });
     }
 

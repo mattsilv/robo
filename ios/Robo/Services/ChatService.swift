@@ -112,12 +112,18 @@ class ChatService {
 
     // MARK: - OpenRouter (Cloud) Path
 
+<<<<<<< HEAD
     private func sendViaOpenRouter(text: String, targetId: UUID) async {
         guard let apiService else {
             updateMessage(id: targetId, content: "Chat not configured. Please restart the app.")
             finishStream(targetId: targetId)
             return
         }
+=======
+                    let content = response.content
+                    logger.debug("Chat response content: \(content)")
+                    self.updateMessage(id: targetId, content: content)
+>>>>>>> 40c716c (fix(chat): improve HIT link parsing with robust regex + fallback)
 
         // Build messages array with system prompt + conversation history
         var openRouterMessages: [[String: String]] = [
@@ -282,25 +288,74 @@ class ChatService {
 
     /// Parse HIT URLs from tool output embedded in assistant response
     private func parseHitResults(content: String, messageId: UUID) {
-        let lines = content.components(separatedBy: "\n")
+        logger.debug("Parsing HIT results from content: \(content.prefix(500))")
+
         var results: [(name: String, url: String)] = []
 
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("•"),
-               let colonRange = trimmed.range(of: ": https://robo.app/hit/") {
-                let name = String(trimmed[trimmed.index(trimmed.startIndex, offsetBy: 2)..<colonRange.lowerBound])
-                let url = String(trimmed[colonRange.lowerBound..<trimmed.endIndex]).dropFirst(2)
-                results.append((name: name.trimmingCharacters(in: .whitespaces), url: String(url)))
+        // Strategy 1: Try regex to find all robo.app/hit URLs with context
+        let pattern = "(?:•|\\-|\\*|\\d+\\.)\\s*([^:\\n]+):\\s*(https://robo\\.app/hit/[a-zA-Z0-9\\-]+)"
+        if let regex = try? NSRegularExpression(pattern: pattern, options: []) {
+            let nsContent = content as NSString
+            let matches = regex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+
+            for match in matches {
+                if match.numberOfRanges == 3 {
+                    let nameRange = match.range(at: 1)
+                    let urlRange = match.range(at: 2)
+
+                    if nameRange.location != NSNotFound, urlRange.location != NSNotFound {
+                        let name = nsContent.substring(with: nameRange).trimmingCharacters(in: .whitespaces)
+                        let url = nsContent.substring(with: urlRange)
+                        results.append((name: name, url: url))
+                        logger.debug("Matched regex pattern: name=\(name), url=\(url)")
+                    }
+                }
             }
         }
 
+        // Strategy 2: Fallback - find any robo.app/hit URLs and try to extract names from context
+        if results.isEmpty {
+            logger.debug("Strategy 1 failed, trying fallback extraction")
+
+            // Find all URLs
+            let urlPattern = "https://robo\\.app/hit/[a-zA-Z0-9\\-]+"
+            if let urlRegex = try? NSRegularExpression(pattern: urlPattern, options: []) {
+                let nsContent = content as NSString
+                let urlMatches = urlRegex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+
+                for urlMatch in urlMatches {
+                    let url = nsContent.substring(with: urlMatch.range)
+
+                    // Try to find a name near this URL (look backwards up to 50 chars)
+                    let searchStart = max(0, urlMatch.range.location - 50)
+                    let searchRange = NSRange(location: searchStart, length: urlMatch.range.location - searchStart)
+                    let context = nsContent.substring(with: searchRange)
+
+                    // Look for patterns like "Name:", "Name -", or just "Name"
+                    let lines = context.components(separatedBy: CharacterSet.newlines)
+                    if let lastLine = lines.last {
+                        let cleaned = lastLine
+                            .replacingOccurrences(of: "•", with: "")
+                            .replacingOccurrences(of: "-", with: "")
+                            .replacingOccurrences(of: "*", with: "")
+                            .replacingOccurrences(of: ":", with: "")
+                            .trimmingCharacters(in: .whitespaces)
+
+                        let name = cleaned.isEmpty ? "Link" : cleaned
+                        results.append((name: name, url: url))
+                        logger.debug("Fallback extraction: name=\(name), url=\(url)")
+                    }
+                }
+            }
+        }
+
+        logger.debug("Found \(results.count) HIT results")
         if !results.isEmpty {
             hitResults[messageId] = results
         }
     }
 
-    static func buildSystemPrompt() -> String {
+    static func buildSystemPrompt(includingTools: Bool = true) -> String {
         let sensorSkills = FeatureRegistry.activeSkills
             .filter { $0.category == .sensor || $0.category == .workflow }
             .map { "- \($0.name): \($0.tagline)" }
@@ -310,7 +365,7 @@ class ChatService {
             .map { $0.name }
             .joined(separator: ", ")
 
-        return """
+        var prompt = """
         You are \(AppCopy.App.name)'s assistant. \(AppCopy.App.name) is an iOS app that turns phone sensors \
         (LiDAR, camera, barcode scanner) into APIs for AI agents.
 
@@ -318,25 +373,35 @@ class ChatService {
         \(sensorSkills)
 
         Coming soon: \(comingSoon)
+        """
 
-        You have these tools — use them when the user asks:
-        - scan_room: Launches LiDAR to scan and measure a room. Use when user says "scan my room", \
-        "measure the kitchen", "map the bedroom", etc.
-        - scan_barcode: Launches the barcode scanner. Use when user says "scan a barcode", \
-        "look up this product", "scan a QR code", etc.
-        - take_photo: Launches the camera to capture photos. Use when user says "take a photo", \
-        "photograph my desk", "capture the label", etc.
-        - create_availability_poll: Creates a group availability poll with shareable links.
+        if includingTools {
+            prompt += """
 
-        When the user asks to scan, photograph, or capture something, call the appropriate tool \
-        immediately. Do NOT tell them to go to the Capture tab — you can do it directly.
+            You have these tools — use them when the user asks:
+            - scan_room: Launches LiDAR to scan and measure a room. Use when user says "scan my room", \
+            "measure the kitchen", "map the bedroom", etc.
+            - scan_barcode: Launches the barcode scanner. Use when user says "scan a barcode", \
+            "look up this product", "scan a QR code", etc.
+            - take_photo: Launches the camera to capture photos. Use when user says "take a photo", \
+            "photograph my desk", "capture the label", etc.
+            - create_availability_poll: Creates a group availability poll with shareable links.
 
-        After a room scan, you'll receive dimensions and details. Use this to answer follow-up \
-        questions like "could a queen bed fit?" or "how much paint do I need?".
+            When the user asks to scan, photograph, or capture something, call the appropriate tool \
+            immediately. Do NOT tell them to go to the Capture tab — you can do it directly.
+
+            After a room scan, you'll receive dimensions and details. Use this to answer follow-up \
+            questions like "could a queen bed fit?" or "how much paint do I need?".
+            """
+        }
+
+        prompt += """
 
         IMPORTANT: Keep responses short — 1-2 sentences. Be conversational and friendly. \
-        When you have enough info, call the tool immediately without asking for confirmation.
+        Never output raw tool calls or code blocks. Just respond naturally.
         """
+
+        return prompt
     }
 }
 

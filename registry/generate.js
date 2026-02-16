@@ -43,11 +43,13 @@ function generateSwift() {
 
   const skillEntries = skills.map(s => {
     const skillTypeStr = s.skillType ? `.${s.skillType}` : 'nil';
+    const featuredStr = s.featured ? 'true' : 'false';
     return `        Skill(
             id: "${swiftEscape(s.id)}",
             name: "${swiftEscape(s.name)}",
             tagline: "${swiftEscape(s.tagline)}",
             status: .${s.status},
+            featured: ${featuredStr},
             skillType: ${skillTypeStr},
             category: .${s.category}
         )`;
@@ -94,6 +96,7 @@ enum FeatureRegistry {
         let name: String
         let tagline: String
         let status: Status
+        let featured: Bool
         let skillType: AgentRequest.SkillType?
         let category: Category
     }
@@ -120,6 +123,9 @@ ${agentEntries}
 
     /// Active skills only.
     static var activeSkills: [Skill] { skills.filter { $0.status == .active } }
+
+    /// Featured skills — shown on onboarding and marketing surfaces.
+    static var featuredSkills: [Skill] { skills.filter { $0.featured } }
 
     /// Coming soon skills only.
     static var comingSoonSkills: [Skill] { skills.filter { $0.status == .coming_soon } }

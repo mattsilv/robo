@@ -28,6 +28,7 @@ export const skills: Skill[] = [
     "name": "LiDAR Floor Plans",
     "tagline": "3D room scans with Apple RoomPlan",
     "status": "active",
+    "featured": true,
     "skillType": "lidar",
     "category": "sensor"
   },
@@ -36,6 +37,7 @@ export const skills: Skill[] = [
     "name": "Barcode Scanning",
     "tagline": "Instant barcode and QR code capture",
     "status": "active",
+    "featured": true,
     "skillType": "barcode",
     "category": "sensor"
   },
@@ -68,6 +70,7 @@ export const skills: Skill[] = [
     "name": "HIT Links",
     "tagline": "Get data from anyone via shareable links",
     "status": "active",
+    "featured": true,
     "skillType": null,
     "category": "platform"
   },
@@ -84,6 +87,7 @@ export const skills: Skill[] = [
     "name": "Share Screenshot to Claude",
     "tagline": "iOS Share Extension for instant context",
     "status": "active",
+    "featured": true,
     "skillType": null,
     "category": "platform"
   },

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ROBO.APP — The Context Collector</title>
-  <meta name="description" content="Your phone has incredible sensors. Robo collects what they see — for you, for your team, or for your AI agent. Open source.">
+  <title>ROBO.APP — The Context Cultivator</title>
+  <meta name="description" content="Your phone has incredible sensors. Robo cultivates what they see — for you, for your team, or for your AI agent. Open source.">
 
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -15,18 +15,18 @@
   <!-- Open Graph / Facebook / Discord / iMessage -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://robo.app/">
-  <meta property="og:title" content="ROBO.APP — The Context Collector">
-  <meta property="og:description" content="Your phone has incredible sensors. Robo collects what they see — for you, for your team, or for your AI agent. Open source.">
+  <meta property="og:title" content="ROBO.APP — The Context Cultivator">
+  <meta property="og:description" content="Your phone has incredible sensors. Robo cultivates what they see — for you, for your team, or for your AI agent. Open source.">
   <meta property="og:image" content="https://robo.app/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="ROBO.APP — The Context Collector">
+  <meta property="og:image:alt" content="ROBO.APP — The Context Cultivator">
   <meta property="og:site_name" content="ROBO.APP">
 
   <!-- Twitter / X -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="ROBO.APP — The Context Collector">
-  <meta name="twitter:description" content="Your phone has incredible sensors. Robo collects what they see — for you, for your team, or for your AI agent. Open source.">
+  <meta name="twitter:title" content="ROBO.APP — The Context Cultivator">
+  <meta name="twitter:description" content="Your phone has incredible sensors. Robo cultivates what they see — for you, for your team, or for your AI agent. Open source.">
   <meta name="twitter:image" content="https://robo.app/og-image.png">
   <meta name="twitter:creator" content="@mattsilv">
 
@@ -656,6 +656,78 @@
       .mcp-tool { font-size: 0.6rem; padding: 0.25rem 0.55rem; }
     }
   
+    /* -- TestFlight CTA -- */
+    .testflight-cta {
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto 2.5rem;
+    }
+    .testflight-cta__inner {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(37,99,235,0.12) 0%, rgba(37,99,235,0.04) 100%);
+      border: 1px solid rgba(37,99,235,0.25);
+    }
+    .testflight-cta__icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: rgba(37,99,235,0.15);
+      color: #3b82f6;
+      flex-shrink: 0;
+    }
+    .testflight-cta__text {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      flex: 1;
+      min-width: 0;
+    }
+    .testflight-cta__title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: white;
+    }
+    .testflight-cta__sub {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.45);
+    }
+    .testflight-cta__btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.55rem 1.1rem;
+      border-radius: 10px;
+      background: #2563EB;
+      color: white;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background 0.15s ease;
+      flex-shrink: 0;
+    }
+    .testflight-cta__btn:hover {
+      background: #1d4ed8;
+    }
+
+    @media (max-width: 480px) {
+      .testflight-cta__inner {
+        flex-wrap: wrap;
+        justify-content: center;
+        text-align: center;
+        gap: 0.75rem;
+      }
+      .testflight-cta__text { align-items: center; }
+      .testflight-cta__btn { width: 100%; justify-content: center; }
+    }
+
     .badge-coming-soon {
       font-size: 0.55rem;
       background: rgba(255,255,255,0.12);
@@ -688,8 +760,8 @@
     <h1 class="wordmark fade-in">ROBO<span class="dot">.</span>APP</h1>
 
     <!-- Tagline -->
-    <p class="tagline fade-in">The Context Collector</p>
-    <p class="tagline-sub fade-in">Your phone has incredible sensors. Robo collects what they see &mdash; for you, for your team, or for your AI agent.</p>
+    <p class="tagline fade-in">The Context Cultivator</p>
+    <p class="tagline-sub fade-in">Your phone has incredible sensors. Robo cultivates what they see &mdash; for you, for your team, or for your AI agent.</p>
 
     <!-- Badge -->
     <div class="badge-wrap fade-in">
@@ -863,6 +935,23 @@
     <p class="description fade-in" style="margin-bottom: 2.5rem;">
       Open source. Privacy-first. Built entirely with <strong>Claude Code</strong>.
     </p>
+
+    <!-- TestFlight CTA -->
+    <div class="testflight-cta fade-in">
+      <div class="testflight-cta__inner">
+        <div class="testflight-cta__icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+        </div>
+        <div class="testflight-cta__text">
+          <span class="testflight-cta__title">Try Robo on TestFlight</span>
+          <span class="testflight-cta__sub">Free beta &mdash; 500 spots available</span>
+        </div>
+        <a href="https://testflight.apple.com/join/jCnqFbdT" class="testflight-cta__btn" target="_blank" rel="noopener">
+          Join Beta
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
+        </a>
+      </div>
+    </div>
 
     <!-- Links -->
     <div class="links fade-in">

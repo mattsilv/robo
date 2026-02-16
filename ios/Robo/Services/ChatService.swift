@@ -24,6 +24,10 @@ class ChatService {
     private var captureCoordinator: CaptureCoordinator?
     private var coindexService: CoindexService?
 
+    var currentProvider: AIProvider {
+        AIProvider(rawValue: UserDefaults.standard.string(forKey: "aiProvider") ?? AIProvider.openRouter.rawValue) ?? .openRouter
+    }
+
     init() {}
 
     func configure(apiService: APIService, captureCoordinator: CaptureCoordinator, coindexService: CoindexService? = nil) {
@@ -43,6 +47,15 @@ class ChatService {
         messages = []
         hitResults = [:]
 
+        // Only set up Apple session if using on-device provider
+        if currentProvider == .appleOnDevice {
+            setupAppleSession()
+        } else {
+            session = nil
+        }
+    }
+
+    private func setupAppleSession() {
         let prompt = Self.buildSystemPrompt()
 
         var tools: [any Tool] = []
@@ -53,10 +66,6 @@ class ChatService {
             tools.append(ScanRoomTool(captureCoordinator: captureCoordinator))
             tools.append(ScanBarcodeTool(captureCoordinator: captureCoordinator))
             tools.append(TakePhotoTool(captureCoordinator: captureCoordinator))
-            // Coindex upload disabled — see GitHub issue #167 for reactivation plan
-            // if let coindexService {
-            //     tools.append(UploadCoinsToCoindexTool(coindexService: coindexService, captureCoordinator: captureCoordinator))
-            // }
         }
 
         if tools.isEmpty {
@@ -90,55 +99,161 @@ class ChatService {
         isStreaming = true
         currentStreamingText = ""
 
-        streamTask = Task { [weak self] in
-            guard let self, let session else { return }
+        if currentProvider == .openRouter {
+            streamTask = Task { [weak self] in
+                await self?.sendViaOpenRouter(text: text, targetId: targetId)
+            }
+        } else {
+            streamTask = Task { [weak self] in
+                await self?.sendViaApple(text: text, targetId: targetId)
+            }
+        }
+    }
 
-            do {
-                if self.apiService != nil || self.captureCoordinator != nil {
-                    // Use non-streaming respond() for tool calling support
-                    let response = try await session.respond(to: text)
-                    guard !Task.isCancelled else { return }
-                    guard self.activeAssistantMessageId == targetId else { return }
+    // MARK: - OpenRouter (Cloud) Path
 
-                    let content = response.content
-                    self.updateMessage(id: targetId, content: content)
+    private func sendViaOpenRouter(text: String, targetId: UUID) async {
+        guard let apiService else {
+            updateMessage(id: targetId, content: "Chat not configured. Please restart the app.")
+            finishStream(targetId: targetId)
+            return
+        }
 
-                    // Check if the response contains HIT URLs (tool was called)
-                    self.parseHitResults(content: content, messageId: targetId)
-                } else {
-                    // Fallback: stream without tools
-                    let stream = session.streamResponse(to: text)
-                    for try await partial in stream {
-                        guard !Task.isCancelled else { break }
-                        guard self.activeAssistantMessageId == targetId else { break }
-                        let text = partial.content
-                        self.currentStreamingText = text
-                        self.updateMessage(id: targetId, content: text)
-                    }
-                }
-            } catch is CancellationError {
-                logger.debug("Stream cancelled")
-                // Show a friendly message instead of leaving an empty bubble
-                if self.activeAssistantMessageId == targetId {
-                    let existing = self.messageContent(for: targetId)
-                    if existing.isEmpty {
-                        self.updateMessage(id: targetId, content: "Capture cancelled. Let me know if you'd like to try again.")
-                    }
-                }
-            } catch {
-                logger.error("Chat error: \(error.localizedDescription)")
-                if self.activeAssistantMessageId == targetId {
-                    let existing = self.messageContent(for: targetId)
-                    if existing.isEmpty {
-                        self.updateMessage(id: targetId, content: "Sorry, I couldn't generate a response. Please try again.")
-                    }
+        // Build messages array with system prompt + conversation history
+        var openRouterMessages: [[String: String]] = [
+            ["role": "system", "content": Self.buildSystemPrompt()]
+        ]
+        for msg in messages.dropLast() { // dropLast to skip empty assistant placeholder
+            if msg.role == .user || msg.role == .assistant {
+                let role = msg.role == .user ? "user" : "assistant"
+                if !msg.content.isEmpty {
+                    openRouterMessages.append(["role": role, "content": msg.content])
                 }
             }
-            if self.activeAssistantMessageId == targetId {
-                self.isStreaming = false
-                self.currentStreamingText = ""
-                self.activeAssistantMessageId = nil
+        }
+
+        let baseURL = apiService.baseURL
+        guard let url = URL(string: "\(baseURL)/api/chat") else {
+            updateMessage(id: targetId, content: "Invalid API URL.")
+            finishStream(targetId: targetId)
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiService.deviceId, forHTTPHeaderField: "X-Device-ID")
+
+        let body: [String: Any] = ["messages": openRouterMessages]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        do {
+            let (bytes, response) = try await URLSession.shared.bytes(for: request)
+
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
+                var errorBody = ""
+                for try await line in bytes.lines {
+                    errorBody += line
+                    if errorBody.count > 500 { break }
+                }
+                logger.error("OpenRouter proxy error \(httpResponse.statusCode): \(errorBody)")
+                updateMessage(id: targetId, content: "Cloud model error (\(httpResponse.statusCode)). Try again or switch to Apple on-device in Settings.")
+                finishStream(targetId: targetId)
+                return
             }
+
+            var accumulated = ""
+            for try await line in bytes.lines {
+                guard !Task.isCancelled else { break }
+                guard activeAssistantMessageId == targetId else { break }
+
+                guard line.hasPrefix("data: ") else { continue }
+                let jsonStr = String(line.dropFirst(6))
+                if jsonStr == "[DONE]" { break }
+
+                // Parse SSE chunk: {"choices":[{"delta":{"content":"..."}}]}
+                if let data = jsonStr.data(using: .utf8),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let choices = json["choices"] as? [[String: Any]],
+                   let delta = choices.first?["delta"] as? [String: Any],
+                   let content = delta["content"] as? String {
+                    accumulated += content
+                    currentStreamingText = accumulated
+                    updateMessage(id: targetId, content: accumulated)
+                }
+            }
+        } catch is CancellationError {
+            logger.debug("OpenRouter stream cancelled")
+        } catch {
+            logger.error("OpenRouter stream error: \(error.localizedDescription)")
+            if messageContent(for: targetId).isEmpty {
+                updateMessage(id: targetId, content: "Connection error. Check your network and try again.")
+            }
+        }
+
+        finishStream(targetId: targetId)
+    }
+
+    // MARK: - Apple Foundation Models (On-Device) Path
+
+    private func sendViaApple(text: String, targetId: UUID) async {
+        guard let session else {
+            // Session might not exist if user switched providers mid-conversation
+            setupAppleSession()
+            guard self.session != nil else {
+                updateMessage(id: targetId, content: "Apple AI not available on this device.")
+                finishStream(targetId: targetId)
+                return
+            }
+            await sendViaApple(text: text, targetId: targetId)
+            return
+        }
+
+        do {
+            if apiService != nil || captureCoordinator != nil {
+                let response = try await session.respond(to: text)
+                guard !Task.isCancelled else { return }
+                guard activeAssistantMessageId == targetId else { return }
+
+                let content = response.content
+                updateMessage(id: targetId, content: content)
+                parseHitResults(content: content, messageId: targetId)
+            } else {
+                let stream = session.streamResponse(to: text)
+                for try await partial in stream {
+                    guard !Task.isCancelled else { break }
+                    guard activeAssistantMessageId == targetId else { break }
+                    let text = partial.content
+                    currentStreamingText = text
+                    updateMessage(id: targetId, content: text)
+                }
+            }
+        } catch is CancellationError {
+            logger.debug("Stream cancelled")
+            if activeAssistantMessageId == targetId {
+                let existing = messageContent(for: targetId)
+                if existing.isEmpty {
+                    updateMessage(id: targetId, content: "Capture cancelled. Let me know if you'd like to try again.")
+                }
+            }
+        } catch {
+            logger.error("Chat error: \(error.localizedDescription)")
+            if activeAssistantMessageId == targetId {
+                let existing = messageContent(for: targetId)
+                if existing.isEmpty {
+                    updateMessage(id: targetId, content: "Sorry, I couldn't generate a response. Please try again.")
+                }
+            }
+        }
+
+        finishStream(targetId: targetId)
+    }
+
+    private func finishStream(targetId: UUID) {
+        if activeAssistantMessageId == targetId {
+            isStreaming = false
+            currentStreamingText = ""
+            activeAssistantMessageId = nil
         }
     }
 
@@ -167,17 +282,15 @@ class ChatService {
 
     /// Parse HIT URLs from tool output embedded in assistant response
     private func parseHitResults(content: String, messageId: UUID) {
-        // Look for lines like "• Name: https://robo.app/hit/XXXX"
         let lines = content.components(separatedBy: "\n")
         var results: [(name: String, url: String)] = []
 
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            // Match "• Name: https://robo.app/hit/..."
             if trimmed.hasPrefix("•"),
                let colonRange = trimmed.range(of: ": https://robo.app/hit/") {
                 let name = String(trimmed[trimmed.index(trimmed.startIndex, offsetBy: 2)..<colonRange.lowerBound])
-                let url = String(trimmed[colonRange.lowerBound..<trimmed.endIndex]).dropFirst(2) // drop ": "
+                let url = String(trimmed[colonRange.lowerBound..<trimmed.endIndex]).dropFirst(2)
                 results.append((name: name.trimmingCharacters(in: .whitespaces), url: String(url)))
             }
         }
@@ -188,7 +301,6 @@ class ChatService {
     }
 
     static func buildSystemPrompt() -> String {
-        // Build tool descriptions from registry active skills
         let sensorSkills = FeatureRegistry.activeSkills
             .filter { $0.category == .sensor || $0.category == .workflow }
             .map { "- \($0.name): \($0.tagline)" }
@@ -199,7 +311,7 @@ class ChatService {
             .joined(separator: ", ")
 
         return """
-        You are \(AppCopy.App.name)'s on-device assistant. \(AppCopy.App.name) is an iOS app that turns phone sensors \
+        You are \(AppCopy.App.name)'s assistant. \(AppCopy.App.name) is an iOS app that turns phone sensors \
         (LiDAR, camera, barcode scanner) into APIs for AI agents.
 
         Available sensor capabilities:

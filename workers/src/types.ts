@@ -10,6 +10,8 @@ export type Env = {
   APNS_AUTH_KEY: string;
   APNS_KEY_ID: string;
   APNS_SANDBOX?: string;
+  OPENROUTER_API_KEY: string;
+  OPENROUTER_MODEL?: string;
 };
 
 // Nutrition lookup

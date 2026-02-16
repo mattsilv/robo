@@ -16,6 +16,7 @@ import { createHit, getHit, deleteHit, uploadHitPhoto, completeHit, listHits, li
 import { serveHitPage } from './routes/hitPage';
 import { serveOgImage } from './routes/ogImage';
 import { listAPIKeys, createAPIKey, deleteAPIKey } from './routes/apikeys';
+import { chatProxy } from './routes/chat';
 import { deviceAuth } from './middleware/deviceAuth';
 import { mcpTokenAuth } from './middleware/mcpTokenAuth';
 import { handleMcpRequest } from './mcp';
@@ -50,6 +51,9 @@ app.get('/api/nutrition/lookup', deviceAuth, lookupNutrition);
 
 // Opus integration
 app.post('/api/opus/analyze', analyzeWithOpus);
+
+// Chat proxy (OpenRouter) — auth required
+app.post('/api/chat', deviceAuth, chatProxy);
 
 // HIT owner routes (auth required)
 app.post('/api/hits', deviceAuth, createHit);

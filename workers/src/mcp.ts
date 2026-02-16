@@ -258,7 +258,7 @@ function createRoboMcpServer(env: Env, deviceId: string) {
 
   server.tool(
     'get_screenshot',
-    'Get the most recent screenshot shared from the iOS Share Extension. Returns the image as base64 so Claude can see it directly.',
+    'Get the most recent screenshot shared from the iOS Share Extension. Returns the image as base64 so Claude can see it directly. The image is deleted from cloud storage immediately after retrieval for privacy — save locally with the suggested filename if you need to retain it.',
     {},
     async () => {
       try {
@@ -278,7 +278,8 @@ function createRoboMcpServer(env: Env, deviceId: string) {
 
         const obj = await env.BUCKET.get(r2Key);
         if (!obj) {
-          return { content: [{ type: 'text', text: `Screenshot R2 object not found: ${r2Key}` }] };
+          // Screenshot may have expired (R2 lifecycle: 7-day TTL on screenshots/ prefix)
+          return { content: [{ type: 'text', text: `Screenshot expired or not found. Screenshots are automatically deleted after 24 hours for privacy (or immediately after first retrieval). Ask the user to share it again.` }] };
         }
 
         const arrayBuffer = await obj.arrayBuffer();
@@ -291,6 +292,11 @@ function createRoboMcpServer(env: Env, deviceId: string) {
         }
         const base64 = btoa(binary);
 
+        // Delete from R2 after successful fetch — screenshots are transient
+        await env.BUCKET.delete(r2Key).catch(() => {});
+
+        const suggestedName = `robo-screenshot-${(row.captured_at as string).replace(/[:.]/g, '-')}.jpg`;
+
         return {
           content: [
             {
@@ -300,7 +306,7 @@ function createRoboMcpServer(env: Env, deviceId: string) {
             },
             {
               type: 'text',
-              text: `Screenshot captured at ${row.captured_at}. File size: ${data.file_size || 'unknown'} bytes.`,
+              text: `Screenshot captured at ${row.captured_at}. File size: ${data.file_size || 'unknown'} bytes. Suggested filename: ${suggestedName}. (Image has been removed from cloud storage for privacy — save locally if needed.)`,
             },
           ],
         };

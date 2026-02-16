@@ -29,19 +29,18 @@ enum KeychainHelper {
     }
 
     static func load() -> DeviceConfig? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecAttrAccessGroup as String: accessGroup,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let data = result as? Data else { return nil }
-        return try? JSONDecoder().decode(DeviceConfig.self, from: data)
+        // Try with access group first (build 163+)
+        if let config = query(accessGroup: accessGroup) {
+            return config
+        }
+        // Fallback: try without access group (pre-163 keychain entries)
+        if let config = query(accessGroup: nil) {
+            // Migrate: re-save with access group so share extension can read it
+            save(config)
+            deleteLegacy()
+            return config
+        }
+        return nil
     }
 
     static func delete() {
@@ -52,5 +51,35 @@ enum KeychainHelper {
             kSecAttrAccessGroup as String: accessGroup,
         ]
         SecItemDelete(query as CFDictionary)
+    }
+
+    // MARK: - Private
+
+    private static func query(accessGroup: String?) -> DeviceConfig? {
+        var q: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        if let accessGroup {
+            q[kSecAttrAccessGroup as String] = accessGroup
+        }
+        var result: AnyObject?
+        guard SecItemCopyMatching(q as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return try? JSONDecoder().decode(DeviceConfig.self, from: data)
+    }
+
+    /// Delete legacy keychain entry (no access group) after migration.
+    private static func deleteLegacy() {
+        let q: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            // NO access group — targets legacy entry only
+        ]
+        SecItemDelete(q as CFDictionary)
     }
 }

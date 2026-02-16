@@ -144,7 +144,10 @@ class ChatService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiService.deviceId, forHTTPHeaderField: "X-Device-ID")
 
-        let body: [String: Any] = ["messages": openRouterMessages]
+        let body: [String: Any] = [
+            "messages": openRouterMessages,
+            "timezone": TimeZone.current.identifier
+        ]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         do {
@@ -384,9 +387,24 @@ class ChatService {
             .map { $0.name }
             .joined(separator: ", ")
 
+        // Build current date/time string for context
+        let now = Date()
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "EEEE, MMMM d, yyyy, h:mm a zzz"
+        dateFormatter.timeZone = TimeZone.current
+        let dateString = dateFormatter.string(from: now)
+        let tz = TimeZone.current
+        let tzName = tz.identifier
+        let tzAbbrev = tz.abbreviation() ?? "Unknown"
+        let tzOffset = tz.secondsFromGMT() / 3600
+        let tzOffsetStr = tzOffset >= 0 ? "UTC+\(tzOffset)" : "UTC\(tzOffset)"
+
         var prompt = """
         You are \(AppCopy.App.name)'s assistant. \(AppCopy.App.name) is an iOS app that turns phone sensors \
         (LiDAR, camera, barcode scanner) into APIs for AI agents.
+
+        Current date and time: \(dateString)
+        The user's local timezone is \(tzName) (\(tzAbbrev), \(tzOffsetStr)).
 
         Available sensor capabilities:
         \(sensorSkills)

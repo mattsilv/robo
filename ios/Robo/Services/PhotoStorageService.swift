@@ -83,6 +83,23 @@ enum PhotoStorageService {
         }
     }
 
+    // MARK: - List All Photos
+
+    static func listAll() -> [(filename: String, date: Date)] {
+        guard let dir = photosDirectory() else { return [] }
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(atPath: dir.path) else { return [] }
+        return files
+            .filter { $0.hasSuffix(".jpg") }
+            .compactMap { filename -> (String, Date)? in
+                let url = dir.appendingPathComponent(filename)
+                guard let attrs = try? fm.attributesOfItem(atPath: url.path),
+                      let date = attrs[.modificationDate] as? Date else { return nil }
+                return (filename, date)
+            }
+            .sorted { $0.1 > $1.1 }
+    }
+
     // MARK: - Directories
 
     private static func photosDirectory() -> URL? {

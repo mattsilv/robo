@@ -37,7 +37,7 @@ struct CaptureHomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    agentRequestsBanner
+                    shortcutsSection
 
                     captureGrid
                 }
@@ -100,13 +100,47 @@ struct CaptureHomeView: View {
         }
     }
 
-    // MARK: - Agent Requests Banner
+    // MARK: - Shortcuts Section
 
     @ViewBuilder
-    private var agentRequestsBanner: some View {
-        let pendingAgents = agents.filter { $0.pendingRequest != nil && $0.status != .syncing }
-        if !pendingAgents.isEmpty {
-            VStack(spacing: 12) {
+    private var shortcutsSection: some View {
+        VStack(spacing: 12) {
+            // Claude Code screenshot shortcut — always visible
+            NavigationLink {
+                ShareScreenshotGuideView()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "terminal")
+                        .font(.title3)
+                        .foregroundStyle(.orange)
+                        .frame(width: 36, height: 36)
+                        .background(.orange.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Send Screenshot to Claude Code")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text("Share your screen with Claude via the iOS Share Sheet")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(12)
+                .background(.secondary.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+
+            // Interior Designer agent banner (if pending)
+            let pendingAgents = agents.filter { $0.name != "Claude Code" && $0.pendingRequest != nil && $0.status != .syncing }
+            if !pendingAgents.isEmpty {
                 HStack {
                     Text("Agent Requests")
                         .font(.headline)
@@ -162,30 +196,6 @@ struct CaptureHomeView: View {
                 showingBeaconMonitor = true
             }
 
-            CaptureButton(icon: "heart.fill", label: "Health\nData", color: .pink) {
-                showingHealthCapture = true
-            }
-
-            NavigationLink {
-                ShareScreenshotGuideView()
-            } label: {
-                VStack(spacing: 12) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 32))
-                        .foregroundStyle(.cyan)
-
-                    Text("Screenshot\nto AI")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 120)
-                .background(Color.cyan.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-            }
         }
     }
 

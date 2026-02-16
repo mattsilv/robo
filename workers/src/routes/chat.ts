@@ -11,21 +11,21 @@ const ChatRequestSchema = z.object({
   timezone: z.string().optional(),
 });
 
-const DEFAULT_MODEL = 'google/gemini-2.5-flash-lite-preview-09-2025';
+const DEFAULT_MODEL = 'google/gemini-2.5-flash';
 
 const tools = [
   {
     type: 'function' as const,
     function: {
       name: 'create_availability_poll',
-      description: 'Creates a group availability poll with shareable HIT links for each participant. Use when the user wants to plan something with friends, schedule a group event, or find a time that works for everyone.',
+      description: 'Creates a group availability poll with shareable HIT links for each participant. Use IMMEDIATELY when the user wants to plan something with friends, schedule a group event, or find a time that works for everyone. You know the current date — calculate specific dates yourself (e.g., if user says "weekends next month", compute the actual YYYY-MM-DD dates). Do NOT ask the user for dates in any specific format — figure it out from context.',
       parameters: {
         type: 'object',
         properties: {
           eventTitle: { type: 'string', description: 'Title of the event (e.g., "Ski Trip")' },
           participants: { type: 'string', description: 'Comma-separated participant names (e.g., "Sam, Vince, Greg")' },
-          dateOptions: { type: 'string', description: 'Comma-separated dates in YYYY-MM-DD format for the options' },
-          timeSlots: { type: 'string', description: 'Comma-separated time slots (e.g., "Morning, Afternoon, Evening")' },
+          dateOptions: { type: 'string', description: 'Comma-separated dates in YYYY-MM-DD format. YOU must compute these from context (e.g., "weekends in March 2026" → "2026-03-07,2026-03-08,2026-03-14,2026-03-15,...")' },
+          timeSlots: { type: 'string', description: 'Comma-separated time slots (e.g., "Morning, Afternoon, Evening"). Default to "Morning, Afternoon, Evening" if not specified.' },
         },
         required: ['eventTitle', 'participants'],
       },

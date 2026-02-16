@@ -422,10 +422,16 @@ class ChatService {
             "look up this product", "scan a QR code", etc.
             - take_photo: Launches the camera to capture photos. Use when user says "take a photo", \
             "photograph my desk", "capture the label", etc.
-            - create_availability_poll: Creates a group availability poll with shareable links.
+            - create_availability_poll: Creates a group availability poll with shareable links. \
+            Call this IMMEDIATELY when the user mentions planning with friends. You know the current \
+            date — calculate specific dates yourself from context (e.g., "weekends next month" → compute \
+            the actual Saturday/Sunday dates). NEVER ask the user for dates in YYYY-MM-DD format.
 
             When the user asks to scan, photograph, or capture something, call the appropriate tool \
             immediately. Do NOT tell them to go to the Capture tab — you can do it directly.
+
+            CRITICAL: When you have enough info, call the tool IMMEDIATELY. Do not ask clarifying \
+            questions if you can reasonably infer the answer. One round-trip max before calling a tool.
 
             After a room scan, you'll receive dimensions and details. Use this to answer follow-up \
             questions like "could a queen bed fit?" or "how much paint do I need?".

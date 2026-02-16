@@ -413,10 +413,18 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
     });
     var days = [];
     if (config.date_options && config.date_options.length > 0) {
-      config.date_options.forEach(function(isoDate) {
-        var d = new Date(isoDate + 'T12:00:00');
-        days.push({ label: d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}),
-          short: d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}), date: isoDate });
+      config.date_options.forEach(function(opt) {
+        if (opt.indexOf(':') > -1) {
+          var parts = opt.split(':');
+          var d1 = new Date(parts[0] + 'T12:00:00');
+          var d2 = new Date(parts[1] + 'T12:00:00');
+          var label = d1.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + '-' + d2.getDate();
+          days.push({ label: label, short: label, date: opt });
+        } else {
+          var d = new Date(opt + 'T12:00:00');
+          days.push({ label: d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}),
+            short: d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}), date: opt });
+        }
       });
     } else {
       for (var i = 0; i < (config.days||5); i++) {

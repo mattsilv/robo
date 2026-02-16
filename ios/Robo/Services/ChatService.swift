@@ -144,10 +144,14 @@ class ChatService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiService.deviceId, forHTTPHeaderField: "X-Device-ID")
 
-        let body: [String: Any] = [
+        let firstName = UserDefaults.standard.string(forKey: "firstName") ?? ""
+        var body: [String: Any] = [
             "messages": openRouterMessages,
             "timezone": TimeZone.current.identifier
         ]
+        if !firstName.isEmpty {
+            body["first_name"] = firstName
+        }
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         do {

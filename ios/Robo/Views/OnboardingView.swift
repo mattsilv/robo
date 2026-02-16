@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct OnboardingView: View {
-    @AppStorage("userName") private var userName = ""
+    @AppStorage("firstName") private var firstName = ""
     @AppStorage("hasOnboarded") private var hasOnboarded = false
     @State private var nameInput = ""
     @FocusState private var isNameFocused: Bool
@@ -184,7 +184,7 @@ struct OnboardingView: View {
     private func completeOnboarding() {
         let trimmed = nameInput.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
-        userName = trimmed
+        firstName = trimmed
         withAnimation(.easeInOut(duration: 0.3)) {
             hasOnboarded = true
         }

@@ -9,6 +9,7 @@ const ChatRequestSchema = z.object({
   })).min(1),
   model: z.string().optional(),
   timezone: z.string().optional(),
+  first_name: z.string().optional(),
 });
 
 const DEFAULT_MODEL = 'google/gemini-2.5-flash';
@@ -24,8 +25,8 @@ const tools = [
         properties: {
           eventTitle: { type: 'string', description: 'Title of the event (e.g., "Ski Trip")' },
           participants: { type: 'string', description: 'Comma-separated participant names (e.g., "Sam, Vince, Greg")' },
-          dateOptions: { type: 'string', description: 'Comma-separated dates in YYYY-MM-DD format. YOU must compute these from context (e.g., "weekends in March 2026" → "2026-03-07,2026-03-08,2026-03-14,2026-03-15,...")' },
-          timeSlots: { type: 'string', description: 'Comma-separated time slots (e.g., "Morning, Afternoon, Evening"). Default to "Morning, Afternoon, Evening" if not specified.' },
+          dateOptions: { type: 'string', description: 'Comma-separated date RANGES for weekends or multi-day options. For weekends, group Sat+Sun as a single range: "2026-03-07:2026-03-08,2026-03-14:2026-03-15". For single days use just the date: "2026-03-10". Each range becomes one selectable option.' },
+          timeSlots: { type: 'string', description: 'LEAVE EMPTY. Time slots are not used — only date-level availability.' },
         },
         required: ['eventTitle', 'participants'],
       },
@@ -94,21 +95,21 @@ interface HitResult {
 async function executeCreateAvailabilityPoll(
   c: Context<{ Bindings: Env }>,
   args: { eventTitle: string; participants: string; dateOptions?: string; timeSlots?: string },
-  deviceId: string
+  deviceId: string,
+  firstName?: string
 ): Promise<{ text: string; hits: HitResult[] }> {
   const db = c.env.DB;
   const participants = args.participants.split(',').map((p: string) => p.trim()).filter(Boolean);
   const hitId = generateShortId();
   const now = new Date().toISOString();
 
-  const device = await db.prepare('SELECT name FROM devices WHERE id = ?').bind(deviceId).first<{ name: string | null }>();
-  const senderName = device?.name || 'Someone';
+  const senderName = firstName || 'Someone';
 
   const config = JSON.stringify({
     title: args.eventTitle,
     participants,
     date_options: args.dateOptions?.split(',').map((d: string) => d.trim()) || [],
-    time_slots: args.timeSlots?.split(',').map((t: string) => t.trim()) || ['Morning', 'Afternoon', 'Evening'],
+    time_slots: [],
   });
 
   await db.prepare(`
@@ -206,7 +207,7 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
 
       if (toolCall.function.name === 'create_availability_poll') {
         try {
-          const result = await executeCreateAvailabilityPoll(c, args, deviceId);
+          const result = await executeCreateAvailabilityPoll(c, args, deviceId, parsed.data.first_name);
           toolResultText = result.text;
           allHitResults = allHitResults.concat(result.hits);
         } catch (err) {

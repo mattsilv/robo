@@ -76,9 +76,12 @@ struct RoboApp: App {
         }
     }
 
+    @AppStorage("hasOnboarded") private var hasOnboarded = false
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if hasOnboarded {
+                ContentView()
                 .environment(deviceService)
                 .environment(apiService)
                 .modifier(CaptureCoordinatorModifier())
@@ -93,6 +96,9 @@ struct RoboApp: App {
                     // Request push notification permission
                     await requestPushPermission()
                 }
+            } else {
+                OnboardingView()
+            }
         }
         .modelContainer(modelContainer)
     }

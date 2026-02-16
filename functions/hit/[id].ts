@@ -39,8 +39,7 @@ export const onRequest: PagesFunction = async (context) => {
 
   // Determine first name for greeting
   const firstName = hit.recipient_name.split(' ')[0];
-  // "M. Silverman" → "Matt", or use first word/name
-  const senderFirst = hit.sender_name === 'M. Silverman' ? 'Matt' : hit.sender_name.split(' ')[0];
+  const senderFirst = hit.sender_name.split(' ')[0];
 
   return new Response(renderHitPage(hit, firstName, senderFirst), {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },

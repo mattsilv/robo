@@ -7,7 +7,7 @@ struct HitListView: View {
 
     @State private var hits: [HitSummary] = []
     @State private var isLoading = false
-    @State private var showingCreate = false
+    @State private var showingCreateInfo = false
     @State private var navigationPath = NavigationPath()
 
     var body: some View {
@@ -19,9 +19,11 @@ struct HitListView: View {
                     ContentUnavailableView {
                         Label("No HITs Yet", systemImage: "link.badge.plus")
                     } description: {
-                        Text("Create a HIT to request photos, polls, or data from anyone.")
+                        Text("Use the Chat tab to create HITs.\nTry: \"Plan a dinner with Sarah and Mike\"")
                     } actions: {
-                        Button("Create HIT") { showingCreate = true }
+                        Button("Open Chat") {
+                            NotificationCenter.default.post(name: .switchToChat, object: nil)
+                        }
                             .buttonStyle(.borderedProminent)
                             .tint(Color(red: 0.15, green: 0.39, blue: 0.92))
                     }
@@ -54,15 +56,12 @@ struct HitListView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        showingCreate = true
+                        NotificationCenter.default.post(name: .switchToChat, object: nil)
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .foregroundStyle(Color(red: 0.15, green: 0.39, blue: 0.92))
                     }
                 }
-            }
-            .sheet(isPresented: $showingCreate, onDismiss: { Task { await loadHits() } }) {
-                CreateHitView()
             }
             .task { await loadHits() }
             .onChange(of: deepLinkHitId) { _, hitId in

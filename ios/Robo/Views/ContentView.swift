@@ -61,6 +61,9 @@ struct ContentView: View {
                 hitBadgeCount += 1
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToChat)) { _ in
+            selectedTab = 3
+        }
         .onChange(of: selectedTab) { _, newTab in
             if newTab == 2 { hitBadgeCount = 0 }
         }

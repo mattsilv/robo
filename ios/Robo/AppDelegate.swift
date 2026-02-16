@@ -87,4 +87,5 @@ extension Notification.Name {
     static let hitCompletedNotification = Notification.Name("hitCompletedNotification")
     static let hitResponseNotification = Notification.Name("hitResponseNotification")
     static let chatPrefillNotification = Notification.Name("chatPrefillNotification")
+    static let switchToChat = Notification.Name("switchToChat")
 }

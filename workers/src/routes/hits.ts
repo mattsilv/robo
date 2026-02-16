@@ -2,8 +2,8 @@ import type { Context } from 'hono';
 import { CreateHitSchema, HitResponseSchema, type Env, type Hit, type HitPhoto, type HitResponse } from '../types';
 import { sendPushNotification } from '../services/apns';
 
-// Default sender for CLI/API-created HITs
-const DEFAULT_SENDER = 'M. Silverman';
+// Default sender when no name can be resolved
+const DEFAULT_SENDER = 'Someone';
 
 /**
  * Generate an 8-char URL-safe short ID
@@ -35,6 +35,8 @@ export async function createHit(c: Context<{ Bindings: Env }>) {
 
   // Get device_id from auth header if present
   const deviceId = c.req.header('X-Device-ID') || null;
+
+  // Only use explicit sender_name from the request — never leak device names into public HIT links
   const resolvedSender = sender_name || DEFAULT_SENDER;
 
   try {

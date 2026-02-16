@@ -3,7 +3,7 @@ import UIKit
 
 /// Protocol for device registration — enables testing without network.
 protocol DeviceRegistering {
-    func registerDevice(name: String) async throws -> DeviceConfig
+    func registerDevice(name: String, vendorId: String?, regenerateToken: Bool) async throws -> DeviceConfig
 }
 
 extension APIService: DeviceRegistering {}
@@ -48,7 +48,8 @@ class DeviceService {
         var lastError: Error?
         for attempt in 1...3 {
             do {
-                let registered = try await apiService.registerDevice(name: UIDevice.current.name)
+                let vendorId = UIDevice.current.identifierForVendor?.uuidString
+                let registered = try await apiService.registerDevice(name: UIDevice.current.name, vendorId: vendorId, regenerateToken: false)
                 self.config = registered
                 self.registrationError = nil
                 self.registrationErrorDetail = nil
@@ -101,8 +102,7 @@ class DeviceService {
         }
     }
 
-    /// Clear local config and re-register to get a fresh device with MCP token.
-    /// Use when the device was registered before auth existed.
+    /// Re-register to get a fresh MCP token while preserving device identity.
     func reRegister(apiService: DeviceRegistering) async {
         self.registrationError = nil
         self.registrationErrorDetail = nil
@@ -113,19 +113,20 @@ class DeviceService {
             return
         }
 
-        let previousConfig = config
-        config = DeviceConfig(
-            id: DeviceConfig.unregisteredID,
-            name: config.name,
-            apiBaseURL: DeviceConfig.default.apiBaseURL
-        )
-        // Don't save yet — let bootstrap() save on success
-        await bootstrap(apiService: apiService)
-
-        // If bootstrap failed, restore previous config
-        if !isRegistered {
-            config = previousConfig
+        do {
+            let vendorId = UIDevice.current.identifierForVendor?.uuidString
+            let registered = try await apiService.registerDevice(
+                name: UIDevice.current.name,
+                vendorId: vendorId,
+                regenerateToken: true
+            )
+            self.config = registered
+            self.registrationError = nil
+            self.registrationErrorDetail = nil
             save()
+        } catch {
+            self.registrationError = "Re-registration failed: \(error.localizedDescription)"
+            self.registrationErrorDetail = buildErrorDetail(error, baseURL: config.apiBaseURL)
         }
     }
 }

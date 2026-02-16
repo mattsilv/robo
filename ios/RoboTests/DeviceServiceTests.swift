@@ -6,7 +6,7 @@ import Testing
 private struct MockRegistrar: DeviceRegistering {
     var result: Result<DeviceConfig, Error>
 
-    func registerDevice(name: String) async throws -> DeviceConfig {
+    func registerDevice(name: String, vendorId: String?, regenerateToken: Bool) async throws -> DeviceConfig {
         try result.get()
     }
 }

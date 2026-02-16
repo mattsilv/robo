@@ -38,6 +38,8 @@ export type NutritionLookupResponse = {
 // Request schemas
 export const RegisterDeviceSchema = z.object({
   name: z.string().min(1).max(100),
+  vendor_id: z.string().uuid().optional(),
+  regenerate_token: z.boolean().optional(),
 });
 
 export const SensorDataSchema = z.object({

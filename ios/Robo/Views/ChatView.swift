@@ -19,9 +19,6 @@ struct ChatView: View {
     @FocusState private var isInputFocused: Bool
 
     private let suggestionChips = [
-        "Scan my room",
-        "Scan a barcode",
-        "Take a photo",
         "Plan something with friends"
     ]
 

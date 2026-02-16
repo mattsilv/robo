@@ -12,6 +12,7 @@ struct ScanHistoryView: View {
     private var beaconEvents: [BeaconEventRecord]
     @Environment(\.modelContext) private var modelContext
 
+    @State private var photos: [(filename: String, date: Date)] = []
     @State private var selectedSegment = 0
     @State private var showingClearConfirmation = false
     @State private var shareURL: URL?
@@ -25,6 +26,7 @@ struct ScanHistoryView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 Picker("Type", selection: $selectedSegment) {
+                    Text("Photos").tag(4)
                     Text("Barcodes").tag(0)
                     Text("Rooms").tag(1)
                     Text("Motion").tag(2)
@@ -38,6 +40,7 @@ struct ScanHistoryView: View {
 
                 Group {
                     switch selectedSegment {
+                    case 4: photoList
                     case 0: barcodeList
                     case 1: roomList
                     case 2: motionList
@@ -70,13 +73,14 @@ struct ScanHistoryView: View {
                                 Label("Export All", systemImage: "square.and.arrow.up")
                             }
                         }
-                        .disabled(isExporting || (scans.isEmpty && roomScans.isEmpty && motionRecords.isEmpty && beaconEvents.isEmpty))
+                        .disabled(isExporting || (scans.isEmpty && roomScans.isEmpty && motionRecords.isEmpty && beaconEvents.isEmpty && photos.isEmpty))
                     }
 
                     if (selectedSegment == 0 && !scans.isEmpty) ||
                        (selectedSegment == 1 && !roomScans.isEmpty) ||
                        (selectedSegment == 2 && !motionRecords.isEmpty) ||
-                       (selectedSegment == 3 && !beaconEvents.isEmpty) {
+                       (selectedSegment == 3 && !beaconEvents.isEmpty) ||
+                       (selectedSegment == 4 && !photos.isEmpty) {
                         ToolbarItem(placement: .destructiveAction) {
                             Button("Clear All", role: .destructive) {
                                 showingClearConfirmation = true
@@ -102,6 +106,8 @@ struct ScanHistoryView: View {
                     Text("This will permanently delete \(motionRecords.count) motion record\(motionRecords.count == 1 ? "" : "s").")
                 case 3:
                     Text("This will permanently delete \(beaconEvents.count) beacon event\(beaconEvents.count == 1 ? "" : "s").")
+                case 4:
+                    Text("This will permanently delete \(photos.count) photo\(photos.count == 1 ? "" : "s").")
                 default:
                     Text("This will permanently delete all items.")
                 }
@@ -125,6 +131,14 @@ struct ScanHistoryView: View {
             }
             .fullScreenCover(isPresented: $showingBeaconMonitor) {
                 BeaconMonitorView()
+            }
+            .onAppear {
+                photos = PhotoStorageService.listAll()
+            }
+            .onChange(of: selectedSegment) {
+                if selectedSegment == 4 {
+                    photos = PhotoStorageService.listAll()
+                }
             }
         }
     }
@@ -306,10 +320,77 @@ struct ScanHistoryView: View {
         }
     }
 
+    // MARK: - Photo List
+
+    @ViewBuilder
+    private var photoList: some View {
+        if photos.isEmpty {
+            ContentUnavailableView {
+                Label("No Photos Yet", systemImage: "photo.on.rectangle")
+            } description: {
+                Text("Capture photos to see them here.")
+            }
+        } else {
+            List {
+                ForEach(photos, id: \.filename) { photo in
+                    HStack(spacing: 12) {
+                        PhotoThumbnailView(filename: photo.filename)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(photo.filename)
+                                .font(.caption.monospaced())
+                                .lineLimit(1)
+                            Text(photo.date, style: .relative)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Text("Local")
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.secondary.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                }
+
+                agentShortcutsSection
+            }
+        }
+    }
+
+    // MARK: - Agent Shortcuts
+
+    @ViewBuilder
+    private var agentShortcutsSection: some View {
+        let agents = MockAgentService.loadAgents()
+        Section("Agents") {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(agents) { agent in
+                    VStack(spacing: 6) {
+                        Image(systemName: agent.iconSystemName)
+                            .font(.title3)
+                            .foregroundStyle(agent.accentColor)
+                            .frame(width: 44, height: 44)
+                            .background(agent.accentColor.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        Text(agent.name)
+                            .font(.caption2)
+                            .lineLimit(1)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
     // MARK: - Export All Section
 
     private var totalItemCount: Int {
-        scans.count + roomScans.count + motionRecords.count + beaconEvents.count
+        scans.count + roomScans.count + motionRecords.count + beaconEvents.count + photos.count
     }
 
     @ViewBuilder
@@ -372,6 +453,9 @@ struct ScanHistoryView: View {
             for motion in motionRecords { modelContext.delete(motion) }
         case 3:
             for event in beaconEvents { modelContext.delete(event) }
+        case 4:
+            PhotoStorageService.delete(photos.map(\.filename))
+            photos = []
         default:
             break
         }
@@ -915,6 +999,36 @@ struct BeaconTimelineView: View {
         let hours = minutes / 60
         let remainMins = minutes % 60
         return "\(hours)h\(remainMins)m"
+    }
+}
+
+// MARK: - Photo Thumbnail View
+
+private struct PhotoThumbnailView: View {
+    let filename: String
+    @State private var thumbnail: UIImage?
+
+    var body: some View {
+        Group {
+            if let thumbnail {
+                Image(uiImage: thumbnail)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(.blue.opacity(0.15))
+                    .frame(width: 44, height: 44)
+                    .overlay {
+                        Image(systemName: "photo")
+                            .foregroundStyle(.blue)
+                    }
+            }
+        }
+        .task {
+            thumbnail = PhotoStorageService.loadThumbnail(filename)
+        }
     }
 }
 

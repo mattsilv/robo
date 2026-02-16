@@ -38,22 +38,22 @@ enum IntentHeuristicService {
         case .barcode:
             return [
                 SuggestedRoute(
-                    agentName: "Practical Chef",
-                    agentIcon: "fork.knife",
+                    agentName: "Claude Code",
+                    agentIcon: "terminal",
                     agentColor: .orange,
                     confidence: 0.8,
-                    reason: "Barcode scans can look up nutrition and recipe data"
+                    reason: "Send barcode data to Claude Code for analysis"
                 )
             ]
 
         case .productScan:
             return [
                 SuggestedRoute(
-                    agentName: "Practical Chef",
-                    agentIcon: "fork.knife",
+                    agentName: "Claude Code",
+                    agentIcon: "terminal",
                     agentColor: .orange,
                     confidence: 0.9,
-                    reason: "Product scans with photos enable full ingredient analysis"
+                    reason: "Product scans with photos are available to Claude Code via MCP"
                 )
             ]
 

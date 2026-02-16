@@ -50,6 +50,40 @@ export const registerDevice = async (c: Context<{ Bindings: Env }>) => {
       }
     }
 
+    // Before creating a new device, check if there's a legacy device with matching
+    // X-Device-ID but null vendor_id (pre-vendor_id migration). If so, adopt it
+    // instead of creating a duplicate.
+    if (vendor_id) {
+      const existingDeviceId = c.req.header('X-Device-ID');
+      if (existingDeviceId) {
+        const legacy = await c.env.DB.prepare(
+          'SELECT id, mcp_token FROM devices WHERE id = ? AND vendor_id IS NULL'
+        ).bind(existingDeviceId).first<{ id: string; mcp_token: string }>();
+
+        if (legacy) {
+          // Adopt legacy device: set its vendor_id so future lookups work
+          let mcpToken = legacy.mcp_token;
+
+          if (regenerate_token) {
+            mcpToken = [...crypto.getRandomValues(new Uint8Array(24))]
+              .map(b => b.toString(16).padStart(2, '0')).join('');
+          }
+
+          await c.env.DB.prepare(
+            'UPDATE devices SET vendor_id = ?, name = ?, mcp_token = ?, last_seen_at = ? WHERE id = ?'
+          ).bind(vendor_id, name, mcpToken, now, legacy.id).run();
+
+          return c.json({
+            id: legacy.id,
+            name,
+            mcp_token: mcpToken,
+            registered_at: now,
+            last_seen_at: now,
+          }, 200);
+        }
+      }
+    }
+
     // New device — create fresh record
     const deviceId = crypto.randomUUID();
     const mcpToken = [...crypto.getRandomValues(new Uint8Array(24))]

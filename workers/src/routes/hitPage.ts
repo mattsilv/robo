@@ -311,6 +311,9 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       html += '</div></div>';
     }
 
+    html += '<div class="name-section fi"><label class="name-label" for="poll-notes-input">Anything to add?</label>' +
+      '<textarea class="name-input" id="poll-notes-input" placeholder="Additional context..." rows="2" style="resize:vertical;font-family:inherit;"></textarea></div>';
+    html += '<div style="height:300px"></div>';
     html += '<button class="submit-btn fi" id="submit-btn" disabled>Pick your name, then vote</button>';
     html += '<div id="result-area"></div>';
     html += '<div class="hit-footer fi"><a href="https://robo.app">Powered by Robo</a></div>';
@@ -354,32 +357,31 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       else { submitBtn.disabled = true; submitBtn.textContent = 'Pick your name, then vote'; }
     }
 
+    function gpShowSuccess(title, msg) {
+      submitBtn.style.display = 'none';
+      var sections = document.querySelectorAll('.availability-section, .name-section, .task-card');
+      for (var i = 0; i < sections.length; i++) sections[i].style.display = 'none';
+      document.getElementById('result-area').innerHTML =
+        '<div class="success"><div class="success-icon">&#10003;</div>' +
+        '<p class="success-title">' + title + '</p>' +
+        '<p class="success-msg">' + msg + '</p></div>';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     submitBtn.addEventListener('click', function() {
       if (submitBtn.disabled) return;
       submitBtn.disabled = true; submitBtn.classList.add('submitting'); submitBtn.textContent = 'Submitting...';
       fetch(API_BASE + '/api/hits/' + hitId + '/respond', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ respondent_name: selectedName, response_data: { selected_dates: Object.keys(selectedDates) } })
+        body: JSON.stringify({ respondent_name: selectedName, response_data: (function() { var d = { selected_dates: Object.keys(selectedDates) }; var n = (document.getElementById('poll-notes-input').value || '').trim(); if (n) d.notes = n; return d; })() })
       })
       .then(function(res) { if (res.status === 409) throw new Error('already_responded'); if (!res.ok) throw new Error('fail'); return res.json(); })
       .then(function() {
-        document.getElementById('result-area').innerHTML =
-          '<div class="success"><div class="success-icon">&#10003;</div>' +
-          '<p class="success-title">Thanks, ' + esc(selectedName) + '!</p>' +
-          '<p class="success-msg">Your vote has been recorded.</p></div>';
-        submitBtn.style.display = 'none';
-        if (document.querySelector('.availability-section')) document.querySelector('.availability-section').style.display = 'none';
-        document.querySelector('.name-section').style.display = 'none';
+        gpShowSuccess('Thank you!', 'This has been sent to ' + esc(hit.sender_name) + '.');
       })
       .catch(function(err) {
         if (err.message === 'already_responded') {
-          document.getElementById('result-area').innerHTML =
-            '<div class="success"><div class="success-icon">&#10003;</div>' +
-            '<p class="success-title">Already voted!</p>' +
-            '<p class="success-msg">You\\'ve already submitted your response.</p></div>';
-          submitBtn.style.display = 'none';
-          if (document.querySelector('.availability-section')) document.querySelector('.availability-section').style.display = 'none';
-          document.querySelector('.name-section').style.display = 'none';
+          gpShowSuccess('Already voted!', 'Your response was already submitted.');
         } else { submitBtn.disabled = false; submitBtn.classList.remove('submitting'); submitBtn.textContent = 'Error — tap to retry'; }
       });
     });
@@ -387,7 +389,21 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
 
   function renderAvailability(hit) {
     var config = hit.config ? (typeof hit.config === 'string' ? JSON.parse(hit.config) : hit.config) : {};
+    var participants = config.participants || [];
+
+    if (participants.length > 0) {
+      fetch(API_BASE + '/api/hits/' + hitId + '/responses')
+        .then(function(res) { return res.json(); })
+        .then(function(data) { renderAvailabilityUI(hit, config, data.responses || []); })
+        .catch(function() { renderAvailabilityUI(hit, config, []); });
+    } else {
+      renderAvailabilityUI(hit, config, []);
+    }
+  }
+
+  function renderAvailabilityUI(hit, config, existingResponses) {
     var title = config.title || hit.task_description;
+    var participants = config.participants || [];
     var timeSlots = config.time_slots || [];
     // Normalize military time (e.g. "19:00" → "7 PM")
     timeSlots = timeSlots.map(function(t) {
@@ -397,10 +413,18 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
     });
     var days = [];
     if (config.date_options && config.date_options.length > 0) {
-      config.date_options.forEach(function(isoDate) {
-        var d = new Date(isoDate + 'T12:00:00');
-        days.push({ label: d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}),
-          short: d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}), date: isoDate });
+      config.date_options.forEach(function(opt) {
+        if (opt.indexOf(':') > -1) {
+          var parts = opt.split(':');
+          var d1 = new Date(parts[0] + 'T12:00:00');
+          var d2 = new Date(parts[1] + 'T12:00:00');
+          var label = d1.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + '-' + d2.getDate();
+          days.push({ label: label, short: label, date: opt });
+        } else {
+          var d = new Date(opt + 'T12:00:00');
+          days.push({ label: d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}),
+            short: d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}), date: opt });
+        }
       });
     } else {
       for (var i = 0; i < (config.days||5); i++) {
@@ -410,6 +434,9 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       }
     }
 
+    var respondedNames = {};
+    existingResponses.forEach(function(r) { respondedNames[r.respondent_name] = true; });
+
     var html = topBar +
       '<div class="hero fi"><h1 class="greeting">Hi!</h1>' +
       '<p class="subtitle"><span class="sender">' + esc(hit.sender_name) + '</span> is planning ' + esc(title) + '</p></div>';
@@ -417,8 +444,22 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
       '</div><div><div class="task-title">' + esc(title) + '</div>' +
       '<div class="task-meta"><span class="task-pill">Availability</span></div></div></div></div>';
-    html += '<div class="name-section fi"><label class="name-label" for="name-input">Your name</label>' +
-      '<input class="name-input" id="name-input" type="text" placeholder="' + esc(hit.recipient_name) + '" value="' + esc(hit.recipient_name) + '"></div>';
+
+    if (participants.length > 0) {
+      html += '<div class="name-section fi"><span class="name-label">Who are you?</span><div class="name-picker" id="avail-name-picker">';
+      participants.forEach(function(name) {
+        var voted = respondedNames[name];
+        html += '<label class="name-option' + (voted ? ' voted' : '') + '">' +
+          '<input type="radio" name="avail-participant" value="' + esc(name) + '"' + (voted ? ' disabled' : '') + '>' +
+          '<span class="name-option-label">' + esc(name) + '</span>' +
+          (voted ? '<span class="voted-badge">Voted &#10003;</span>' : '') + '</label>';
+      });
+      html += '</div></div>';
+    } else {
+      html += '<div class="name-section fi"><label class="name-label" for="name-input">Your name</label>' +
+        '<input class="name-input" id="name-input" type="text" placeholder="' + esc(hit.recipient_name) + '" value="' + esc(hit.recipient_name) + '"></div>';
+    }
+
     var dateOnly = timeSlots.length === 0;
     html += '<div class="availability-section fi"><span class="section-label">When are you free?</span><div class="day-grid" id="day-grid">';
     if (dateOnly) {
@@ -435,12 +476,31 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       });
     }
     html += '</div></div>';
-    html += '<button class="submit-btn fi" id="submit-btn" disabled>' + (dateOnly ? 'Select dates, then submit' : 'Select times, then submit') + '</button>';
+    html += '<div class="name-section fi"><label class="name-label" for="notes-input">Anything to add?</label>' +
+      '<textarea class="name-input" id="notes-input" placeholder="Additional context..." rows="2" style="resize:vertical;font-family:inherit;"></textarea></div>';
+    html += '<div style="height:300px"></div>';
+
+    var hasParticipants = participants.length > 0;
+    var defaultBtnText = hasParticipants ? 'Pick your name, then select dates' : (dateOnly ? 'Select dates, then submit' : 'Select times, then submit');
+    html += '<button class="submit-btn fi" id="submit-btn" disabled>' + defaultBtnText + '</button>';
     html += '<div id="result-area"></div>';
     html += '<div class="hit-footer fi"><a href="https://robo.app">Powered by Robo</a></div>';
     app.innerHTML = html;
 
+    var selectedName = null;
     var selectedSlots = {};
+
+    if (hasParticipants) {
+      document.querySelectorAll('#avail-name-picker input[type="radio"]').forEach(function(input) {
+        input.addEventListener('change', function() {
+          selectedName = this.value;
+          updSlots();
+          var dg = document.getElementById('day-grid');
+          if (dg) dg.scrollIntoView({ behavior:'smooth', block:'start' });
+        });
+      });
+    }
+
     document.getElementById('day-grid').addEventListener('click', function(e) {
       var slot = e.target.closest('.time-slot'); if (!slot) return;
       var key = slot.dataset.day + '|' + slot.dataset.time;
@@ -451,30 +511,64 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
     var submitBtn = document.getElementById('submit-btn');
     function updSlots() {
       var n = Object.keys(selectedSlots).length;
-      submitBtn.disabled = n === 0;
       var unit = dateOnly ? 'date' : 'time';
-      submitBtn.textContent = n > 0 ? 'Submit ' + n + ' ' + unit + (n>1?'s':'') : (dateOnly ? 'Select dates, then submit' : 'Select times, then submit');
+      if (hasParticipants) {
+        if (selectedName && n > 0) { submitBtn.disabled = false; submitBtn.textContent = 'Submit ' + n + ' ' + unit + (n>1?'s':''); }
+        else if (selectedName) { submitBtn.disabled = true; submitBtn.textContent = 'Select at least one ' + unit; }
+        else { submitBtn.disabled = true; submitBtn.textContent = 'Pick your name, then select ' + unit + 's'; }
+      } else {
+        submitBtn.disabled = n === 0;
+        submitBtn.textContent = n > 0 ? 'Submit ' + n + ' ' + unit + (n>1?'s':'') : (dateOnly ? 'Select dates, then submit' : 'Select times, then submit');
+      }
     }
+    function showSuccess(title, msg) {
+      // Hide all form elements, show only success
+      submitBtn.style.display = 'none';
+      var sections = document.querySelectorAll('.availability-section, .name-section, .task-card');
+      for (var i = 0; i < sections.length; i++) sections[i].style.display = 'none';
+      // Also hide any extra name-section (notes field)
+      var allNameSections = document.querySelectorAll('.name-section');
+      for (var j = 0; j < allNameSections.length; j++) allNameSections[j].style.display = 'none';
+      document.getElementById('result-area').innerHTML =
+        '<div class="success"><div class="success-icon">&#10003;</div>' +
+        '<p class="success-title">' + title + '</p>' +
+        '<p class="success-msg">' + msg + '</p></div>';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     submitBtn.addEventListener('click', function() {
       if (submitBtn.disabled) return;
+      var name;
+      if (hasParticipants) {
+        name = selectedName;
+        if (respondedNames[name]) {
+          document.getElementById('result-area').innerHTML =
+            '<div class="success"><div class="success-icon">&#10003;</div>' +
+            '<p class="success-title">Already responded!</p>' +
+            '<p class="success-msg">You\\'ve already submitted your availability.</p></div>';
+          return;
+        }
+      } else {
+        name = document.getElementById('name-input').value.trim() || hit.recipient_name;
+      }
       submitBtn.disabled = true; submitBtn.classList.add('submitting'); submitBtn.textContent = 'Submitting...';
-      var name = document.getElementById('name-input').value.trim() || hit.recipient_name;
       var slots = Object.keys(selectedSlots).map(function(k) { var p=k.split('|'); return {date:p[0],time:p[1]}; });
+      var notes = (document.getElementById('notes-input').value || '').trim();
+      var responseData = { available_slots: slots };
+      if (notes) responseData.notes = notes;
       fetch(API_BASE + '/api/hits/' + hitId + '/respond', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ respondent_name: name, response_data: { available_slots: slots } })
+        body: JSON.stringify({ respondent_name: name, response_data: responseData })
       })
-      .then(function(res) { if (!res.ok) throw new Error('fail'); return res.json(); })
+      .then(function(res) { if (res.status === 409) throw new Error('already_responded'); if (!res.ok) throw new Error('fail'); return res.json(); })
       .then(function() {
-        document.getElementById('result-area').innerHTML =
-          '<div class="success"><div class="success-icon">&#10003;</div>' +
-          '<p class="success-title">Thanks, ' + esc(name) + '!</p>' +
-          '<p class="success-msg">Your availability has been shared with ' + esc(hit.sender_name) + '.</p></div>';
-        submitBtn.style.display='none';
-        document.querySelector('.availability-section').style.display='none';
-        document.querySelector('.name-section').style.display='none';
+        showSuccess('Thank you!', 'This has been sent to ' + esc(hit.sender_name) + '.');
       })
-      .catch(function() { submitBtn.disabled=false; submitBtn.classList.remove('submitting'); submitBtn.textContent='Error — tap to retry'; });
+      .catch(function(err) {
+        if (err.message === 'already_responded') {
+          showSuccess('Already responded!', 'Your availability was already submitted.');
+        } else { submitBtn.disabled=false; submitBtn.classList.remove('submitting'); submitBtn.textContent='Error — tap to retry'; }
+      });
     });
   }
 

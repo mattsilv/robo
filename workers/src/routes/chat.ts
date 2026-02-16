@@ -9,23 +9,24 @@ const ChatRequestSchema = z.object({
   })).min(1),
   model: z.string().optional(),
   timezone: z.string().optional(),
+  first_name: z.string().optional(),
 });
 
-const DEFAULT_MODEL = 'google/gemini-2.5-flash-lite-preview-09-2025';
+const DEFAULT_MODEL = 'google/gemini-2.5-flash';
 
 const tools = [
   {
     type: 'function' as const,
     function: {
       name: 'create_availability_poll',
-      description: 'Creates a group availability poll with shareable HIT links for each participant. Use when the user wants to plan something with friends, schedule a group event, or find a time that works for everyone.',
+      description: 'Creates a group availability poll with shareable HIT links for each participant. Use IMMEDIATELY when the user wants to plan something with friends, schedule a group event, or find a time that works for everyone. You know the current date — calculate specific dates yourself (e.g., if user says "weekends next month", compute the actual YYYY-MM-DD dates). Do NOT ask the user for dates in any specific format — figure it out from context.',
       parameters: {
         type: 'object',
         properties: {
           eventTitle: { type: 'string', description: 'Title of the event (e.g., "Ski Trip")' },
           participants: { type: 'string', description: 'Comma-separated participant names (e.g., "Sam, Vince, Greg")' },
-          dateOptions: { type: 'string', description: 'Comma-separated dates in YYYY-MM-DD format for the options' },
-          timeSlots: { type: 'string', description: 'Comma-separated time slots (e.g., "Morning, Afternoon, Evening")' },
+          dateOptions: { type: 'string', description: 'Comma-separated date RANGES for weekends or multi-day options. For weekends, group Sat+Sun as a single range: "2026-03-07:2026-03-08,2026-03-14:2026-03-15". For single days use just the date: "2026-03-10". Each range becomes one selectable option.' },
+          timeSlots: { type: 'string', description: 'LEAVE EMPTY. Time slots are not used — only date-level availability.' },
         },
         required: ['eventTitle', 'participants'],
       },
@@ -82,61 +83,74 @@ function generateShortId(): string {
   return Array.from(bytes, (b) => chars[b % chars.length]).join('');
 }
 
+interface HitResult {
+  name: string;
+  url: string;
+  hitId: string;
+}
+
 /**
  * Execute the create_availability_poll tool call by creating HITs in D1
  */
 async function executeCreateAvailabilityPoll(
   c: Context<{ Bindings: Env }>,
   args: { eventTitle: string; participants: string; dateOptions?: string; timeSlots?: string },
-  deviceId: string
-): Promise<string> {
+  deviceId: string,
+  firstName?: string
+): Promise<{ text: string; hits: HitResult[] }> {
   const db = c.env.DB;
   const participants = args.participants.split(',').map((p: string) => p.trim()).filter(Boolean);
-  const groupId = crypto.randomUUID();
-  const results: string[] = [];
+  const hitId = generateShortId();
+  const now = new Date().toISOString();
 
-  // Get sender name from device
-  const device = await db.prepare('SELECT name FROM devices WHERE id = ?').bind(deviceId).first<{ name: string | null }>();
-  const senderName = device?.name || 'Someone';
-
-  for (const name of participants) {
-    const hitId = generateShortId();
-    const now = new Date().toISOString();
-
-    const config = JSON.stringify({
-      eventTitle: args.eventTitle,
-      dateOptions: args.dateOptions?.split(',').map((d: string) => d.trim()) || [],
-      timeSlots: args.timeSlots?.split(',').map((t: string) => t.trim()) || [],
-    });
-
-    await db.prepare(`
-      INSERT INTO hits (id, sender_name, recipient_name, task_description, status, photo_count, created_at, device_id, hit_type, config, group_id)
-      VALUES (?, ?, ?, ?, 'pending', 0, ?, ?, 'availability', ?, ?)
-    `).bind(
-      hitId,
-      senderName,
-      name,
-      `When are you free for: ${args.eventTitle}?`,
-      now,
-      deviceId,
-      config,
-      groupId
-    ).run();
-
-    results.push(`• ${name}: https://robo.app/hit/${hitId}`);
+  // Fallback: first_name from request → device name from DB → "Someone"
+  let senderName = firstName || '';
+  if (!senderName) {
+    const device = await db.prepare('SELECT name FROM devices WHERE id = ?').bind(deviceId).first<{ name: string | null }>();
+    const deviceName = device?.name || '';
+    // Don't use generic device names like "iPhone" or "iPhone 16 Pro"
+    senderName = (deviceName && !deviceName.toLowerCase().startsWith('iphone')) ? deviceName : 'Someone';
   }
 
-  return `Created availability poll "${args.eventTitle}" for ${participants.length} participants:\n${results.join('\n')}`;
+  const config = JSON.stringify({
+    title: args.eventTitle,
+    participants,
+    date_options: args.dateOptions?.split(',').map((d: string) => d.trim()) || [],
+    time_slots: [],
+  });
+
+  await db.prepare(`
+    INSERT INTO hits (id, sender_name, recipient_name, task_description, status, photo_count, created_at, device_id, hit_type, config, group_id)
+    VALUES (?, ?, ?, ?, 'pending', 0, ?, ?, 'availability', ?, ?)
+  `).bind(
+    hitId,
+    senderName,
+    participants.join(', '),
+    `When are you free for: ${args.eventTitle}?`,
+    now,
+    deviceId,
+    config,
+    crypto.randomUUID()
+  ).run();
+
+  const url = `https://robo.app/hit/${hitId}`;
+  return {
+    text: `Created availability poll "${args.eventTitle}" for ${participants.length} people: ${url}`,
+    hits: [{ name: args.eventTitle, url, hitId }],
+  };
 }
 
 /**
  * Convert content string to SSE response format
  */
-function contentToSSE(content: string): Response {
+function contentToSSE(content: string, hitResults?: HitResult[]): Response {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     start(controller) {
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`));
+      if (hitResults && hitResults.length > 0) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ hit_results: hitResults })}\n\n`));
+      }
       controller.enqueue(encoder.encode('data: [DONE]\n\n'));
       controller.close();
     },
@@ -193,26 +207,42 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
   if (choice?.message?.tool_calls?.length > 0) {
     // Handle tool calls
     const toolResults = [];
+    let allHitResults: HitResult[] = [];
     for (const toolCall of choice.message.tool_calls) {
       const args = JSON.parse(toolCall.function.arguments);
-      let toolResult: string;
+      let toolResultText: string;
 
       if (toolCall.function.name === 'create_availability_poll') {
         try {
-          toolResult = await executeCreateAvailabilityPoll(c, args, deviceId);
+          const result = await executeCreateAvailabilityPoll(c, args, deviceId, parsed.data.first_name);
+          toolResultText = result.text;
+          allHitResults = allHitResults.concat(result.hits);
         } catch (err) {
           console.error('Failed to create availability poll:', err);
-          toolResult = 'Failed to create the availability poll. Please try again.';
+          toolResultText = 'Failed to create the availability poll. Please try again.';
         }
       } else {
         // Sensor tools can't run server-side
-        toolResult = `The ${toolCall.function.name} tool requires the Robo iOS app. Please use the Capture tab to ${toolCall.function.name.replace(/_/g, ' ')}.`;
+        toolResultText = `The ${toolCall.function.name} tool requires the Robo iOS app. Please use the Capture tab to ${toolCall.function.name.replace(/_/g, ' ')}.`;
       }
 
       toolResults.push({
         role: 'tool' as const,
         tool_call_id: toolCall.id,
-        content: toolResult,
+        content: toolResultText,
+      });
+    }
+
+    // Build follow-up messages, instructing model not to include URLs if HITs were created
+    const followUpMessages = [
+      ...messages,
+      choice.message,
+      ...toolResults,
+    ];
+    if (allHitResults.length > 0) {
+      followUpMessages.push({
+        role: 'system' as const,
+        content: 'A single shared poll link was created. Do NOT include any URLs in your response — the app displays them as a tappable card with a copy button. In your response, tell the user to copy the link and send it to their group chat or text thread with their friends. Keep it casual and brief, like "Copy the link below and send it to your group chat — everyone picks their name and marks their availability."',
       });
     }
 
@@ -225,11 +255,7 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
       },
       body: JSON.stringify({
         model,
-        messages: [
-          ...messages,
-          choice.message,
-          ...toolResults,
-        ],
+        messages: followUpMessages,
         reasoning: { effort: 'low' },
       }),
     });
@@ -239,12 +265,12 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
       console.error('Follow-up request failed:', text);
       // Fall back to returning tool result directly
       const fallbackContent = toolResults.map((r) => r.content).join('\n');
-      return contentToSSE(fallbackContent);
+      return contentToSSE(fallbackContent, allHitResults.length > 0 ? allHitResults : undefined);
     }
 
     const followUpResult = await followUp.json() as any;
-    const finalContent = followUpResult.choices?.[0]?.message?.content || 'Done!';
-    return contentToSSE(finalContent);
+    const modelSummary = followUpResult.choices?.[0]?.message?.content || 'Done!';
+    return contentToSSE(modelSummary, allHitResults.length > 0 ? allHitResults : undefined);
   } else {
     // No tool calls — return content as SSE
     const content = choice?.message?.content || '';

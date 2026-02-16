@@ -144,10 +144,20 @@ class ChatService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiService.deviceId, forHTTPHeaderField: "X-Device-ID")
 
-        let body: [String: Any] = [
+        // Migrate old "userName" key to "firstName" (one-time)
+        var firstName = UserDefaults.standard.string(forKey: "firstName") ?? ""
+        if firstName.isEmpty, let old = UserDefaults.standard.string(forKey: "userName"), !old.isEmpty {
+            firstName = old
+            UserDefaults.standard.set(old, forKey: "firstName")
+            UserDefaults.standard.removeObject(forKey: "userName")
+        }
+        var body: [String: Any] = [
             "messages": openRouterMessages,
             "timezone": TimeZone.current.identifier
         ]
+        if !firstName.isEmpty {
+            body["first_name"] = firstName
+        }
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         do {
@@ -183,6 +193,23 @@ class ChatService {
                     accumulated += content
                     currentStreamingText = accumulated
                     updateMessage(id: targetId, content: accumulated)
+                }
+
+                // Check for structured HIT results
+                if let hitData = jsonStr.data(using: .utf8),
+                   let hitJson = try? JSONSerialization.jsonObject(with: hitData) as? [String: Any],
+                   let hitResultsArray = hitJson["hit_results"] as? [[String: Any]] {
+                    var results: [(name: String, url: String)] = []
+                    for hit in hitResultsArray {
+                        if let name = hit["name"] as? String,
+                           let url = hit["url"] as? String {
+                            results.append((name: name, url: url))
+                        }
+                    }
+                    if !results.isEmpty {
+                        hitResults[targetId] = results
+                        logger.debug("Parsed \(results.count) structured HIT results")
+                    }
                 }
             }
         } catch is CancellationError {
@@ -422,10 +449,16 @@ class ChatService {
             "look up this product", "scan a QR code", etc.
             - take_photo: Launches the camera to capture photos. Use when user says "take a photo", \
             "photograph my desk", "capture the label", etc.
-            - create_availability_poll: Creates a group availability poll with shareable links.
+            - create_availability_poll: Creates a group availability poll with shareable links. \
+            Call this IMMEDIATELY when the user mentions planning with friends. You know the current \
+            date — calculate specific dates yourself from context (e.g., "weekends next month" → compute \
+            the actual Saturday/Sunday dates). NEVER ask the user for dates in YYYY-MM-DD format.
 
             When the user asks to scan, photograph, or capture something, call the appropriate tool \
             immediately. Do NOT tell them to go to the Capture tab — you can do it directly.
+
+            CRITICAL: When you have enough info, call the tool IMMEDIATELY. Do not ask clarifying \
+            questions if you can reasonably infer the answer. One round-trip max before calling a tool.
 
             After a room scan, you'll receive dimensions and details. Use this to answer follow-up \
             questions like "could a queen bed fit?" or "how much paint do I need?".

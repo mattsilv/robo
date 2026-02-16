@@ -19,10 +19,7 @@ struct ChatView: View {
     @FocusState private var isInputFocused: Bool
 
     private let suggestionChips = [
-        "Scan my room",
-        "Scan a barcode",
-        "Take a photo",
-        "Plan something with friends"
+        "Plan a weekend with friends"
     ]
 
     var body: some View {
@@ -53,6 +50,7 @@ struct ChatView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     if !chatService.messages.isEmpty {
                         Button {
+                            speechService.stopRecording()
                             chatService.resetSession()
                         } label: {
                             Image(systemName: "arrow.counterclockwise")
@@ -64,8 +62,14 @@ struct ChatView: View {
                 chatService.configure(apiService: apiService, captureCoordinator: captureCoordinator)
                 chatService.prewarm()
             }
+            .onDisappear {
+                speechService.stopRecording()
+            }
             .fullScreenCover(item: captureBinding) { capture in
                 captureView(for: capture)
+            }
+            .onChange(of: captureCoordinator.pendingCapture != nil) { _, isPresenting in
+                if isPresenting { speechService.stopRecording() }
             }
         }
     }
@@ -305,6 +309,7 @@ struct ChatView: View {
         guard !trimmed.isEmpty else { return }
         inputText = ""
         isInputFocused = false
+        speechService.stopRecording()
         chatService.send(trimmed)
     }
 
@@ -332,9 +337,13 @@ private struct MessageBubble: View {
 
             ZStack(alignment: .top) {
                 HStack(alignment: .bottom, spacing: 0) {
-                    Text(message.content.isEmpty && isStreaming ? " " : message.content)
-                    if isStreaming && !message.content.isEmpty {
-                        TypingCursor()
+                    if message.content.isEmpty && isStreaming {
+                        TypingDotsView()
+                    } else {
+                        Text(message.content)
+                        if isStreaming && !message.content.isEmpty {
+                            TypingCursor()
+                        }
                     }
                 }
                 .padding(12)
@@ -374,6 +383,30 @@ private struct MessageBubble: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation(.easeInOut(duration: 0.2)) { showCopied = false }
         }
+    }
+}
+
+@available(iOS 26, *)
+private struct TypingDotsView: View {
+    @State private var active = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<3) { i in
+                Circle()
+                    .fill(Color.secondary)
+                    .frame(width: 7, height: 7)
+                    .opacity(active ? 1 : 0.3)
+                    .animation(
+                        .easeInOut(duration: 0.5)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(i) * 0.15),
+                        value: active
+                    )
+            }
+        }
+        .padding(.vertical, 4)
+        .onAppear { active = true }
     }
 }
 

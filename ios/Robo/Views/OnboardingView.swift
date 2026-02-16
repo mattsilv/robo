@@ -23,22 +23,12 @@ struct OnboardingView: View {
                         .frame(height: 20)
 
                     // App icon
-                    if let uiImage = UIImage(named: "Icon-1024") {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .frame(width: 80, height: 80)
-                            .clipShape(RoundedRectangle(cornerRadius: 18))
-                            .shadow(color: .blue.opacity(0.3), radius: 20, y: 8)
-                            .padding(.bottom, 24)
-                    } else {
-                        Image(systemName: "cpu")
-                            .font(.system(size: 48))
-                            .foregroundStyle(.blue)
-                            .frame(width: 80, height: 80)
-                            .background(Color.blue.opacity(0.15))
-                            .clipShape(RoundedRectangle(cornerRadius: 18))
-                            .padding(.bottom, 24)
-                    }
+                    Image("AppIconImage")
+                        .resizable()
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                        .shadow(color: .blue.opacity(0.3), radius: 20, y: 8)
+                        .padding(.bottom, 24)
 
                     // Wordmark
                     HStack(spacing: 0) {

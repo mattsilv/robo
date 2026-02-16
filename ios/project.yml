@@ -21,6 +21,8 @@ targets:
   Robo:
     type: application
     platform: iOS
+    dependencies:
+      - target: RoboShare
     sources:
       - path: Robo
         excludes:
@@ -32,6 +34,10 @@ targets:
         com.apple.developer.healthkit.access: []
         com.apple.developer.networking.wifi-info: true
         aps-environment: development
+        com.apple.security.application-groups:
+          - group.com.silv.Robo
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)group.com.silv.Robo
     settings:
       base:
         INFOPLIST_FILE: Robo/Info.plist
@@ -80,6 +86,48 @@ targets:
           - location
           - bluetooth-central
           - remote-notification
+
+  RoboShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: RoboShare
+        excludes:
+          - "**/.DS_Store"
+    entitlements:
+      path: RoboShare/RoboShare.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.silv.Robo
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)group.com.silv.Robo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.silv.Robo.ShareExtension
+        PRODUCT_MODULE_NAME: RoboShare
+        CODE_SIGN_ENTITLEMENTS: RoboShare/RoboShare.entitlements
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: RoboShare/Info.plist
+    info:
+      path: RoboShare/Info.plist
+      properties:
+        CFBundleDevelopmentRegion: en
+        CFBundleDisplayName: Robo
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleInfoDictionaryVersion: "6.0"
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundlePackageType: XPC!
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsImageWithMaxCount: 1
+    dependencies: []
 
   RoboTests:
     type: bundle.unit-test

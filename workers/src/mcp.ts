@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
 import type { Env } from './types';
+import { logEvent } from './services/eventLogger';
 
 const MAX_SAMPLE_BYTES = 5_000; // 5 KB structural sample for room scan context
 
@@ -564,12 +565,15 @@ export async function handleMcpRequest(request: Request, env: Env, ctx?: Executi
     }), { status: 401, headers: { 'Content-Type': 'application/json' } });
   }
 
-  // Record heartbeat timestamp (fire-and-forget)
+  // Record heartbeat timestamp + event log (fire-and-forget)
   if (ctx) {
     ctx.waitUntil(
       env.DB.prepare('UPDATE devices SET last_mcp_call_at = ? WHERE id = ?')
         .bind(new Date().toISOString(), device.id).run()
     );
+    logEvent(env, ctx, {
+      type: 'mcp_tool_call', device_id: device.id, endpoint: '/mcp', status: 'success',
+    });
   }
 
   const server = createRoboMcpServer(env, device.id);

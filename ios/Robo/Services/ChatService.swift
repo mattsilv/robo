@@ -184,12 +184,23 @@ class ChatService {
                     currentStreamingText = accumulated
                     updateMessage(id: targetId, content: accumulated)
                 }
-            }
-            // Parse HIT results from accumulated response
-            parseHitResults(content: accumulated, messageId: targetId)
-            if hitResults[targetId] != nil {
-                let cleaned = Self.cleanHitContent(accumulated)
-                updateMessage(id: targetId, content: cleaned)
+
+                // Check for structured HIT results
+                if let hitData = jsonStr.data(using: .utf8),
+                   let hitJson = try? JSONSerialization.jsonObject(with: hitData) as? [String: Any],
+                   let hitResultsArray = hitJson["hit_results"] as? [[String: Any]] {
+                    var results: [(name: String, url: String)] = []
+                    for hit in hitResultsArray {
+                        if let name = hit["name"] as? String,
+                           let url = hit["url"] as? String {
+                            results.append((name: name, url: url))
+                        }
+                    }
+                    if !results.isEmpty {
+                        hitResults[targetId] = results
+                        logger.debug("Parsed \(results.count) structured HIT results")
+                    }
+                }
             }
         } catch is CancellationError {
             logger.debug("OpenRouter stream cancelled")

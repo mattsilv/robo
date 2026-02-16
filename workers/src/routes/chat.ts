@@ -82,6 +82,12 @@ function generateShortId(): string {
   return Array.from(bytes, (b) => chars[b % chars.length]).join('');
 }
 
+interface HitResult {
+  name: string;
+  url: string;
+  hitId: string;
+}
+
 /**
  * Execute the create_availability_poll tool call by creating HITs in D1
  */
@@ -89,11 +95,11 @@ async function executeCreateAvailabilityPoll(
   c: Context<{ Bindings: Env }>,
   args: { eventTitle: string; participants: string; dateOptions?: string; timeSlots?: string },
   deviceId: string
-): Promise<string> {
+): Promise<{ text: string; hits: HitResult[] }> {
   const db = c.env.DB;
   const participants = args.participants.split(',').map((p: string) => p.trim()).filter(Boolean);
   const groupId = crypto.randomUUID();
-  const results: string[] = [];
+  const hits: HitResult[] = [];
 
   // Get sender name from device
   const device = await db.prepare('SELECT name FROM devices WHERE id = ?').bind(deviceId).first<{ name: string | null }>();
@@ -123,20 +129,24 @@ async function executeCreateAvailabilityPoll(
       groupId
     ).run();
 
-    results.push(`• ${name}: https://robo.app/hit/${hitId}`);
+    hits.push({ name, url: `https://robo.app/hit/${hitId}`, hitId });
   }
 
-  return `Created availability poll "${args.eventTitle}" for ${participants.length} participants:\n${results.join('\n')}`;
+  const text = `Created availability poll "${args.eventTitle}" for ${participants.length} participants.`;
+  return { text, hits };
 }
 
 /**
  * Convert content string to SSE response format
  */
-function contentToSSE(content: string): Response {
+function contentToSSE(content: string, hitResults?: HitResult[]): Response {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     start(controller) {
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`));
+      if (hitResults && hitResults.length > 0) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ hit_results: hitResults })}\n\n`));
+      }
       controller.enqueue(encoder.encode('data: [DONE]\n\n'));
       controller.close();
     },
@@ -193,26 +203,42 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
   if (choice?.message?.tool_calls?.length > 0) {
     // Handle tool calls
     const toolResults = [];
+    let allHitResults: HitResult[] = [];
     for (const toolCall of choice.message.tool_calls) {
       const args = JSON.parse(toolCall.function.arguments);
-      let toolResult: string;
+      let toolResultText: string;
 
       if (toolCall.function.name === 'create_availability_poll') {
         try {
-          toolResult = await executeCreateAvailabilityPoll(c, args, deviceId);
+          const result = await executeCreateAvailabilityPoll(c, args, deviceId);
+          toolResultText = result.text;
+          allHitResults = allHitResults.concat(result.hits);
         } catch (err) {
           console.error('Failed to create availability poll:', err);
-          toolResult = 'Failed to create the availability poll. Please try again.';
+          toolResultText = 'Failed to create the availability poll. Please try again.';
         }
       } else {
         // Sensor tools can't run server-side
-        toolResult = `The ${toolCall.function.name} tool requires the Robo iOS app. Please use the Capture tab to ${toolCall.function.name.replace(/_/g, ' ')}.`;
+        toolResultText = `The ${toolCall.function.name} tool requires the Robo iOS app. Please use the Capture tab to ${toolCall.function.name.replace(/_/g, ' ')}.`;
       }
 
       toolResults.push({
         role: 'tool' as const,
         tool_call_id: toolCall.id,
-        content: toolResult,
+        content: toolResultText,
+      });
+    }
+
+    // Build follow-up messages, instructing model not to include URLs if HITs were created
+    const followUpMessages = [
+      ...messages,
+      choice.message,
+      ...toolResults,
+    ];
+    if (allHitResults.length > 0) {
+      followUpMessages.push({
+        role: 'system' as const,
+        content: 'The HIT links will be displayed separately by the app as tappable cards. Do NOT include any URLs in your response. Just provide a brief, friendly confirmation.',
       });
     }
 
@@ -225,11 +251,7 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
       },
       body: JSON.stringify({
         model,
-        messages: [
-          ...messages,
-          choice.message,
-          ...toolResults,
-        ],
+        messages: followUpMessages,
         reasoning: { effort: 'low' },
       }),
     });
@@ -239,18 +261,12 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
       console.error('Follow-up request failed:', text);
       // Fall back to returning tool result directly
       const fallbackContent = toolResults.map((r) => r.content).join('\n');
-      return contentToSSE(fallbackContent);
+      return contentToSSE(fallbackContent, allHitResults.length > 0 ? allHitResults : undefined);
     }
 
     const followUpResult = await followUp.json() as any;
     const modelSummary = followUpResult.choices?.[0]?.message?.content || 'Done!';
-    // Append tool results that contain HIT URLs so iOS can parse them into cards
-    const hitUrls = toolResults
-      .map((r) => r.content)
-      .filter((c) => c.includes('robo.app/hit/'))
-      .join('\n');
-    const finalContent = hitUrls ? `${modelSummary}\n\n${hitUrls}` : modelSummary;
-    return contentToSSE(finalContent);
+    return contentToSSE(modelSummary, allHitResults.length > 0 ? allHitResults : undefined);
   } else {
     // No tool calls — return content as SSE
     const content = choice?.message?.content || '';

@@ -98,42 +98,38 @@ async function executeCreateAvailabilityPoll(
 ): Promise<{ text: string; hits: HitResult[] }> {
   const db = c.env.DB;
   const participants = args.participants.split(',').map((p: string) => p.trim()).filter(Boolean);
-  const groupId = crypto.randomUUID();
-  const hits: HitResult[] = [];
+  const hitId = generateShortId();
+  const now = new Date().toISOString();
 
-  // Get sender name from device
   const device = await db.prepare('SELECT name FROM devices WHERE id = ?').bind(deviceId).first<{ name: string | null }>();
   const senderName = device?.name || 'Someone';
 
-  for (const name of participants) {
-    const hitId = generateShortId();
-    const now = new Date().toISOString();
+  const config = JSON.stringify({
+    title: args.eventTitle,
+    participants,
+    date_options: args.dateOptions?.split(',').map((d: string) => d.trim()) || [],
+    time_slots: args.timeSlots?.split(',').map((t: string) => t.trim()) || ['Morning', 'Afternoon', 'Evening'],
+  });
 
-    const config = JSON.stringify({
-      eventTitle: args.eventTitle,
-      dateOptions: args.dateOptions?.split(',').map((d: string) => d.trim()) || [],
-      timeSlots: args.timeSlots?.split(',').map((t: string) => t.trim()) || [],
-    });
+  await db.prepare(`
+    INSERT INTO hits (id, sender_name, recipient_name, task_description, status, photo_count, created_at, device_id, hit_type, config, group_id)
+    VALUES (?, ?, ?, ?, 'pending', 0, ?, ?, 'availability', ?, ?)
+  `).bind(
+    hitId,
+    senderName,
+    participants.join(', '),
+    `When are you free for: ${args.eventTitle}?`,
+    now,
+    deviceId,
+    config,
+    crypto.randomUUID()
+  ).run();
 
-    await db.prepare(`
-      INSERT INTO hits (id, sender_name, recipient_name, task_description, status, photo_count, created_at, device_id, hit_type, config, group_id)
-      VALUES (?, ?, ?, ?, 'pending', 0, ?, ?, 'availability', ?, ?)
-    `).bind(
-      hitId,
-      senderName,
-      name,
-      `When are you free for: ${args.eventTitle}?`,
-      now,
-      deviceId,
-      config,
-      groupId
-    ).run();
-
-    hits.push({ name, url: `https://robo.app/hit/${hitId}`, hitId });
-  }
-
-  const text = `Created availability poll "${args.eventTitle}" for ${participants.length} participants.`;
-  return { text, hits };
+  const url = `https://robo.app/hit/${hitId}`;
+  return {
+    text: `Created availability poll "${args.eventTitle}" for ${participants.length} people: ${url}`,
+    hits: [{ name: args.eventTitle, url, hitId }],
+  };
 }
 
 /**
@@ -238,7 +234,7 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
     if (allHitResults.length > 0) {
       followUpMessages.push({
         role: 'system' as const,
-        content: 'The HIT links will be displayed separately by the app as tappable cards. Do NOT include any URLs in your response. Just provide a brief, friendly confirmation.',
+        content: 'A single shared poll link was created. All participants use the same link and select their name when they open it. Do NOT include any URLs in your response — the app displays them as a card.',
       });
     }
 

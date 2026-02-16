@@ -338,20 +338,22 @@ export async function respondToHit(c: Context<{ Bindings: Env }>) {
       return c.json({ error: `HIT is ${hit.status}` }, 400);
     }
 
-    // For group_poll: validate respondent is in participant list and hasn't already responded
-    if (hit.hit_type === 'group_poll') {
+    // For group_poll and availability: validate respondent is in participant list and hasn't already responded
+    if (hit.hit_type === 'group_poll' || hit.hit_type === 'availability') {
       const config = hit.config ? JSON.parse(hit.config) : {};
       const participants: string[] = config.participants || [];
       if (participants.length > 0 && !participants.includes(respondent_name)) {
         return c.json({ error: 'Name not in participant list' }, 400);
       }
 
-      // Check for duplicate response
-      const existing = await c.env.DB.prepare(
-        'SELECT id FROM hit_responses WHERE hit_id = ? AND respondent_name = ?'
-      ).bind(hitId, respondent_name).first();
-      if (existing) {
-        return c.json({ error: 'You have already responded' }, 409);
+      // Check for duplicate response (only when participants list exists)
+      if (participants.length > 0) {
+        const existing = await c.env.DB.prepare(
+          'SELECT id FROM hit_responses WHERE hit_id = ? AND respondent_name = ?'
+        ).bind(hitId, respondent_name).first();
+        if (existing) {
+          return c.json({ error: 'You have already responded' }, 409);
+        }
       }
     }
 

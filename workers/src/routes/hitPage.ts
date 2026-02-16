@@ -387,7 +387,21 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
 
   function renderAvailability(hit) {
     var config = hit.config ? (typeof hit.config === 'string' ? JSON.parse(hit.config) : hit.config) : {};
+    var participants = config.participants || [];
+
+    if (participants.length > 0) {
+      fetch(API_BASE + '/api/hits/' + hitId + '/responses')
+        .then(function(res) { return res.json(); })
+        .then(function(data) { renderAvailabilityUI(hit, config, data.responses || []); })
+        .catch(function() { renderAvailabilityUI(hit, config, []); });
+    } else {
+      renderAvailabilityUI(hit, config, []);
+    }
+  }
+
+  function renderAvailabilityUI(hit, config, existingResponses) {
     var title = config.title || hit.task_description;
+    var participants = config.participants || [];
     var timeSlots = config.time_slots || [];
     // Normalize military time (e.g. "19:00" → "7 PM")
     timeSlots = timeSlots.map(function(t) {
@@ -410,6 +424,9 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       }
     }
 
+    var respondedNames = {};
+    existingResponses.forEach(function(r) { respondedNames[r.respondent_name] = true; });
+
     var html = topBar +
       '<div class="hero fi"><h1 class="greeting">Hi!</h1>' +
       '<p class="subtitle"><span class="sender">' + esc(hit.sender_name) + '</span> is planning ' + esc(title) + '</p></div>';
@@ -417,8 +434,22 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
       '</div><div><div class="task-title">' + esc(title) + '</div>' +
       '<div class="task-meta"><span class="task-pill">Availability</span></div></div></div></div>';
-    html += '<div class="name-section fi"><label class="name-label" for="name-input">Your name</label>' +
-      '<input class="name-input" id="name-input" type="text" placeholder="' + esc(hit.recipient_name) + '" value="' + esc(hit.recipient_name) + '"></div>';
+
+    if (participants.length > 0) {
+      html += '<div class="name-section fi"><span class="name-label">Who are you?</span><div class="name-picker" id="avail-name-picker">';
+      participants.forEach(function(name) {
+        var voted = respondedNames[name];
+        html += '<label class="name-option' + (voted ? ' voted' : '') + '">' +
+          '<input type="radio" name="avail-participant" value="' + esc(name) + '"' + (voted ? ' disabled' : '') + '>' +
+          '<span class="name-option-label">' + esc(name) + '</span>' +
+          (voted ? '<span class="voted-badge">Voted &#10003;</span>' : '') + '</label>';
+      });
+      html += '</div></div>';
+    } else {
+      html += '<div class="name-section fi"><label class="name-label" for="name-input">Your name</label>' +
+        '<input class="name-input" id="name-input" type="text" placeholder="' + esc(hit.recipient_name) + '" value="' + esc(hit.recipient_name) + '"></div>';
+    }
+
     var dateOnly = timeSlots.length === 0;
     html += '<div class="availability-section fi"><span class="section-label">When are you free?</span><div class="day-grid" id="day-grid">';
     if (dateOnly) {
@@ -435,12 +466,27 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       });
     }
     html += '</div></div>';
-    html += '<button class="submit-btn fi" id="submit-btn" disabled>' + (dateOnly ? 'Select dates, then submit' : 'Select times, then submit') + '</button>';
+    var hasParticipants = participants.length > 0;
+    var defaultBtnText = hasParticipants ? 'Pick your name, then select dates' : (dateOnly ? 'Select dates, then submit' : 'Select times, then submit');
+    html += '<button class="submit-btn fi" id="submit-btn" disabled>' + defaultBtnText + '</button>';
     html += '<div id="result-area"></div>';
     html += '<div class="hit-footer fi"><a href="https://robo.app">Powered by Robo</a></div>';
     app.innerHTML = html;
 
+    var selectedName = null;
     var selectedSlots = {};
+
+    if (hasParticipants) {
+      document.querySelectorAll('#avail-name-picker input[type="radio"]').forEach(function(input) {
+        input.addEventListener('change', function() {
+          selectedName = this.value;
+          updSlots();
+          var dg = document.getElementById('day-grid');
+          if (dg) dg.scrollIntoView({ behavior:'smooth', block:'start' });
+        });
+      });
+    }
+
     document.getElementById('day-grid').addEventListener('click', function(e) {
       var slot = e.target.closest('.time-slot'); if (!slot) return;
       var key = slot.dataset.day + '|' + slot.dataset.time;
@@ -451,20 +497,38 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
     var submitBtn = document.getElementById('submit-btn');
     function updSlots() {
       var n = Object.keys(selectedSlots).length;
-      submitBtn.disabled = n === 0;
       var unit = dateOnly ? 'date' : 'time';
-      submitBtn.textContent = n > 0 ? 'Submit ' + n + ' ' + unit + (n>1?'s':'') : (dateOnly ? 'Select dates, then submit' : 'Select times, then submit');
+      if (hasParticipants) {
+        if (selectedName && n > 0) { submitBtn.disabled = false; submitBtn.textContent = 'Submit ' + n + ' ' + unit + (n>1?'s':''); }
+        else if (selectedName) { submitBtn.disabled = true; submitBtn.textContent = 'Select at least one ' + unit; }
+        else { submitBtn.disabled = true; submitBtn.textContent = 'Pick your name, then select ' + unit + 's'; }
+      } else {
+        submitBtn.disabled = n === 0;
+        submitBtn.textContent = n > 0 ? 'Submit ' + n + ' ' + unit + (n>1?'s':'') : (dateOnly ? 'Select dates, then submit' : 'Select times, then submit');
+      }
     }
     submitBtn.addEventListener('click', function() {
       if (submitBtn.disabled) return;
+      var name;
+      if (hasParticipants) {
+        name = selectedName;
+        if (respondedNames[name]) {
+          document.getElementById('result-area').innerHTML =
+            '<div class="success"><div class="success-icon">&#10003;</div>' +
+            '<p class="success-title">Already responded!</p>' +
+            '<p class="success-msg">You\\'ve already submitted your availability.</p></div>';
+          return;
+        }
+      } else {
+        name = document.getElementById('name-input').value.trim() || hit.recipient_name;
+      }
       submitBtn.disabled = true; submitBtn.classList.add('submitting'); submitBtn.textContent = 'Submitting...';
-      var name = document.getElementById('name-input').value.trim() || hit.recipient_name;
       var slots = Object.keys(selectedSlots).map(function(k) { var p=k.split('|'); return {date:p[0],time:p[1]}; });
       fetch(API_BASE + '/api/hits/' + hitId + '/respond', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ respondent_name: name, response_data: { available_slots: slots } })
       })
-      .then(function(res) { if (!res.ok) throw new Error('fail'); return res.json(); })
+      .then(function(res) { if (res.status === 409) throw new Error('already_responded'); if (!res.ok) throw new Error('fail'); return res.json(); })
       .then(function() {
         document.getElementById('result-area').innerHTML =
           '<div class="success"><div class="success-icon">&#10003;</div>' +
@@ -474,7 +538,17 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
         document.querySelector('.availability-section').style.display='none';
         document.querySelector('.name-section').style.display='none';
       })
-      .catch(function() { submitBtn.disabled=false; submitBtn.classList.remove('submitting'); submitBtn.textContent='Error — tap to retry'; });
+      .catch(function(err) {
+        if (err.message === 'already_responded') {
+          document.getElementById('result-area').innerHTML =
+            '<div class="success"><div class="success-icon">&#10003;</div>' +
+            '<p class="success-title">Already responded!</p>' +
+            '<p class="success-msg">You\\'ve already submitted your availability.</p></div>';
+          submitBtn.style.display = 'none';
+          document.querySelector('.availability-section').style.display = 'none';
+          document.querySelector('.name-section').style.display = 'none';
+        } else { submitBtn.disabled=false; submitBtn.classList.remove('submitting'); submitBtn.textContent='Error — tap to retry'; }
+      });
     });
   }
 

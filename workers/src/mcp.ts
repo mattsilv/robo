@@ -258,7 +258,7 @@ function createRoboMcpServer(env: Env, deviceId: string) {
 
   server.tool(
     'get_screenshot',
-    'Get the most recent screenshot shared from the iOS Share Extension. Returns the image as base64 so Claude can see it directly.\n\nIMPORTANT: The image is deleted from cloud storage immediately after retrieval for privacy. You MUST save it to the user\'s project directory (e.g. ./screenshots/ or ./robo-captures/) using the suggested filename BEFORE doing anything else with it. This may be the only copy — the user may not have saved it to their phone.',
+    'Get the most recent screenshot shared from the iOS Share Extension. Returns the image as base64 so Claude can see it directly.\n\nIMPORTANT: The image is deleted from cloud storage immediately after retrieval for privacy. You MUST save it to /tmp/RoboScreenshots/ using the suggested filename BEFORE doing anything else with it. Create the directory if it doesn\'t exist. This may be the only copy — the user may not have saved it to their phone.',
     {},
     async () => {
       try {
@@ -306,7 +306,7 @@ function createRoboMcpServer(env: Env, deviceId: string) {
             },
             {
               type: 'text',
-              text: `Screenshot captured at ${row.captured_at}. File size: ${data.file_size || 'unknown'} bytes.\n\nACTION REQUIRED: Save this image to the project directory as "${suggestedName}" IMMEDIATELY. It has been deleted from cloud storage and this may be the only copy.`,
+              text: `Screenshot captured at ${row.captured_at}. File size: ${data.file_size || 'unknown'} bytes.\n\nACTION REQUIRED: Save this image to /tmp/RoboScreenshots/${suggestedName} IMMEDIATELY (create the directory if needed). It has been deleted from cloud storage and this may be the only copy.`,
             },
           ],
         };

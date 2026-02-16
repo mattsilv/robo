@@ -10,6 +10,7 @@ import { submitSensorData } from './routes/sensors';
 import { getInbox, pushCard, respondToCard } from './routes/inbox';
 import { analyzeWithOpus } from './routes/opus';
 import { debugSync, debugList, debugGet, debugDownload } from './routes/debug';
+import { uploadScreenshot } from './routes/screenshots';
 import { lookupNutrition } from './routes/nutrition';
 import { createHit, getHit, deleteHit, uploadHitPhoto, completeHit, listHits, listHitPhotos, respondToHit, listHitResponses } from './routes/hits';
 import { serveHitPage } from './routes/hitPage';
@@ -71,6 +72,9 @@ app.get('/hit/:id', serveHitPage);
 app.get('/api/keys', mcpTokenAuth, listAPIKeys);
 app.post('/api/keys', mcpTokenAuth, createAPIKey);
 app.delete('/api/keys/:key_id', mcpTokenAuth, deleteAPIKey);
+
+// Screenshot upload (Share Extension → R2)
+app.post('/api/screenshots', deviceAuth, uploadScreenshot);
 
 // Debug sync (auth required — stores scan data in R2 for developer debugging)
 app.post('/api/debug/sync', deviceAuth, debugSync);

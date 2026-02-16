@@ -2,9 +2,12 @@ import Foundation
 import Security
 
 /// Minimal Keychain wrapper for storing DeviceConfig across app reinstalls.
+/// Uses App Group access group so the Share Extension can read credentials.
 enum KeychainHelper {
     private static let service = "com.silv.Robo"
     private static let account = "deviceConfig"
+    // Team ID prefix must match DEVELOPMENT_TEAM in project.yml
+    private static let accessGroup = "R3Z5CY34Q5.group.com.silv.Robo"
 
     static func save(_ config: DeviceConfig) {
         guard let data = try? JSONEncoder().encode(config) else { return }
@@ -13,6 +16,7 @@ enum KeychainHelper {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
+            kSecAttrAccessGroup as String: accessGroup,
         ]
 
         // Delete existing, then add (simpler than update logic)
@@ -29,6 +33,7 @@ enum KeychainHelper {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
+            kSecAttrAccessGroup as String: accessGroup,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
@@ -44,6 +49,7 @@ enum KeychainHelper {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
+            kSecAttrAccessGroup as String: accessGroup,
         ]
         SecItemDelete(query as CFDictionary)
     }

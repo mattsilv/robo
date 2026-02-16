@@ -256,6 +256,60 @@ function createRoboMcpServer(env: Env, deviceId: string) {
     }
   );
 
+  server.tool(
+    'get_screenshot',
+    'Get the most recent screenshot shared from the iOS Share Extension. Returns the image as base64 so Claude can see it directly.',
+    {},
+    async () => {
+      try {
+        const row = await env.DB.prepare(
+          "SELECT * FROM sensor_data WHERE device_id = ? AND sensor_type = 'camera' AND data LIKE '%share_extension%' ORDER BY captured_at DESC LIMIT 1"
+        ).bind(deviceId).first();
+
+        if (!row) {
+          return { content: [{ type: 'text', text: 'No screenshots found. Share a screenshot from iOS using Share → Robo.' }] };
+        }
+
+        const data = JSON.parse(row.data as string);
+        const r2Key = data.r2_key;
+        if (!r2Key) {
+          return { content: [{ type: 'text', text: 'Screenshot metadata found but no R2 key.' }] };
+        }
+
+        const obj = await env.BUCKET.get(r2Key);
+        if (!obj) {
+          return { content: [{ type: 'text', text: `Screenshot R2 object not found: ${r2Key}` }] };
+        }
+
+        const arrayBuffer = await obj.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+
+        // Base64 encode
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
+
+        return {
+          content: [
+            {
+              type: 'image' as const,
+              data: base64,
+              mimeType: 'image/jpeg',
+            },
+            {
+              type: 'text',
+              text: `Screenshot captured at ${row.captured_at}. File size: ${data.file_size || 'unknown'} bytes.`,
+            },
+          ],
+        };
+      } catch (err: any) {
+        return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+      }
+    }
+  );
+
   return server;
 }
 

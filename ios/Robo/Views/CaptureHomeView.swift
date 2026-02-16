@@ -3,6 +3,7 @@ import SwiftData
 import AudioToolbox
 
 struct CaptureHomeView: View {
+    @AppStorage("userName") private var userName = ""
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \RoomScanRecord.capturedAt, order: .reverse) private var roomScans: [RoomScanRecord]
     @Query(sort: \ScanRecord.capturedAt, order: .reverse) private var scans: [ScanRecord]
@@ -43,7 +44,7 @@ struct CaptureHomeView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Capture")
+            .navigationTitle(userName.isEmpty ? "Capture" : "Hi, \(userName)")
             .overlay(alignment: .top) {
                 if let name = completedAgentName {
                     successToast(name: name)

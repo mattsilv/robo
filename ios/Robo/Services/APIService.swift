@@ -131,6 +131,26 @@ class APIService {
         return try await post(url: url, body: payload)
     }
 
+    func createHitWithMode(
+        distributionMode: String,
+        taskDescription: String,
+        participants: [String]?,
+        senderName: String? = nil,
+        hitType: String? = nil,
+        config: [String: Any]? = nil
+    ) async throws -> HitCreateWithModeResponse {
+        let url = try makeURL(path: "/api/hits")
+        var payload: [String: Any] = [
+            "distribution_mode": distributionMode,
+            "task_description": taskDescription,
+        ]
+        if let participants { payload["participants"] = participants }
+        if let senderName { payload["sender_name"] = senderName }
+        if let hitType { payload["hit_type"] = hitType }
+        if let config { payload["config"] = config }
+        return try await post(url: url, body: payload)
+    }
+
     func fetchHits() async throws -> [HitSummary] {
         let url = try makeURL(path: "/api/hits")
         let response: HitListResponse = try await get(url: url)
@@ -404,6 +424,31 @@ struct HitCreateResponse: Decodable {
         case taskDescription = "task_description"
         case hitType = "hit_type"
         case groupId = "group_id"
+    }
+}
+
+struct HitCreateWithModeResponse: Decodable {
+    let distributionMode: String?
+    let id: String?
+    let url: String?
+    let groupId: String?
+    let hits: [HitLink]?
+    let count: Int?
+    let senderName: String?
+    let taskDescription: String?
+
+    struct HitLink: Decodable {
+        let name: String
+        let id: String
+        let url: String
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, url, hits, count
+        case distributionMode = "distribution_mode"
+        case groupId = "group_id"
+        case senderName = "sender_name"
+        case taskDescription = "task_description"
     }
 }
 

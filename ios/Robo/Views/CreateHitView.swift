@@ -1,27 +1,85 @@
 import SwiftUI
 
+enum HitDistributionMode: String, CaseIterable {
+    case individual
+    case group
+    case open
+
+    var label: String {
+        switch self {
+        case .individual: return "Individual"
+        case .group: return "Group"
+        case .open: return "Open"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .individual: return "Separate link per person"
+        case .group: return "One link, pick name from list"
+        case .open: return "One link, anyone can respond"
+        }
+    }
+}
+
 struct CreateHitView: View {
     @Environment(APIService.self) private var apiService
     @Environment(\.dismiss) private var dismiss
 
-    @State private var recipientName = ""
+    @State private var distributionMode: HitDistributionMode = .individual
     @State private var taskDescription = ""
+    @State private var participantNames = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var createdHitURL: URL?
+    @State private var createdHitURLs: [(name: String, url: URL)] = []
+    @State private var showResults = false
+
+    private var participants: [String] {
+        participantNames
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
 
     private var isValid: Bool {
-        !recipientName.trimmingCharacters(in: .whitespaces).isEmpty
-        && !taskDescription.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasDescription = !taskDescription.trimmingCharacters(in: .whitespaces).isEmpty
+        switch distributionMode {
+        case .individual, .group:
+            return hasDescription && !participants.isEmpty
+        case .open:
+            return hasDescription
+        }
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Recipient") {
-                    TextField("Name (e.g. Sarah, Mom)", text: $recipientName)
-                        .textContentType(.name)
-                        .textInputAutocapitalization(.words)
+                Section {
+                    Picker("Distribution", selection: $distributionMode) {
+                        ForEach(HitDistributionMode.allCases, id: \.self) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text(distributionMode.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if distributionMode != .open {
+                    Section("Participants") {
+                        TextField("Names (comma-separated)", text: $participantNames)
+                            .textContentType(.name)
+                            .textInputAutocapitalization(.words)
+
+                        if !participants.isEmpty {
+                            Text("\(participants.count) participant\(participants.count == 1 ? "" : "s"): \(participants.joined(separator: ", "))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
 
                 Section("Task") {
@@ -38,7 +96,7 @@ struct CreateHitView: View {
                             if isLoading {
                                 ProgressView()
                             } else {
-                                Label("Generate Link", systemImage: "link.badge.plus")
+                                Label("Generate Link\(distributionMode == .individual && participants.count > 1 ? "s" : "")", systemImage: "link.badge.plus")
                             }
                             Spacer()
                         }
@@ -51,6 +109,27 @@ struct CreateHitView: View {
                         Text(errorMessage)
                             .foregroundStyle(.red)
                             .font(.caption)
+                    }
+                }
+
+                if !createdHitURLs.isEmpty {
+                    Section("Generated Links") {
+                        ForEach(createdHitURLs, id: \.url) { item in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(item.name)
+                                        .font(.headline)
+                                    Text(item.url.absoluteString)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                Spacer()
+                                ShareLink(item: item.url) {
+                                    Image(systemName: "square.and.arrow.up")
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -72,11 +151,20 @@ struct CreateHitView: View {
         errorMessage = nil
 
         do {
-            let hit = try await apiService.createHit(
-                recipientName: recipientName.trimmingCharacters(in: .whitespaces),
-                taskDescription: taskDescription.trimmingCharacters(in: .whitespaces)
+            let result = try await apiService.createHitWithMode(
+                distributionMode: distributionMode.rawValue,
+                taskDescription: taskDescription.trimmingCharacters(in: .whitespaces),
+                participants: distributionMode != .open ? participants : nil
             )
-            if let url = URL(string: hit.url) {
+
+            if let urls = result.hits, !urls.isEmpty {
+                // Individual mode: show all links inline
+                createdHitURLs = urls.compactMap { hit in
+                    guard let url = URL(string: hit.url) else { return nil }
+                    return (name: hit.name, url: url)
+                }
+            } else if let urlString = result.url, let url = URL(string: urlString) {
+                // Group/open mode: single share sheet
                 createdHitURL = url
             }
         } catch {

@@ -94,15 +94,44 @@ export type InboxCard = {
   responded_at: string | null;
 };
 
+// HIT Distribution Modes
+export const HIT_DISTRIBUTION_MODES = {
+  individual: {
+    key: 'individual' as const,
+    label: 'Individual Links',
+    description: 'Separate link per person, name baked in',
+    requires_participants: true,
+    creates_multiple_hits: true,
+  },
+  group: {
+    key: 'group' as const,
+    label: 'Group Link',
+    description: 'Single link, pick your name from dropdown',
+    requires_participants: true,
+    creates_multiple_hits: false,
+  },
+  open: {
+    key: 'open' as const,
+    label: 'Open Link',
+    description: 'Single link, type your name',
+    requires_participants: false,
+    creates_multiple_hits: false,
+  },
+} as const;
+
+export type DistributionMode = keyof typeof HIT_DISTRIBUTION_MODES;
+
 // HIT (Human Intelligence Task) schemas
 export const CreateHitSchema = z.object({
-  recipient_name: z.string().min(1).max(50),
+  recipient_name: z.string().min(1).max(50).optional(),
   task_description: z.string().min(1).max(500),
   agent_name: z.string().max(100).optional(),
   hit_type: z.enum(['photo', 'poll', 'availability', 'group_poll']).optional(),
   config: z.record(z.any()).optional(),
   group_id: z.string().max(100).optional(),
   sender_name: z.string().max(50).optional(),
+  distribution_mode: z.enum(['individual', 'group', 'open']).optional(),
+  participants: z.array(z.string().min(1).max(50)).max(50).optional(),
 });
 
 export const HitResponseSchema = z.object({

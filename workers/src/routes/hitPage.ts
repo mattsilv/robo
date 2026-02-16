@@ -43,6 +43,12 @@ export async function serveHitPage(c: Context<{ Bindings: Env }>) {
         const title = config.title || desc;
         ogTitle = `${senderName} is planning ${title}`;
         ogDescription = '';
+      } else if (recipientName === 'Group') {
+        ogTitle = `${senderName} sent a group request`;
+        ogDescription = desc;
+      } else if (recipientName === 'Anyone') {
+        ogTitle = `${senderName} needs your help`;
+        ogDescription = desc;
       } else {
         ogTitle = `Hi ${recipientName} — ${senderName} wants you to test something`;
         ogDescription = `${senderName} assigned you a HIT (Human Intelligence Task). ${desc}`;
@@ -573,8 +579,18 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
   }
 
   function renderGenericHit(hit) {
+    var config = hit.config ? (typeof hit.config === 'string' ? JSON.parse(hit.config) : hit.config) : {};
+    var participants = config.participants || [];
+    var isGroup = hit.recipient_name === 'Group' && participants.length > 0;
+    var isOpen = hit.recipient_name === 'Anyone';
+
+    var greeting;
+    if (isGroup) greeting = '<h1 class="greeting">Hi there,</h1>';
+    else if (isOpen) greeting = '<h1 class="greeting">Hi there,</h1>';
+    else greeting = '<h1 class="greeting">Hi <span class="name">' + esc(hit.recipient_name) + '</span>,</h1>';
+
     var html = topBar +
-      '<div class="hero fi"><h1 class="greeting">Hi <span class="name">' + esc(hit.recipient_name) + '</span>,</h1>' +
+      '<div class="hero fi">' + greeting +
       '<p class="subtitle"><span class="sender">' + esc(hit.sender_name) + '</span> sent you a request</p></div>';
     html += '<div class="task-card fi"><div class="task-header"><div class="task-icon">' +
       '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>' +
@@ -582,6 +598,21 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       '<div class="task-meta"><span class="task-pill">Photo</span>';
     if (hit.agent_name) html += '<span style="font-family:\\'JetBrains Mono\\',monospace;font-size:0.72rem;color:var(--text-muted);">via ' + esc(hit.agent_name) + '</span>';
     html += '</div></div></div></div>';
+
+    // Group mode: name picker dropdown
+    if (isGroup) {
+      html += '<div class="name-section fi"><span class="name-label">Who are you?</span><div class="name-picker" id="generic-name-picker">';
+      participants.forEach(function(name) {
+        html += '<label class="name-option"><input type="radio" name="generic-participant" value="' + esc(name) + '"><span class="name-option-label">' + esc(name) + '</span></label>';
+      });
+      html += '</div></div>';
+    }
+    // Open mode: free-text name input
+    else if (isOpen) {
+      html += '<div class="name-section fi"><label class="name-label" for="open-name-input">Your name</label>' +
+        '<input class="name-input" id="open-name-input" type="text" placeholder="Enter your name" autocomplete="name"></div>';
+    }
+
     html += '<p class="fi" style="font-size:0.85rem;color:var(--text-dim);text-align:center;">Photo upload is available in the Robo app.</p>';
     html += '<div class="hit-footer fi"><a href="https://robo.app">Get Robo</a></div>';
     app.innerHTML = html;

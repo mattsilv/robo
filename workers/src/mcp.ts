@@ -5,6 +5,58 @@ import type { Env } from './types';
 
 const MAX_SAMPLE_BYTES = 5_000; // 5 KB structural sample for room scan context
 
+/** Generate a Python script that renders a 2D floor plan PNG and opens it in the browser. */
+function generateFloorPlanScript(
+  polygon: { x: number; y: number }[],
+  widthFt: number,
+  depthFt: number,
+  objects: { category: string; x_ft: number; y_ft: number; width_ft: number; depth_ft: number }[],
+): string {
+  const pts = polygon.map((p) => `(${p.x}, ${p.y})`).join(', ');
+  const objLines = objects.map((o) =>
+    `    ax.add_patch(plt.Rectangle((${o.x_ft - o.width_ft / 2}, ${o.y_ft - o.depth_ft / 2}), ${o.width_ft}, ${o.depth_ft}, fc='#dbeafe', ec='#3b82f6', lw=1))\n` +
+    `    ax.text(${o.x_ft}, ${o.y_ft}, '${o.category}', ha='center', va='center', fontsize=7, color='#1e40af')`
+  ).join('\n');
+
+  return `#!/usr/bin/env python3
+"""Robo floor plan renderer — auto-generated from LiDAR scan. Run: python3 /tmp/floor_plan.py"""
+import subprocess, sys
+try:
+    import matplotlib
+except ImportError:
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'matplotlib'])
+    import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
+import webbrowser, os
+
+polygon = [${pts}]
+fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+ax.add_patch(Polygon(polygon, closed=True, fc='#f8fafc', ec='#1e293b', lw=2))
+ax.set_aspect('equal')
+xs = [p[0] for p in polygon]
+ys = [p[1] for p in polygon]
+margin = 2
+ax.set_xlim(min(xs) - margin, max(xs) + margin)
+ax.set_ylim(min(ys) - margin, max(ys) + margin)
+ax.set_xlabel('feet')
+ax.set_ylabel('feet')
+ax.set_title('Floor Plan (${widthFt} x ${depthFt} ft)')
+ax.grid(True, alpha=0.3)
+# Label dimensions
+ax.annotate(f'${widthFt} ft', xy=((min(xs)+max(xs))/2, min(ys)-1), ha='center', fontsize=10, color='#64748b')
+ax.annotate(f'${depthFt} ft', xy=(min(xs)-1, (min(ys)+max(ys))/2), ha='center', fontsize=10, color='#64748b', rotation=90)
+# Objects
+if True:
+${objLines || '    pass'}
+out = '/tmp/robo_floor_plan.png'
+fig.savefig(out, dpi=150, bbox_inches='tight')
+print(f'Floor plan saved to {out}')
+webbrowser.open('file://' + os.path.abspath(out))
+`;
+}
+
 function createRoboMcpServer(env: Env, deviceId: string) {
   const server = new McpServer({
     name: 'Robo Sensor Bridge',
@@ -190,10 +242,51 @@ function createRoboMcpServer(env: Env, deviceId: string) {
           }
 
           const toFt = (m: number) => +(m * 3.28084).toFixed(1);
-          const sample: any = {};
-          if (walls.length) sample.walls_sample = [walls[0]];
-          if (floors.length) sample.floors_sample = [floors[0]];
-          if (objects.length) sample.objects_sample = [objects[0]];
+
+          // Extract floor polygon in 2D feet (same as iOS RoomDataProcessor)
+          const floorPolygon2dFt: { x: number; y: number }[] = [];
+          if (floors.length > 0) {
+            const f = floors[0];
+            const corners = f.polygonCorners || [];
+            // Transform corners from local to world space using the floor's 4x4 transform
+            const cols = f.transform?.columns;
+            for (const c of corners) {
+              let wx: number, wz: number;
+              if (cols && cols.length === 4) {
+                // column-major 4x4: world = M * local
+                wx = cols[0][0] * c.x + cols[1][0] * c.y + cols[2][0] * c.z + cols[3][0];
+                wz = cols[0][2] * c.x + cols[1][2] * c.y + cols[2][2] * c.z + cols[3][2];
+              } else {
+                wx = c.x;
+                wz = c.z;
+              }
+              floorPolygon2dFt.push({
+                x: +(wx * 3.28084).toFixed(2),
+                y: +(wz * 3.28084).toFixed(2),
+              });
+            }
+          }
+
+          // Simplified objects list: category + position + size in feet (no matrices)
+          const objectsSummary = objects.map((o: any) => {
+            const d = o.dimensions || {};
+            const cols = o.transform?.columns;
+            const pos = cols?.[3] || [0, 0, 0];
+            return {
+              category: o.category || 'unknown',
+              x_ft: toFt(pos[0] || 0),
+              y_ft: toFt(pos[2] || 0),
+              width_ft: toFt(d.x || 0),
+              depth_ft: toFt(d.z || 0),
+            };
+          });
+
+          const widthFt = toFt(maxX - minX);
+          const depthFt = toFt(maxZ - minZ);
+          const downloadPath = `/api/debug/download/${encodeURIComponent(key)}`;
+
+          // Python floor plan script — renders PNG and opens in browser
+          const floorPlanScript = generateFloorPlanScript(floorPolygon2dFt, widthFt, depthFt, objectsSummary);
 
           const summary = {
             type: 'room_scan_summary',
@@ -206,33 +299,27 @@ function createRoboMcpServer(env: Env, deviceId: string) {
               object_categories: [...new Set(objects.map((o: any) => o.category))],
               total_wall_area_sqft: +(totalWallArea * 10.7639).toFixed(1),
               total_floor_area_sqft: +(totalFloorArea * 10.7639).toFixed(1),
-              room_dimensions_ft: `${toFt(maxX - minX)} x ${toFt(maxZ - minZ)}`,
+              room_dimensions_ft: `${widthFt} x ${depthFt}`,
               payload_size_bytes: text.length,
               payload_size_human: text.length > 1_000_000
                 ? `${(text.length / 1_000_000).toFixed(1)} MB`
                 : `${(text.length / 1_000).toFixed(1)} KB`,
             },
-            download_url: `/api/debug/download/${encodeURIComponent(key)}`,
-            download_instructions: 'Use this URL with your Bearer token to download the full JSON to a local file. Do NOT load it into context — save to disk and process programmatically.',
+            floor_polygon_2d_ft: floorPolygon2dFt,
+            objects_summary: objectsSummary,
+            download_url: downloadPath,
             viewer_template_url: '/static/room-viewer.html',
-            viewer_instructions: 'Fetch the HTML template, replace {{ROOM_DATA}} with the downloaded JSON, save as a local .html file, and open in browser.',
-            schema: {
-              walls: '{ dimensions: {x: width, y: height, z: depth}, transform: {columns: [[4x4 col-major]]} }',
-              floors: '{ polygonCorners: [{x,y,z}], dimensions, transform }',
-              doors: '{ dimensions, transform }',
-              windows: '{ dimensions, transform }',
-              objects: '{ category: string, dimensions, transform }',
-              coordinate_system: 'Apple RoomPlan Y-up (same as Three.js). Transforms are column-major 4x4. Position = columns[3].',
-            },
-            engineering_guidance: [
-              '1. DOWNLOAD: fetch download_url with Bearer token, save to local .json file',
-              '2. 3D VIEWER: fetch viewer_template_url, replace {{ROOM_DATA}} with JSON, save as .html, open in browser',
-              '3. PAINT ESTIMATE: total_wall_area_sqft / 350 = gallons (one coat). Subtract doors (~21 sqft) and windows (~15 sqft each)',
-              '4. FURNITURE FIT: find target wall by index, compare wall dimensions.x (width) vs furniture width',
-              '5. FLOOR PLAN SVG: use floor polygonCorners for outline, add wall segments and door arcs',
-              '6. FLOORING: total_floor_area_sqft + 10% waste factor for ordering',
+            actionable_commands: [
+              `# Download full room JSON (save to disk, do NOT load into context)`,
+              `http GET https://api.robo.app${downloadPath} 'Authorization:Bearer YOUR_TOKEN' --download -o /tmp/room.json`,
+              `# Render 2D floor plan PNG (auto-opens in browser)`,
+              `python3 /tmp/floor_plan.py`,
+              `# Open interactive 3D viewer`,
+              `http GET https://api.robo.app/static/room-viewer.html --download -o /tmp/viewer.html && sed -i '' 's/{{ROOM_DATA}}/'$(cat /tmp/room.json)'/g' /tmp/viewer.html && open /tmp/viewer.html`,
+              `# Paint estimate: ${+(totalWallArea * 10.7639).toFixed(1)} sqft / 350 = ${+((totalWallArea * 10.7639) / 350).toFixed(1)} gallons (one coat). Subtract ~21 sqft per door, ~15 sqft per window.`,
+              `# Flooring: ${+(totalFloorArea * 10.7639).toFixed(1)} sqft + 10% waste = ${+((totalFloorArea * 10.7639) * 1.1).toFixed(0)} sqft to order`,
             ],
-            structural_sample: sample,
+            floor_plan_script: floorPlanScript,
           };
 
           return {

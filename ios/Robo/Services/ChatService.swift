@@ -185,6 +185,12 @@ class ChatService {
                     updateMessage(id: targetId, content: accumulated)
                 }
             }
+            // Parse HIT results from accumulated response
+            parseHitResults(content: accumulated, messageId: targetId)
+            if hitResults[targetId] != nil {
+                let cleaned = Self.cleanHitContent(accumulated)
+                updateMessage(id: targetId, content: cleaned)
+            }
         } catch is CancellationError {
             logger.debug("OpenRouter stream cancelled")
         } catch {

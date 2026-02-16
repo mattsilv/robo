@@ -36,16 +36,8 @@ export async function createHit(c: Context<{ Bindings: Env }>) {
   // Get device_id from auth header if present
   const deviceId = c.req.header('X-Device-ID') || null;
 
-  // Resolve sender name: explicit param → device name → fallback
-  let resolvedSender = sender_name || '';
-  if (!resolvedSender && deviceId) {
-    const device = await c.env.DB.prepare('SELECT name FROM devices WHERE id = ?').bind(deviceId).first<{ name: string | null }>();
-    const deviceName = device?.name || '';
-    if (deviceName && !deviceName.toLowerCase().startsWith('iphone')) {
-      resolvedSender = deviceName;
-    }
-  }
-  if (!resolvedSender) resolvedSender = DEFAULT_SENDER;
+  // Only use explicit sender_name from the request — never leak device names into public HIT links
+  const resolvedSender = sender_name || DEFAULT_SENDER;
 
   try {
     await c.env.DB.prepare(

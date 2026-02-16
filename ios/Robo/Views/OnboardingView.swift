@@ -64,7 +64,7 @@ struct OnboardingView: View {
                         .padding(.bottom, 24)
 
                     // Description
-                    Text("Your phone has incredible sensors. Robo collects what they see — for you, for your team, or for your AI agent.")
+                    Text("Your phone has incredible sensors. Robo connects them to your favorite AI agent.")
                         .font(.body)
                         .foregroundStyle(.white.opacity(0.7))
                         .multilineTextAlignment(.center)

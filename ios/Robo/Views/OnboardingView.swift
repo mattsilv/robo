@@ -55,7 +55,7 @@ struct OnboardingView: View {
                     .padding(.bottom, 12)
 
                     // Tagline
-                    Text("The Context Collector")
+                    Text(AppCopy.App.tagline)
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundStyle(.blue)
@@ -72,12 +72,15 @@ struct OnboardingView: View {
                         .padding(.horizontal, 32)
                         .padding(.bottom, 40)
 
-                    // Feature pills
+                    // Feature pills — driven by FeatureRegistry
                     VStack(spacing: 12) {
-                        featureRow(icon: "cube.transparent", text: "LiDAR room scanning with measurements", color: .purple)
-                        featureRow(icon: "camera.fill", text: "Photo capture for AI analysis", color: .blue)
-                        featureRow(icon: "barcode.viewfinder", text: "Barcode & product scanning", color: .orange)
-                        featureRow(icon: "person.3.fill", text: "Group decisions via shareable links", color: .green)
+                        ForEach(FeatureRegistry.activeSkills) { skill in
+                            featureRow(
+                                icon: Self.iconForSkill(skill.id),
+                                text: "\(skill.name) — \(skill.tagline)",
+                                color: Self.colorForSkill(skill.id)
+                            )
+                        }
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 48)
@@ -160,6 +163,32 @@ struct OnboardingView: View {
         .padding(.vertical, 10)
         .background(Color.white.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private static func iconForSkill(_ id: String) -> String {
+        switch id {
+        case "lidar": return "cube.transparent"
+        case "barcode": return "barcode.viewfinder"
+        case "camera": return "camera.fill"
+        case "product_scan": return "cart"
+        case "hit_links": return "person.3.fill"
+        case "mcp_bridge": return "terminal"
+        case "screenshot_share": return "square.and.arrow.up"
+        default: return "star"
+        }
+    }
+
+    private static func colorForSkill(_ id: String) -> Color {
+        switch id {
+        case "lidar": return .purple
+        case "barcode": return .orange
+        case "camera": return .blue
+        case "product_scan": return .green
+        case "hit_links": return .mint
+        case "mcp_bridge": return .orange
+        case "screenshot_share": return .cyan
+        default: return .gray
+        }
     }
 
     private func completeOnboarding() {

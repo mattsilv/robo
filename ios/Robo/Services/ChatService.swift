@@ -119,9 +119,9 @@ class ChatService {
             return
         }
 
-        // Build messages array with system prompt + conversation history
+        // Build messages array with system prompt (no tools) + conversation history
         var openRouterMessages: [[String: String]] = [
-            ["role": "system", "content": Self.buildSystemPrompt()]
+            ["role": "system", "content": Self.buildSystemPrompt(includingTools: false)]
         ]
         for msg in messages.dropLast() { // dropLast to skip empty assistant placeholder
             if msg.role == .user || msg.role == .assistant {

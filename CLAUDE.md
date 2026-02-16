@@ -193,7 +193,7 @@ wrangler deploy
 ```
 
 ### iOS (TestFlight)
-Auto-deploys to TestFlight on push to `main` when `ios/**` files change (via `.github/workflows/testflight.yml`). Can also trigger manually:
+Manual trigger only (no auto-deploy on push):
 ```bash
 gh workflow run testflight.yml
 ```

@@ -324,23 +324,55 @@ private struct MessageBubble: View {
     let isStreaming: Bool
 
     private var isUser: Bool { message.role == .user }
+    @State private var showCopied = false
 
     var body: some View {
         HStack {
             if isUser { Spacer(minLength: 60) }
 
-            HStack(alignment: .bottom, spacing: 0) {
-                Text(message.content.isEmpty && isStreaming ? " " : message.content)
-                if isStreaming && !message.content.isEmpty {
-                    TypingCursor()
+            ZStack(alignment: .top) {
+                HStack(alignment: .bottom, spacing: 0) {
+                    Text(message.content.isEmpty && isStreaming ? " " : message.content)
+                    if isStreaming && !message.content.isEmpty {
+                        TypingCursor()
+                    }
+                }
+                .padding(12)
+                .background(isUser ? Color.blue : Color(.systemGray5))
+                .foregroundStyle(isUser ? .white : .primary)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+
+                if showCopied {
+                    Text("Copied!")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
+                        .transition(.opacity.combined(with: .scale))
+                        .offset(y: -8)
                 }
             }
-            .padding(12)
-            .background(isUser ? Color.blue : Color(.systemGray5))
-            .foregroundStyle(isUser ? .white : .primary)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .onTapGesture {
+                guard !message.content.isEmpty, !isStreaming else { return }
+                copyMessage()
+            }
+            .onLongPressGesture {
+                guard !message.content.isEmpty else { return }
+                copyMessage()
+            }
 
             if !isUser { Spacer(minLength: 60) }
+        }
+    }
+
+    private func copyMessage() {
+        UIPasteboard.general.string = message.content
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation(.easeInOut(duration: 0.2)) { showCopied = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation(.easeInOut(duration: 0.2)) { showCopied = false }
         }
     }
 }

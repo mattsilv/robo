@@ -116,7 +116,8 @@ class APIService {
         taskDescription: String,
         hitType: String? = nil,
         config: [String: Any]? = nil,
-        groupId: String? = nil
+        groupId: String? = nil,
+        senderName: String? = nil
     ) async throws -> HitCreateResponse {
         let url = try makeURL(path: "/api/hits")
         var payload: [String: Any] = [
@@ -126,6 +127,7 @@ class APIService {
         if let hitType { payload["hit_type"] = hitType }
         if let config { payload["config"] = config }
         if let groupId { payload["group_id"] = groupId }
+        if let senderName { payload["sender_name"] = senderName }
         return try await post(url: url, body: payload)
     }
 

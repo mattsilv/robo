@@ -38,6 +38,11 @@ export async function serveHitPage(c: Context<{ Bindings: Env }>) {
         const config = hit.config ? JSON.parse(hit.config) : {};
         ogTitle = `${senderName} needs your help`;
         ogDescription = config.context || desc;
+      } else if (hit.hit_type === 'availability') {
+        const config = hit.config ? JSON.parse(hit.config) : {};
+        const title = config.title || desc;
+        ogTitle = `${senderName} is planning ${title}`;
+        ogDescription = '';
       } else {
         ogTitle = `Hi ${recipientName} — ${senderName} wants you to test something`;
         ogDescription = `${senderName} assigned you a HIT (Human Intelligence Task). ${desc}`;
@@ -383,7 +388,13 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
   function renderAvailability(hit) {
     var config = hit.config ? (typeof hit.config === 'string' ? JSON.parse(hit.config) : hit.config) : {};
     var title = config.title || hit.task_description;
-    var timeSlots = config.time_slots || ['5 PM','6 PM','7 PM','8 PM'];
+    var timeSlots = config.time_slots || [];
+    // Normalize military time (e.g. "19:00" → "7 PM")
+    timeSlots = timeSlots.map(function(t) {
+      var m = t.match(/^(\d{1,2}):(\d{2})$/);
+      if (m) { var h = parseInt(m[1],10); var suffix = h >= 12 ? 'PM' : 'AM'; if (h > 12) h -= 12; if (h === 0) h = 12; return h + ' ' + suffix; }
+      return t;
+    });
     var days = [];
     if (config.date_options && config.date_options.length > 0) {
       config.date_options.forEach(function(isoDate) {
@@ -401,21 +412,30 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
 
     var html = topBar +
       '<div class="hero fi"><h1 class="greeting">Hi!</h1>' +
-      '<p class="subtitle"><span class="sender">' + esc(hit.sender_name) + '</span> is planning something</p></div>';
+      '<p class="subtitle"><span class="sender">' + esc(hit.sender_name) + '</span> is planning ' + esc(title) + '</p></div>';
     html += '<div class="task-card fi"><div class="task-header"><div class="task-icon">' +
       '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
       '</div><div><div class="task-title">' + esc(title) + '</div>' +
       '<div class="task-meta"><span class="task-pill">Availability</span></div></div></div></div>';
     html += '<div class="name-section fi"><label class="name-label" for="name-input">Your name</label>' +
       '<input class="name-input" id="name-input" type="text" placeholder="' + esc(hit.recipient_name) + '" value="' + esc(hit.recipient_name) + '"></div>';
+    var dateOnly = timeSlots.length === 0;
     html += '<div class="availability-section fi"><span class="section-label">When are you free?</span><div class="day-grid" id="day-grid">';
-    days.forEach(function(day) {
-      html += '<div class="day-row"><span class="day-label">' + day.short + '</span><div class="time-slots">';
-      timeSlots.forEach(function(time) { html += '<div class="time-slot" data-day="' + day.date + '" data-time="' + time + '">' + time + '</div>'; });
-      html += '</div></div>';
-    });
+    if (dateOnly) {
+      days.forEach(function(day) {
+        html += '<div class="day-row"><div class="time-slots">' +
+          '<div class="time-slot date-option" data-day="' + day.date + '" data-time="all-day" style="flex:1;padding:0.75rem;font-size:0.75rem;">' + day.label + '</div>' +
+          '</div></div>';
+      });
+    } else {
+      days.forEach(function(day) {
+        html += '<div class="day-row"><span class="day-label">' + day.short + '</span><div class="time-slots">';
+        timeSlots.forEach(function(time) { html += '<div class="time-slot" data-day="' + day.date + '" data-time="' + time + '">' + time + '</div>'; });
+        html += '</div></div>';
+      });
+    }
     html += '</div></div>';
-    html += '<button class="submit-btn fi" id="submit-btn" disabled>Select times, then submit</button>';
+    html += '<button class="submit-btn fi" id="submit-btn" disabled>' + (dateOnly ? 'Select dates, then submit' : 'Select times, then submit') + '</button>';
     html += '<div id="result-area"></div>';
     html += '<div class="hit-footer fi"><a href="https://robo.app">Powered by Robo</a></div>';
     app.innerHTML = html;
@@ -432,7 +452,8 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
     function updSlots() {
       var n = Object.keys(selectedSlots).length;
       submitBtn.disabled = n === 0;
-      submitBtn.textContent = n > 0 ? 'Submit ' + n + ' time' + (n>1?'s':'') : 'Select times, then submit';
+      var unit = dateOnly ? 'date' : 'time';
+      submitBtn.textContent = n > 0 ? 'Submit ' + n + ' ' + unit + (n>1?'s':'') : (dateOnly ? 'Select dates, then submit' : 'Select times, then submit');
     }
     submitBtn.addEventListener('click', function() {
       if (submitBtn.disabled) return;

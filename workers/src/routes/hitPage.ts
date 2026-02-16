@@ -311,6 +311,8 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       html += '</div></div>';
     }
 
+    html += '<div class="name-section fi"><label class="name-label" for="poll-notes-input">Anything to add?</label>' +
+      '<textarea class="name-input" id="poll-notes-input" placeholder="Additional context..." rows="2" style="resize:vertical;font-family:inherit;"></textarea></div>';
     html += '<button class="submit-btn fi" id="submit-btn" disabled>Pick your name, then vote</button>';
     html += '<div id="result-area"></div>';
     html += '<div class="hit-footer fi"><a href="https://robo.app">Powered by Robo</a></div>';
@@ -359,7 +361,7 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       submitBtn.disabled = true; submitBtn.classList.add('submitting'); submitBtn.textContent = 'Submitting...';
       fetch(API_BASE + '/api/hits/' + hitId + '/respond', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ respondent_name: selectedName, response_data: { selected_dates: Object.keys(selectedDates) } })
+        body: JSON.stringify({ respondent_name: selectedName, response_data: (function() { var d = { selected_dates: Object.keys(selectedDates) }; var n = (document.getElementById('poll-notes-input').value || '').trim(); if (n) d.notes = n; return d; })() })
       })
       .then(function(res) { if (res.status === 409) throw new Error('already_responded'); if (!res.ok) throw new Error('fail'); return res.json(); })
       .then(function() {
@@ -466,6 +468,9 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       });
     }
     html += '</div></div>';
+    html += '<div class="name-section fi"><label class="name-label" for="notes-input">Anything to add?</label>' +
+      '<textarea class="name-input" id="notes-input" placeholder="Additional context..." rows="2" style="resize:vertical;font-family:inherit;"></textarea></div>';
+
     var hasParticipants = participants.length > 0;
     var defaultBtnText = hasParticipants ? 'Pick your name, then select dates' : (dateOnly ? 'Select dates, then submit' : 'Select times, then submit');
     html += '<button class="submit-btn fi" id="submit-btn" disabled>' + defaultBtnText + '</button>';
@@ -524,9 +529,12 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       }
       submitBtn.disabled = true; submitBtn.classList.add('submitting'); submitBtn.textContent = 'Submitting...';
       var slots = Object.keys(selectedSlots).map(function(k) { var p=k.split('|'); return {date:p[0],time:p[1]}; });
+      var notes = (document.getElementById('notes-input').value || '').trim();
+      var responseData = { available_slots: slots };
+      if (notes) responseData.notes = notes;
       fetch(API_BASE + '/api/hits/' + hitId + '/respond', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ respondent_name: name, response_data: { available_slots: slots } })
+        body: JSON.stringify({ respondent_name: name, response_data: responseData })
       })
       .then(function(res) { if (res.status === 409) throw new Error('already_responded'); if (!res.ok) throw new Error('fail'); return res.json(); })
       .then(function() {

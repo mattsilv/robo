@@ -343,6 +343,89 @@ function createRoboMcpServer(env: Env, deviceId: string) {
     }
   );
 
+  // @ts-expect-error - MCP SDK deep type instantiation
+  server.tool(
+    'check_hit_status',
+    'Check the status of recent HITs (Human Intelligence Tasks) — availability polls, group polls, etc. Returns the most recent HITs with response details so you can see who has responded and what they said. If no hit_id is provided, returns the 3 most recent HITs.',
+    {
+      hit_id: z.string().optional().describe('Specific HIT ID to check. If omitted, returns the 3 most recent.'),
+    },
+    async ({ hit_id }) => {
+      try {
+        let hits: any[];
+        if (hit_id) {
+          const hit = await env.DB.prepare('SELECT * FROM hits WHERE id = ? AND device_id = ?')
+            .bind(hit_id, deviceId).first();
+          hits = hit ? [hit] : [];
+        } else {
+          const result = await env.DB.prepare(
+            'SELECT * FROM hits WHERE device_id = ? ORDER BY created_at DESC LIMIT 3'
+          ).bind(deviceId).all();
+          hits = result.results;
+        }
+
+        if (hits.length === 0) {
+          return { content: [{ type: 'text', text: 'No HITs found.' }] };
+        }
+
+        const enriched = [];
+        for (const hit of hits) {
+          const responses = await env.DB.prepare(
+            'SELECT respondent_name, response_data, created_at FROM hit_responses WHERE hit_id = ? ORDER BY created_at ASC'
+          ).bind(hit.id).all();
+
+          const config = hit.config ? JSON.parse(hit.config) : {};
+          const participants: string[] = config.participants || [];
+          const respondedNames = responses.results.map((r: any) => r.respondent_name);
+          const notResponded = participants.filter((p: string) => !respondedNames.includes(p));
+
+          enriched.push({
+            id: hit.id,
+            type: hit.hit_type,
+            title: config.title || hit.task_description,
+            status: hit.status,
+            created_at: hit.created_at,
+            url: `https://robo.app/hit/${hit.id}`,
+            participants,
+            responded: respondedNames,
+            not_responded: notResponded,
+            responses: responses.results.map((r: any) => ({
+              name: r.respondent_name,
+              data: JSON.parse(r.response_data),
+              at: r.created_at,
+            })),
+          });
+        }
+
+        // For the most recent HIT, provide a natural language summary
+        const latest = enriched[0];
+        let summary = `Most recent HIT: "${latest.title}" (${latest.type})\n`;
+        summary += `Status: ${latest.status} | Created: ${latest.created_at}\n`;
+        summary += `Link: ${latest.url}\n\n`;
+
+        if (latest.participants.length > 0) {
+          summary += `Responded (${latest.responded.length}/${latest.participants.length}): ${latest.responded.join(', ') || 'nobody yet'}\n`;
+          if (latest.not_responded.length > 0) {
+            summary += `Still waiting on: ${latest.not_responded.join(', ')}\n`;
+          }
+        }
+
+        if (latest.responses.length > 0) {
+          summary += '\nResponses:\n';
+          for (const r of latest.responses) {
+            summary += `  ${r.name}: ${JSON.stringify(r.data)}\n`;
+          }
+        }
+
+        return {
+          content: [{ type: 'text', text: summary + '\n\n' + JSON.stringify(enriched, null, 2) }],
+        };
+      } catch (err: any) {
+        return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+      }
+    }
+  );
+
   server.tool(
     'get_screenshot',
     'Get the most recent screenshot shared from the iOS Share Extension. Returns the image as base64 so Claude can see it directly.\n\nIMPORTANT: The image is deleted from cloud storage immediately after retrieval for privacy. You MUST save it to /tmp/RoboScreenshots/ using the suggested filename BEFORE doing anything else with it. Create the directory if it doesn\'t exist. This may be the only copy — the user may not have saved it to their phone.',

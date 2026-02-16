@@ -50,6 +50,7 @@ struct ChatView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     if !chatService.messages.isEmpty {
                         Button {
+                            speechService.stopRecording()
                             chatService.resetSession()
                         } label: {
                             Image(systemName: "arrow.counterclockwise")
@@ -61,8 +62,14 @@ struct ChatView: View {
                 chatService.configure(apiService: apiService, captureCoordinator: captureCoordinator)
                 chatService.prewarm()
             }
+            .onDisappear {
+                speechService.stopRecording()
+            }
             .fullScreenCover(item: captureBinding) { capture in
                 captureView(for: capture)
+            }
+            .onChange(of: captureCoordinator.pendingCapture != nil) { _, isPresenting in
+                if isPresenting { speechService.stopRecording() }
             }
         }
     }
@@ -302,6 +309,7 @@ struct ChatView: View {
         guard !trimmed.isEmpty else { return }
         inputText = ""
         isInputFocused = false
+        speechService.stopRecording()
         chatService.send(trimmed)
     }
 

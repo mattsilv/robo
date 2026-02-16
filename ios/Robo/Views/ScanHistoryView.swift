@@ -73,7 +73,7 @@ struct ScanHistoryView: View {
                                 Label("Export All", systemImage: "square.and.arrow.up")
                             }
                         }
-                        .disabled(isExporting || (scans.isEmpty && roomScans.isEmpty && motionRecords.isEmpty && beaconEvents.isEmpty))
+                        .disabled(isExporting || (scans.isEmpty && roomScans.isEmpty && motionRecords.isEmpty && beaconEvents.isEmpty && photos.isEmpty))
                     }
 
                     if (selectedSegment == 0 && !scans.isEmpty) ||
@@ -334,21 +334,7 @@ struct ScanHistoryView: View {
             List {
                 ForEach(photos, id: \.filename) { photo in
                     HStack(spacing: 12) {
-                        if let thumb = PhotoStorageService.loadThumbnail(photo.filename) {
-                            Image(uiImage: thumb)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 44, height: 44)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        } else {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(.blue.opacity(0.15))
-                                .frame(width: 44, height: 44)
-                                .overlay {
-                                    Image(systemName: "photo")
-                                        .foregroundStyle(.blue)
-                                }
-                        }
+                        PhotoThumbnailView(filename: photo.filename)
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(photo.filename)
@@ -404,7 +390,7 @@ struct ScanHistoryView: View {
     // MARK: - Export All Section
 
     private var totalItemCount: Int {
-        scans.count + roomScans.count + motionRecords.count + beaconEvents.count
+        scans.count + roomScans.count + motionRecords.count + beaconEvents.count + photos.count
     }
 
     @ViewBuilder
@@ -1013,6 +999,36 @@ struct BeaconTimelineView: View {
         let hours = minutes / 60
         let remainMins = minutes % 60
         return "\(hours)h\(remainMins)m"
+    }
+}
+
+// MARK: - Photo Thumbnail View
+
+private struct PhotoThumbnailView: View {
+    let filename: String
+    @State private var thumbnail: UIImage?
+
+    var body: some View {
+        Group {
+            if let thumbnail {
+                Image(uiImage: thumbnail)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(.blue.opacity(0.15))
+                    .frame(width: 44, height: 44)
+                    .overlay {
+                        Image(systemName: "photo")
+                            .foregroundStyle(.blue)
+                    }
+            }
+        }
+        .task {
+            thumbnail = PhotoStorageService.loadThumbnail(filename)
+        }
     }
 }
 

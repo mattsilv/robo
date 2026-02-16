@@ -74,7 +74,7 @@ struct OnboardingView: View {
 
                     // Feature pills — driven by FeatureRegistry
                     VStack(spacing: 12) {
-                        ForEach(FeatureRegistry.activeSkills) { skill in
+                        ForEach(FeatureRegistry.featuredSkills) { skill in
                             featureRow(
                                 icon: Self.iconForSkill(skill.id),
                                 text: "\(skill.name) — \(skill.tagline)",

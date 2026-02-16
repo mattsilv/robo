@@ -24,6 +24,7 @@ enum FeatureRegistry {
         let name: String
         let tagline: String
         let status: Status
+        let featured: Bool
         let skillType: AgentRequest.SkillType?
         let category: Category
     }
@@ -43,6 +44,7 @@ enum FeatureRegistry {
             name: "LiDAR Floor Plans",
             tagline: "3D room scans with Apple RoomPlan",
             status: .active,
+            featured: true,
             skillType: .lidar,
             category: .sensor
         ),
@@ -51,6 +53,7 @@ enum FeatureRegistry {
             name: "Barcode Scanning",
             tagline: "Instant barcode and QR code capture",
             status: .active,
+            featured: true,
             skillType: .barcode,
             category: .sensor
         ),
@@ -59,6 +62,7 @@ enum FeatureRegistry {
             name: "Guided Photos",
             tagline: "Checklist-driven photo capture for agents",
             status: .active,
+            featured: false,
             skillType: .camera,
             category: .sensor
         ),
@@ -67,6 +71,7 @@ enum FeatureRegistry {
             name: "Product Scanner",
             tagline: "Barcode + photos for product analysis",
             status: .active,
+            featured: false,
             skillType: .productScan,
             category: .workflow
         ),
@@ -75,6 +80,7 @@ enum FeatureRegistry {
             name: "BLE Beacons",
             tagline: "Bluetooth Low Energy beacon detection",
             status: .coming_soon,
+            featured: false,
             skillType: .beacon,
             category: .sensor
         ),
@@ -83,6 +89,7 @@ enum FeatureRegistry {
             name: "HIT Links",
             tagline: "Get data from anyone via shareable links",
             status: .active,
+            featured: true,
             skillType: nil,
             category: .platform
         ),
@@ -91,6 +98,7 @@ enum FeatureRegistry {
             name: "MCP Bridge",
             tagline: "Connect phone sensors to Claude Code",
             status: .active,
+            featured: false,
             skillType: nil,
             category: .platform
         ),
@@ -99,6 +107,7 @@ enum FeatureRegistry {
             name: "Share Screenshot to Claude",
             tagline: "iOS Share Extension for instant context",
             status: .active,
+            featured: true,
             skillType: nil,
             category: .platform
         ),
@@ -107,6 +116,7 @@ enum FeatureRegistry {
             name: "Motion Capture",
             tagline: "Accelerometer and gyroscope data",
             status: .coming_soon,
+            featured: false,
             skillType: .motion,
             category: .sensor
         ),
@@ -115,6 +125,7 @@ enum FeatureRegistry {
             name: "HealthKit Data",
             tagline: "Health and fitness metrics",
             status: .coming_soon,
+            featured: false,
             skillType: .health,
             category: .sensor
         )
@@ -152,6 +163,9 @@ enum FeatureRegistry {
 
     /// Active skills only.
     static var activeSkills: [Skill] { skills.filter { $0.status == .active } }
+
+    /// Featured skills — shown on onboarding and marketing surfaces.
+    static var featuredSkills: [Skill] { skills.filter { $0.featured } }
 
     /// Coming soon skills only.
     static var comingSoonSkills: [Skill] { skills.filter { $0.status == .coming_soon } }

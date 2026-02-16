@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var isReRegistering = false
     @State private var lastMcpCallDate: Date?
     @State private var pollingTask: Task<Void, Never>?
+    @AppStorage("aiProvider") private var aiProviderRaw: String = AIProvider.openRouter.rawValue
     #if DEBUG
     @AppStorage("dev.syncToCloud") private var debugSyncEnabled = false
     @Query(sort: \RoomScanRecord.capturedAt, order: .reverse) private var roomScans: [RoomScanRecord]
@@ -155,6 +156,20 @@ struct SettingsView: View {
                             }
                         }
                     }
+                }
+
+                Section("AI Model") {
+                    Picker("Provider", selection: $aiProviderRaw) {
+                        ForEach(AIProvider.allCases) { provider in
+                            Text(provider.displayName).tag(provider.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    Text(aiProviderRaw == AIProvider.openRouter.rawValue
+                        ? "Uses Gemini Flash Lite via OpenRouter (cloud)"
+                        : "Apple Foundation Models (on-device, iOS 26+)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 #if DEBUG

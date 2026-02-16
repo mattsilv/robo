@@ -31,11 +31,11 @@ class APIService {
         self.deviceService = deviceService
     }
 
-    private var baseURL: String {
+    var baseURL: String {
         deviceService.config.apiBaseURL
     }
 
-    private var deviceId: String {
+    var deviceId: String {
         deviceService.config.id
     }
 

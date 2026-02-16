@@ -33,6 +33,7 @@ struct CreateHitView: View {
     @State private var errorMessage: String?
     @State private var createdHitURL: URL?
     @State private var createdHitURLs: [(name: String, url: URL)] = []
+    @State private var showResults = false
 
     private var participants: [String] {
         participantNames
@@ -110,6 +111,27 @@ struct CreateHitView: View {
                             .font(.caption)
                     }
                 }
+
+                if !createdHitURLs.isEmpty {
+                    Section("Generated Links") {
+                        ForEach(createdHitURLs, id: \.url) { item in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(item.name)
+                                        .font(.headline)
+                                    Text(item.url.absoluteString)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                Spacer()
+                                ShareLink(item: item.url) {
+                                    Image(systemName: "square.and.arrow.up")
+                                }
+                            }
+                        }
+                    }
+                }
             }
             .navigationTitle("Create HIT")
             .navigationBarTitleDisplayMode(.inline)
@@ -135,10 +157,14 @@ struct CreateHitView: View {
                 participants: distributionMode != .open ? participants : nil
             )
 
-            // For individual mode, share the first URL (user can see all in list)
-            if let urls = result.hits, let first = urls.first, let url = URL(string: first.url) {
-                createdHitURL = url
+            if let urls = result.hits, !urls.isEmpty {
+                // Individual mode: show all links inline
+                createdHitURLs = urls.compactMap { hit in
+                    guard let url = URL(string: hit.url) else { return nil }
+                    return (name: hit.name, url: url)
+                }
             } else if let urlString = result.url, let url = URL(string: urlString) {
+                // Group/open mode: single share sheet
                 createdHitURL = url
             }
         } catch {

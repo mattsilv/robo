@@ -131,7 +131,7 @@ export const CreateHitSchema = z.object({
   group_id: z.string().max(100).optional(),
   sender_name: z.string().max(50).optional(),
   distribution_mode: z.enum(['individual', 'group', 'open']).optional(),
-  participants: z.array(z.string().min(1).max(50)).optional(),
+  participants: z.array(z.string().min(1).max(50)).max(50).optional(),
 });
 
 export const HitResponseSchema = z.object({

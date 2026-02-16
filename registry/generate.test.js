@@ -127,6 +127,74 @@ assert(swift === swift2, 'Swift output is identical after second run');
 assert(ts === ts2, 'TS output is identical after second run');
 assert(html === html2, 'HTML output is identical after second run (no double badges)');
 
+// ─── P1: Swift string escaping ──────────────────────────────────────
+console.log('\n6. Swift string escaping');
+
+// Verify no unescaped special chars in Swift string literals
+// Match all `"..."` inside static let/Skill/Agent declarations
+const swiftStringLiterals = swift.match(/(?<=(?:static let \w+ = |id: |name: |tagline: |description: |icon: |color: |ogTitle: |ogDescription: ))"([^"]*)"/g) || [];
+for (const literal of swiftStringLiterals) {
+  const inner = literal.slice(1, -1); // strip outer quotes
+  // Check no raw backslashes that aren't part of escape sequences
+  const badBackslash = inner.match(/\\(?![\\nrt"])/);
+  assert(!badBackslash, `No unescaped backslashes in Swift literal: ${literal.slice(0, 40)}`);
+}
+
+// Verify escaping works on strings that contain special chars
+// The current data may not have them, but verify the mechanism:
+// All quotes in source data should appear as \" in Swift
+for (const agent of features.agents) {
+  if (agent.description.includes('"')) {
+    assert(swift.includes(agent.description.replace(/"/g, '\\"')),
+      `Agent "${agent.name}" description quotes are escaped in Swift`);
+  }
+}
+// em-dash (—) should pass through unchanged (valid UTF-8 in Swift)
+for (const agent of features.agents) {
+  if (agent.description.includes('—')) {
+    assert(swift.includes('—'), `Em-dash passes through in Swift for agent "${agent.name}"`);
+  }
+}
+assert(swiftStringLiterals.length > 0, `Found ${swiftStringLiterals.length} Swift string literals to validate`);
+
+// ─── P2: Badge reversibility (status change simulation) ────────────
+console.log('\n7. Badge reversibility');
+
+// Simulate: change a coming_soon skill to active, re-run codegen, verify badge removed
+import { writeFileSync as writeTmp } from 'fs';
+const featuresPath = join(__dirname, 'features.json');
+const originalFeatures = readFileSync(featuresPath, 'utf-8');
+
+// Mutate: make "beacon" active
+const mutated = JSON.parse(originalFeatures);
+const beaconSkill = mutated.skills.find(s => s.id === 'beacon');
+beaconSkill.status = 'active';
+writeTmp(featuresPath, JSON.stringify(mutated, null, 2));
+
+try {
+  execSync('node registry/generate.js', { cwd: ROOT, stdio: 'pipe' });
+  const htmlAfterChange = readFileSync(join(ROOT, 'site/index.html'), 'utf-8');
+  assert(!htmlAfterChange.includes('BLE Beacons <span class="badge-coming-soon">Soon</span>'),
+    'BLE Beacons badge REMOVED after status changed to active');
+  assert(htmlAfterChange.includes('Motion Capture <span class="badge-coming-soon">Soon</span>'),
+    'Motion Capture badge STILL PRESENT (unchanged)');
+
+  // Verify Swift also updated
+  const swiftAfterChange = readFileSync(swiftPath, 'utf-8');
+  const activeLineAfter = swiftAfterChange.match(/static let activeSkillTypes.*=.*\[([^\]]*)\]/)?.[1] || '';
+  assert(activeLineAfter.includes('.beacon'),
+    'Swift activeSkillTypes now includes .beacon after status change');
+} finally {
+  // Restore original features.json
+  writeTmp(featuresPath, originalFeatures);
+  execSync('node registry/generate.js', { cwd: ROOT, stdio: 'pipe' });
+}
+
+// Verify restoration
+const htmlRestored = readFileSync(join(ROOT, 'site/index.html'), 'utf-8');
+assert(htmlRestored.includes('BLE Beacons <span class="badge-coming-soon">Soon</span>'),
+  'BLE Beacons badge RESTORED after reverting features.json');
+
 // ─── Summary ────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

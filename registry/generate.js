@@ -17,6 +17,16 @@ const ROOT = join(__dirname, '..');
 const features = JSON.parse(readFileSync(join(__dirname, 'features.json'), 'utf-8'));
 const copy = JSON.parse(readFileSync(join(__dirname, 'copy.json'), 'utf-8'));
 
+/** Escape a string for embedding in a Swift string literal. */
+function swiftEscape(str) {
+  return str
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
+}
+
 // ─── Swift Generation ───────────────────────────────────────────────
 
 function generateSwift() {
@@ -34,9 +44,9 @@ function generateSwift() {
   const skillEntries = skills.map(s => {
     const skillTypeStr = s.skillType ? `.${s.skillType}` : 'nil';
     return `        Skill(
-            id: "${s.id}",
-            name: "${s.name}",
-            tagline: "${s.tagline}",
+            id: "${swiftEscape(s.id)}",
+            name: "${swiftEscape(s.name)}",
+            tagline: "${swiftEscape(s.tagline)}",
             status: .${s.status},
             skillType: ${skillTypeStr},
             category: .${s.category}
@@ -45,11 +55,11 @@ function generateSwift() {
 
   const agentEntries = agents.map(a => {
     return `        Agent(
-            id: "${a.id}",
-            name: "${a.name}",
-            description: "${a.description.replace(/"/g, '\\"')}",
-            icon: "${a.icon}",
-            color: "${a.color}",
+            id: "${swiftEscape(a.id)}",
+            name: "${swiftEscape(a.name)}",
+            description: "${swiftEscape(a.description)}",
+            icon: "${swiftEscape(a.icon)}",
+            color: "${swiftEscape(a.color)}",
             status: .${a.status}
         )`;
   }).join(',\n');
@@ -122,21 +132,21 @@ ${agentEntries}
 /// Edit registry/copy.json, then run: npm run codegen
 enum AppCopy {
     enum App {
-        static let name = "${copy.app.name}"
-        static let tagline = "${copy.app.tagline}"
-        static let ogTitle = "${copy.app.og_title}"
-        static let ogDescription = "${copy.app.og_description}"
+        static let name = "${swiftEscape(copy.app.name)}"
+        static let tagline = "${swiftEscape(copy.app.tagline)}"
+        static let ogTitle = "${swiftEscape(copy.app.og_title)}"
+        static let ogDescription = "${swiftEscape(copy.app.og_description)}"
     }
 
     enum Tabs {
-        static let capture = "${copy.tabs.capture}"
-        static let history = "${copy.tabs.history}"
-        static let chat = "${copy.tabs.chat}"
-        static let settings = "${copy.tabs.settings}"
+        static let capture = "${swiftEscape(copy.tabs.capture)}"
+        static let history = "${swiftEscape(copy.tabs.history)}"
+        static let chat = "${swiftEscape(copy.tabs.chat)}"
+        static let settings = "${swiftEscape(copy.tabs.settings)}"
     }
 
     enum Footer {
-        static let tagline = "${copy.footer.tagline}"
+        static let tagline = "${swiftEscape(copy.footer.tagline)}"
     }
 }
 
@@ -195,10 +205,12 @@ function updateLandingPage() {
   const htmlPath = join(ROOT, 'site/index.html');
   let html = readFileSync(htmlPath, 'utf-8');
 
-  // Find and update feature labels with status badges
+  // Step 1: Strip ALL existing badges (makes this idempotent and handles status changes)
+  html = html.replace(/ <span class="badge-coming-soon">Soon<\/span>/g, '');
+
+  // Step 2: Add badges for current coming_soon skills
   for (const skill of features.skills) {
     if (skill.status === 'coming_soon') {
-      // Add "Coming Soon" badge to feature labels
       const labelRegex = new RegExp(
         `(<span class="feature-label">${escapeRegex(skill.name)})(</span>)`,
         'g'
@@ -207,9 +219,8 @@ function updateLandingPage() {
     }
   }
 
-  // Don't double-inject badges
+  // Step 3: Ensure badge CSS exists (only add once)
   if (!html.includes('.badge-coming-soon')) {
-    // Add badge CSS before </style>
     const badgeCSS = `
     .badge-coming-soon {
       font-size: 0.55rem;

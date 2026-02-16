@@ -29,26 +29,27 @@ export async function createHit(c: Context<{ Bindings: Env }>) {
     return c.json({ error: 'Invalid request body', issues: validated.error.issues }, 400);
   }
 
-  const { recipient_name, task_description, agent_name, hit_type, config, group_id } = validated.data;
+  const { recipient_name, task_description, agent_name, hit_type, config, group_id, sender_name } = validated.data;
   const id = generateShortId();
   const now = new Date().toISOString();
 
   // Get device_id from auth header if present
   const deviceId = c.req.header('X-Device-ID') || null;
+  const resolvedSender = sender_name || DEFAULT_SENDER;
 
   try {
     await c.env.DB.prepare(
       `INSERT INTO hits (id, sender_name, recipient_name, task_description, agent_name, status, photo_count, created_at, device_id, hit_type, config, group_id)
        VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?, ?)`
     )
-      .bind(id, DEFAULT_SENDER, recipient_name, task_description, agent_name || null, now, deviceId, hit_type || 'photo', config ? JSON.stringify(config) : null, group_id || null)
+      .bind(id, resolvedSender, recipient_name, task_description, agent_name || null, now, deviceId, hit_type || 'photo', config ? JSON.stringify(config) : null, group_id || null)
       .run();
 
     return c.json(
       {
         id,
         url: `https://robo.app/hit/${id}`,
-        sender_name: DEFAULT_SENDER,
+        sender_name: resolvedSender,
         recipient_name,
         task_description,
         agent_name: agent_name || null,

@@ -102,6 +102,7 @@ export const CreateHitSchema = z.object({
   hit_type: z.enum(['photo', 'poll', 'availability', 'group_poll']).optional(),
   config: z.record(z.any()).optional(),
   group_id: z.string().max(100).optional(),
+  sender_name: z.string().max(50).optional(),
 });
 
 export const HitResponseSchema = z.object({

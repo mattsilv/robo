@@ -23,7 +23,10 @@ function buildOgLayout(hit: HitData) {
     const config = hit.config ? JSON.parse(hit.config) : {};
     subtitle = config.context || config.title || hit.task_description || '';
   } else if (hit.hit_type === 'availability') {
-    headline = `${senderName} is planning something`;
+    const config = hit.config ? JSON.parse(hit.config) : {};
+    const title = config.title || hit.task_description || 'something';
+    headline = `${senderName} is planning ${title}`;
+    subtitle = '';
   }
 
   if (headline.length > 50) headline = headline.slice(0, 47) + '...';
@@ -40,7 +43,9 @@ function buildOgHtml(headline: string, subtitle: string): string {
     ? `<div style="display: flex; font-size: 24px; color: #3b82f6; background-color: rgba(37,99,235,0.12); border: 1px solid rgba(37,99,235,0.25); border-radius: 12px; padding: 12px 20px; line-height: 1.4;">${safeSubtitle}</div>`
     : '';
 
-  return `<div style="display: flex; width: 1200px; height: 630px; background-color: #06060a; font-family: sans-serif;"><div style="display: flex; flex-direction: column; justify-content: center; padding: 60px 70px; flex: 1;"><div style="display: flex; align-items: center; margin-bottom: 40px;"><div style="display: flex; width: 44px; height: 44px; background-color: #2563EB; border-radius: 12px; margin-right: 12px;"></div><div style="display: flex; font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: 0.05em;">ROBO.APP</div></div><div style="display: flex; font-size: 52px; font-weight: 700; color: #ffffff; line-height: 1.15; margin-bottom: 20px;">${safeHeadline}</div>${subtitleHtml}<div style="display: flex; font-size: 16px; color: #6b6b7b; margin-top: 40px; letter-spacing: 0.03em;">robo.app</div></div><div style="display: flex; align-items: center; justify-content: center; width: 350px;"><div style="display: flex; width: 200px; height: 200px; background-color: #2563EB; border-radius: 44px;"></div></div></div>`;
+  const robotIcon = `<svg viewBox="0 0 120 120" width="200" height="200" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="120" rx="28" fill="#2563EB"/><circle cx="42" cy="48" r="14" fill="white"/><circle cx="78" cy="48" r="14" fill="white"/><circle cx="42" cy="48" r="7" fill="#1a4fc0"/><circle cx="78" cy="48" r="7" fill="#1a4fc0"/><path d="M 34 80 Q 60 102 86 80" fill="none" stroke="white" stroke-width="8" stroke-linecap="round"/></svg>`;
+
+  return `<div style="display: flex; width: 1200px; height: 630px; background-color: #06060a; font-family: sans-serif;"><div style="display: flex; flex-direction: column; justify-content: center; padding: 60px 70px; flex: 1;"><div style="display: flex; align-items: center; margin-bottom: 40px;"><div style="display: flex; width: 44px; height: 44px; background-color: #2563EB; border-radius: 12px; margin-right: 12px;"></div><div style="display: flex; font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: 0.05em;">ROBO.APP</div></div><div style="display: flex; font-size: 52px; font-weight: 700; color: #ffffff; line-height: 1.15; margin-bottom: 20px;">${safeHeadline}</div>${subtitleHtml}<div style="display: flex; font-size: 16px; color: #6b6b7b; margin-top: 40px; letter-spacing: 0.03em;">robo.app</div></div><div style="display: flex; align-items: center; justify-content: center; width: 350px;">${robotIcon}</div></div>`;
 }
 
 export async function serveOgImage(c: Context<{ Bindings: Env }>) {

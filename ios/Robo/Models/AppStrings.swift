@@ -1,11 +1,12 @@
 import Foundation
 
-/// Single source of truth for user-facing strings.
+/// Legacy alias — use AppCopy.Tabs directly in new code.
+/// Generated from registry/copy.json via `npm run codegen`.
 enum AppStrings {
     enum Tabs {
-        static let capture = "Capture"
-        static let history = "My Data"
-        static let chat = "Chat"
-        static let settings = "Settings"
+        static let capture = AppCopy.Tabs.capture
+        static let history = AppCopy.Tabs.history
+        static let chat = AppCopy.Tabs.chat
+        static let settings = AppCopy.Tabs.settings
     }
 }

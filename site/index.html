@@ -656,6 +656,82 @@
       .mcp-tool { font-size: 0.6rem; padding: 0.25rem 0.55rem; }
     }
   
+    /* -- Demo Video -- */
+    .demo-video {
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto 1.5rem;
+    }
+    .demo-video__link {
+      display: block;
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      text-decoration: none;
+      transition: border-color 0.2s ease, transform 0.15s ease;
+    }
+    .demo-video__link:hover {
+      border-color: rgba(37,99,235,0.4);
+      transform: translateY(-2px);
+    }
+    .demo-video__badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 2;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: white;
+      background: #2563EB;
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+    }
+    .demo-video__thumb {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      display: block;
+      filter: brightness(0.7);
+      transition: filter 0.2s ease;
+    }
+    .demo-video__link:hover .demo-video__thumb {
+      filter: brightness(0.85);
+    }
+    .demo-video__play {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+      transition: transform 0.15s ease;
+    }
+    .demo-video__link:hover .demo-video__play {
+      transform: translate(-50%, -50%) scale(1.1);
+    }
+    .demo-video__caption {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 1.25rem 1rem 0.85rem;
+      background: linear-gradient(transparent, rgba(0,0,0,0.85));
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+    .demo-video__title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: white;
+    }
+    .demo-video__duration {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.5);
+    }
+
     /* -- TestFlight CTA -- */
     .testflight-cta {
       width: 100%;
@@ -935,6 +1011,21 @@
     <p class="description fade-in" style="margin-bottom: 2.5rem;">
       Open source. Privacy-first. Built entirely with <strong>Claude Code</strong>.
     </p>
+
+    <!-- Demo Video -->
+    <div class="demo-video fade-in">
+      <a href="https://www.youtube.com/watch?v=NlL9ZPDl6Rw" class="demo-video__link" target="_blank" rel="noopener">
+        <div class="demo-video__badge">Hackathon Demo</div>
+        <img class="demo-video__thumb" src="https://img.youtube.com/vi/NlL9ZPDl6Rw/maxresdefault.jpg" alt="Robo demo video" loading="lazy">
+        <div class="demo-video__play">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="24" fill="rgba(0,0,0,0.6)"/><path d="M19 15l14 9-14 9V15z" fill="white"/></svg>
+        </div>
+        <div class="demo-video__caption">
+          <span class="demo-video__title">See Robo in action</span>
+          <span class="demo-video__duration">3 min &mdash; Built with Opus 4.6 Hackathon Submission</span>
+        </div>
+      </a>
+    </div>
 
     <!-- TestFlight CTA -->
     <div class="testflight-cta fade-in">

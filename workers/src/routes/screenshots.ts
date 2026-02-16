@@ -3,11 +3,12 @@ import type { Env } from '../types';
 
 /**
  * POST /api/screenshots — Upload a screenshot image (multipart/form-data)
- * Headers: X-Device-ID (validated by deviceAuth middleware)
+ * Auth: Bearer token (preferred, resolves device ID) or X-Device-ID header
  * Body: multipart with "image" file field
  */
 export async function uploadScreenshot(c: Context<{ Bindings: Env }>) {
-  const deviceId = c.req.header('X-Device-ID')!;
+  // Prefer token-resolved device ID (accurate even if X-Device-ID is stale)
+  const deviceId = c.get('resolvedDeviceId') ?? c.req.header('X-Device-ID')!;
 
   let formData: FormData;
   try {

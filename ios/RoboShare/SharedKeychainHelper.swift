@@ -52,7 +52,9 @@ enum SharedKeychainHelper {
 }
 
 /// Minimal subset of DeviceConfig needed by the share extension.
+/// Fields are decoded from the full DeviceConfig stored by the main app.
 struct SharedDeviceConfig: Codable {
     var id: String
     var apiBaseURL: String
+    var mcpToken: String?
 }

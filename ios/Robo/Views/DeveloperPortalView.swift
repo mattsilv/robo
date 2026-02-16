@@ -155,6 +155,7 @@ struct DeveloperPortalView: View {
         {
           "mcpServers": {
             "robo": {
+              "type": "http",
               "url": "https://mcp.robo.app/mcp",
               "headers": {
                 "Authorization": "Bearer \(token)"

@@ -128,7 +128,7 @@ struct SettingsView: View {
                     NavigationLink {
                         DeveloperPortalView()
                     } label: {
-                        Label("API Keys & Quick Start", systemImage: "key")
+                        Label("MCP Quick Start", systemImage: "terminal")
                     }
                 }
 

@@ -9,8 +9,9 @@ enum KeychainHelper {
     // Team ID prefix must match DEVELOPMENT_TEAM in project.yml
     private static let accessGroup = "R3Z5CY34Q5.group.com.silv.Robo"
 
-    static func save(_ config: DeviceConfig) {
-        guard let data = try? JSONEncoder().encode(config) else { return }
+    @discardableResult
+    static func save(_ config: DeviceConfig) -> Bool {
+        guard let data = try? JSONEncoder().encode(config) else { return false }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -25,7 +26,7 @@ enum KeychainHelper {
         var addQuery = query
         addQuery[kSecValueData as String] = data
         addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        SecItemAdd(addQuery as CFDictionary, nil)
+        return SecItemAdd(addQuery as CFDictionary, nil) == errSecSuccess
     }
 
     static func load() -> DeviceConfig? {
@@ -35,9 +36,12 @@ enum KeychainHelper {
         }
         // Fallback: try without access group (pre-163 keychain entries)
         if let config = query(accessGroup: nil) {
-            // Migrate: re-save with access group so share extension can read it
-            save(config)
-            deleteLegacy()
+            // Migrate: re-save with access group so share extension can read it.
+            // Only delete legacy entry if save succeeded — otherwise we'd lose
+            // the only copy of the credentials.
+            if save(config) {
+                deleteLegacy()
+            }
             return config
         }
         return nil

@@ -66,6 +66,15 @@
 | `0001_initial_schema.sql` | devices, sensor_data, inbox_cards | Core tables |
 | `0002_hits.sql` | hits, hit_photos | HIT system tables |
 
+## GitHub Actions API Token (`CLOUDFLARE_API_TOKEN`)
+
+Token name: **Robo.app API token**
+
+| Scope | Permissions |
+|-------|-------------|
+| All accounts | D1:Edit, Cloudflare Pages:Edit, Workers R2 Storage:Edit, Workers Scripts:Edit |
+| robo.app zone | Workers Routes:Edit |
+
 ## Wrangler Commands
 
 ```bash

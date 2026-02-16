@@ -1,3 +1,6 @@
+# Claude Code MCP config (contains API tokens)
+.mcp.json
+
 # Xcode
 *.xcodeproj
 *.xcworkspace

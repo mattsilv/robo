@@ -144,7 +144,13 @@ class ChatService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiService.deviceId, forHTTPHeaderField: "X-Device-ID")
 
-        let firstName = UserDefaults.standard.string(forKey: "firstName") ?? ""
+        // Migrate old "userName" key to "firstName" (one-time)
+        var firstName = UserDefaults.standard.string(forKey: "firstName") ?? ""
+        if firstName.isEmpty, let old = UserDefaults.standard.string(forKey: "userName"), !old.isEmpty {
+            firstName = old
+            UserDefaults.standard.set(old, forKey: "firstName")
+            UserDefaults.standard.removeObject(forKey: "userName")
+        }
         var body: [String: Any] = [
             "messages": openRouterMessages,
             "timezone": TimeZone.current.identifier

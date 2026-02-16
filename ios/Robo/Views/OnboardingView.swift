@@ -3,6 +3,14 @@ import SwiftUI
 struct OnboardingView: View {
     @AppStorage("firstName") private var firstName = ""
     @AppStorage("hasOnboarded") private var hasOnboarded = false
+
+    /// Migrate old "userName" key to "firstName" (one-time)
+    private func migrateUserNameIfNeeded() {
+        if firstName.isEmpty, let old = UserDefaults.standard.string(forKey: "userName"), !old.isEmpty {
+            firstName = old
+            UserDefaults.standard.removeObject(forKey: "userName")
+        }
+    }
     @State private var nameInput = ""
     @FocusState private var isNameFocused: Bool
 
@@ -129,6 +137,7 @@ struct OnboardingView: View {
             .scrollDismissesKeyboard(.interactively)
             } // ScrollViewReader
         }
+        .onAppear { migrateUserNameIfNeeded() }
         .onTapGesture {
             isNameFocused = false
         }

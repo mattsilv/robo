@@ -103,7 +103,14 @@ async function executeCreateAvailabilityPoll(
   const hitId = generateShortId();
   const now = new Date().toISOString();
 
-  const senderName = firstName || 'Someone';
+  // Fallback: first_name from request → device name from DB → "Someone"
+  let senderName = firstName || '';
+  if (!senderName) {
+    const device = await db.prepare('SELECT name FROM devices WHERE id = ?').bind(deviceId).first<{ name: string | null }>();
+    const deviceName = device?.name || '';
+    // Don't use generic device names like "iPhone" or "iPhone 16 Pro"
+    senderName = (deviceName && !deviceName.toLowerCase().startsWith('iphone')) ? deviceName : 'Someone';
+  }
 
   const config = JSON.stringify({
     title: args.eventTitle,

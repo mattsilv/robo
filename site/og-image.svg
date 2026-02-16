@@ -23,12 +23,12 @@
   <text x="90" y="155" font-family="ui-monospace, 'Cascadia Code', 'Fira Code', monospace" font-weight="800" font-size="120" letter-spacing="5" fill="white">ROBO<tspan fill="#3b82f6">.</tspan>APP</text>
 
   <!-- Main tagline - big, commanding -->
-  <text x="90" y="260" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="700" font-size="62" fill="white" letter-spacing="-1">Control your</text>
-  <text x="90" y="330" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="700" font-size="62" fill="#3b82f6" letter-spacing="-1">AI Context</text>
+  <text x="90" y="280" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="700" font-size="72" fill="white" letter-spacing="-1">The Context</text>
+  <text x="90" y="360" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="700" font-size="72" fill="#3b82f6" letter-spacing="-1">Cultivator</text>
 
   <!-- Sub-tagline -->
-  <text x="90" y="395" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="400" font-size="28" fill="#6b6b7b" letter-spacing="0.5">Your phone's sensors, exposed as APIs.</text>
-  <text x="90" y="432" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="400" font-size="28" fill="#6b6b7b" letter-spacing="0.5">Any AI agent. One tap.</text>
+  <text x="90" y="420" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="400" font-size="28" fill="#6b6b7b" letter-spacing="0.5">Your phone's sensors, exposed as APIs.</text>
+  <text x="90" y="457" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="400" font-size="28" fill="#6b6b7b" letter-spacing="0.5">Any AI agent. One tap.</text>
 
   <!-- === RIGHT SIDE: Robot icon as card === -->
   <!-- Card shadow -->

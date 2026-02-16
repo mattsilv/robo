@@ -4,6 +4,7 @@ import AudioToolbox
 
 struct CaptureHomeView: View {
     @AppStorage("userName") private var userName = ""
+    var switchToMyData: (() -> Void)?
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \RoomScanRecord.capturedAt, order: .reverse) private var roomScans: [RoomScanRecord]
     @Query(sort: \ScanRecord.capturedAt, order: .reverse) private var scans: [ScanRecord]
@@ -31,8 +32,6 @@ struct CaptureHomeView: View {
     @State private var photoCapturedCount = 0
     @State private var completedAgentName: String?
 
-    // Post-capture routing
-    @State private var pendingRouting: CaptureRouting?
 
     var body: some View {
         NavigationStack {
@@ -85,19 +84,6 @@ struct CaptureHomeView: View {
         }
         .fullScreenCover(isPresented: $showingHealthCapture, onDismiss: handleHealthDismiss) {
             HealthCaptureView(captureContext: activeCaptureContext)
-        }
-        .sheet(item: $pendingRouting) { routing in
-            RoutingSuggestionSheet(
-                routing: routing,
-                agents: agents,
-                onRoute: { agentId in
-                    pendingRouting = nil
-                },
-                onSaveLocally: {
-                    pendingRouting = nil
-                }
-            )
-            .presentationDetents([.medium])
         }
     }
 
@@ -261,7 +247,7 @@ struct CaptureHomeView: View {
         if syncingAgentId != nil {
             handleAgentDismiss(dataWasCaptured: roomScans.count > initialRoomCount)
         } else if roomScans.count > initialRoomCount {
-            pendingRouting = CaptureRouting(sensorType: .lidar)
+            switchToMyData?()
         }
     }
 
@@ -269,7 +255,7 @@ struct CaptureHomeView: View {
         if syncingAgentId != nil {
             handleAgentDismiss(dataWasCaptured: photoCapturedCount > 0)
         } else if photoCapturedCount > 0 {
-            pendingRouting = CaptureRouting(sensorType: .camera, photoCount: photoCapturedCount)
+            switchToMyData?()
         }
         photoCapturedCount = 0
     }
@@ -286,7 +272,7 @@ struct CaptureHomeView: View {
         if syncingAgentId != nil {
             handleAgentDismiss(dataWasCaptured: scans.count > initialBarcodeCount)
         } else if scans.count > initialBarcodeCount {
-            pendingRouting = CaptureRouting(sensorType: .barcode)
+            switchToMyData?()
         }
     }
 
@@ -294,7 +280,7 @@ struct CaptureHomeView: View {
         if syncingAgentId != nil {
             handleAgentDismiss(dataWasCaptured: productCaptures.count > initialProductCount)
         } else if productCaptures.count > initialProductCount {
-            pendingRouting = CaptureRouting(sensorType: .productScan)
+            switchToMyData?()
         }
     }
 
@@ -302,7 +288,7 @@ struct CaptureHomeView: View {
         if syncingAgentId != nil {
             handleAgentDismiss(dataWasCaptured: beaconEvents.count > initialBeaconCount)
         } else if beaconEvents.count > initialBeaconCount {
-            pendingRouting = CaptureRouting(sensorType: .beacon)
+            switchToMyData?()
         }
     }
 
@@ -448,14 +434,6 @@ private struct AgentRequestBanner: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
-}
-
-// MARK: - Capture Routing Model
-
-struct CaptureRouting: Identifiable {
-    let id = UUID()
-    let sensorType: AgentRequest.SkillType
-    var photoCount: Int = 0
 }
 
 #Preview {

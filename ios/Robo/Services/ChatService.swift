@@ -112,18 +112,12 @@ class ChatService {
 
     // MARK: - OpenRouter (Cloud) Path
 
-<<<<<<< HEAD
     private func sendViaOpenRouter(text: String, targetId: UUID) async {
         guard let apiService else {
             updateMessage(id: targetId, content: "Chat not configured. Please restart the app.")
             finishStream(targetId: targetId)
             return
         }
-=======
-                    let content = response.content
-                    logger.debug("Chat response content: \(content)")
-                    self.updateMessage(id: targetId, content: content)
->>>>>>> 40c716c (fix(chat): improve HIT link parsing with robust regex + fallback)
 
         // Build messages array with system prompt + conversation history
         var openRouterMessages: [[String: String]] = [
@@ -222,8 +216,19 @@ class ChatService {
                 guard activeAssistantMessageId == targetId else { return }
 
                 let content = response.content
-                updateMessage(id: targetId, content: content)
+                logger.debug("Chat response content: \(content)")
+
+                // Parse HIT results before cleaning content
                 parseHitResults(content: content, messageId: targetId)
+
+                // If we found HIT results, clean the markdown mess from the bubble
+                let displayContent: String
+                if hitResults[targetId] != nil {
+                    displayContent = Self.cleanHitContent(content)
+                } else {
+                    displayContent = content
+                }
+                updateMessage(id: targetId, content: displayContent)
             } else {
                 let stream = session.streamResponse(to: text)
                 for try await partial in stream {
@@ -277,6 +282,25 @@ class ChatService {
 
     // MARK: - Private Helpers
 
+    /// Strip ugly markdown link lines from HIT responses so the bubble is clean.
+    /// The actual links are shown as interactive cards below the bubble.
+    static func cleanHitContent(_ content: String) -> String {
+        let lines = content.components(separatedBy: "\n")
+        var cleaned: [String] = []
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            // Skip lines that are just HIT links (bullet + name + URL)
+            if trimmed.contains("robo.app/hit/") { continue }
+            cleaned.append(line)
+        }
+
+        // Collapse multiple blank lines
+        return cleaned.joined(separator: "\n")
+            .replacingOccurrences(of: "\n\n\n", with: "\n\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func updateMessage(id: UUID, content: String) {
         guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
         messages[index].content = content
@@ -286,65 +310,60 @@ class ChatService {
         messages.first(where: { $0.id == id })?.content ?? ""
     }
 
-    /// Parse HIT URLs from tool output embedded in assistant response
+    /// Parse HIT URLs from tool output embedded in assistant response.
+    /// Apple Intelligence may reformat tool output into markdown links like:
+    ///   `• Vince: [Link](https://robo.app/hit/IbATsszG)`
+    /// or keep the raw format:
+    ///   `• Vince: https://robo.app/hit/IbATsszG`
     private func parseHitResults(content: String, messageId: UUID) {
         logger.debug("Parsing HIT results from content: \(content.prefix(500))")
 
         var results: [(name: String, url: String)] = []
+        let nsContent = content as NSString
 
-        // Strategy 1: Try regex to find all robo.app/hit URLs with context
-        let pattern = "(?:•|\\-|\\*|\\d+\\.)\\s*([^:\\n]+):\\s*(https://robo\\.app/hit/[a-zA-Z0-9\\-]+)"
-        if let regex = try? NSRegularExpression(pattern: pattern, options: []) {
-            let nsContent = content as NSString
+        // Strategy 1: Markdown link format — "• Name: [Link](https://robo.app/hit/XXX)"
+        let mdPattern = "(?:•|\\-|\\*)\\s*([^:\\n]+):\\s*\\[[^\\]]*\\]\\((https://robo\\.app/hit/[a-zA-Z0-9\\-]+)\\)"
+        if let regex = try? NSRegularExpression(pattern: mdPattern, options: []) {
             let matches = regex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+            for match in matches where match.numberOfRanges == 3 {
+                let nameRange = match.range(at: 1)
+                let urlRange = match.range(at: 2)
+                if nameRange.location != NSNotFound, urlRange.location != NSNotFound {
+                    let name = nsContent.substring(with: nameRange).trimmingCharacters(in: .whitespaces)
+                    let url = nsContent.substring(with: urlRange)
+                    results.append((name: name, url: url))
+                    logger.debug("Matched markdown link: name=\(name), url=\(url)")
+                }
+            }
+        }
 
-            for match in matches {
-                if match.numberOfRanges == 3 {
+        // Strategy 2: Plain URL format — "• Name: https://robo.app/hit/XXX"
+        if results.isEmpty {
+            let plainPattern = "(?:•|\\-|\\*|\\d+\\.)\\s*([^:\\n]+):\\s*(https://robo\\.app/hit/[a-zA-Z0-9\\-]+)"
+            if let regex = try? NSRegularExpression(pattern: plainPattern, options: []) {
+                let matches = regex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+                for match in matches where match.numberOfRanges == 3 {
                     let nameRange = match.range(at: 1)
                     let urlRange = match.range(at: 2)
-
                     if nameRange.location != NSNotFound, urlRange.location != NSNotFound {
                         let name = nsContent.substring(with: nameRange).trimmingCharacters(in: .whitespaces)
                         let url = nsContent.substring(with: urlRange)
                         results.append((name: name, url: url))
-                        logger.debug("Matched regex pattern: name=\(name), url=\(url)")
+                        logger.debug("Matched plain URL: name=\(name), url=\(url)")
                     }
                 }
             }
         }
 
-        // Strategy 2: Fallback - find any robo.app/hit URLs and try to extract names from context
+        // Strategy 3: Last resort — find any robo.app/hit URLs anywhere
         if results.isEmpty {
-            logger.debug("Strategy 1 failed, trying fallback extraction")
-
-            // Find all URLs
             let urlPattern = "https://robo\\.app/hit/[a-zA-Z0-9\\-]+"
             if let urlRegex = try? NSRegularExpression(pattern: urlPattern, options: []) {
-                let nsContent = content as NSString
                 let urlMatches = urlRegex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
-
-                for urlMatch in urlMatches {
+                for (i, urlMatch) in urlMatches.enumerated() {
                     let url = nsContent.substring(with: urlMatch.range)
-
-                    // Try to find a name near this URL (look backwards up to 50 chars)
-                    let searchStart = max(0, urlMatch.range.location - 50)
-                    let searchRange = NSRange(location: searchStart, length: urlMatch.range.location - searchStart)
-                    let context = nsContent.substring(with: searchRange)
-
-                    // Look for patterns like "Name:", "Name -", or just "Name"
-                    let lines = context.components(separatedBy: CharacterSet.newlines)
-                    if let lastLine = lines.last {
-                        let cleaned = lastLine
-                            .replacingOccurrences(of: "•", with: "")
-                            .replacingOccurrences(of: "-", with: "")
-                            .replacingOccurrences(of: "*", with: "")
-                            .replacingOccurrences(of: ":", with: "")
-                            .trimmingCharacters(in: .whitespaces)
-
-                        let name = cleaned.isEmpty ? "Link" : cleaned
-                        results.append((name: name, url: url))
-                        logger.debug("Fallback extraction: name=\(name), url=\(url)")
-                    }
+                    results.append((name: "Person \(i + 1)", url: url))
+                    logger.debug("Fallback extraction: url=\(url)")
                 }
             }
         }

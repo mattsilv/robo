@@ -5,8 +5,33 @@ import XCTest
 @available(iOS 26, *)
 final class ChatServiceHitParsingTests: XCTestCase {
 
-    func testParseHitResults_BulletFormat() {
-        // Test the original bullet format that the tool outputs
+    // MARK: - Parsing Tests
+
+    func testParseHitResults_MarkdownLinkFormat() {
+        // This is the ACTUAL format Apple Intelligence produces
+        let content = """
+        Here's the availability poll for the ski trip:
+
+        • Vince: [Link](https://robo.app/hit/IbATsszG)
+        • E: [Link](https://robo.app/hit/PhK9aF6E)
+        • Turtle: [Link](https://robo.app/hit/3OK7tFuX)
+
+        Share each link with the corresponding person. They can pick their available times in their browser.
+        """
+
+        let results = extractHitResults(from: content)
+
+        XCTAssertEqual(results.count, 3, "Should extract 3 HIT results from markdown link format")
+        XCTAssertEqual(results[0].name, "Vince")
+        XCTAssertEqual(results[0].url, "https://robo.app/hit/IbATsszG")
+        XCTAssertEqual(results[1].name, "E")
+        XCTAssertEqual(results[1].url, "https://robo.app/hit/PhK9aF6E")
+        XCTAssertEqual(results[2].name, "Turtle")
+        XCTAssertEqual(results[2].url, "https://robo.app/hit/3OK7tFuX")
+    }
+
+    func testParseHitResults_PlainURLFormat() {
+        // Original format from tool output
         let content = """
         Created availability poll: Ski Trip
 
@@ -14,12 +39,12 @@ final class ChatServiceHitParsingTests: XCTestCase {
         • E: https://robo.app/hit/def456
         • Turtle: https://robo.app/hit/ghi789
 
-        Share each link with the corresponding person. They can pick their available times in their browser.
+        Share each link with the corresponding person.
         """
 
         let results = extractHitResults(from: content)
 
-        XCTAssertEqual(results.count, 3)
+        XCTAssertEqual(results.count, 3, "Should extract 3 HIT results from plain URL format")
         XCTAssertEqual(results[0].name, "Vince")
         XCTAssertEqual(results[0].url, "https://robo.app/hit/abc123")
         XCTAssertEqual(results[1].name, "E")
@@ -28,53 +53,106 @@ final class ChatServiceHitParsingTests: XCTestCase {
         XCTAssertEqual(results[2].url, "https://robo.app/hit/ghi789")
     }
 
-    func testParseHitResults_MarkdownFormat() {
-        // Test if the model returns markdown-formatted links
+    func testParseHitResults_DashBulletFormat() {
         let content = """
-        I've created an availability poll for your ski trip!
-
-        - [Vince](https://robo.app/hit/abc123)
-        - [E](https://robo.app/hit/def456)
-        - [Turtle](https://robo.app/hit/ghi789)
-
-        Share these links with each person.
+        - Sarah: [Link](https://robo.app/hit/aaa111)
+        - Mike: [Link](https://robo.app/hit/bbb222)
         """
 
         let results = extractHitResults(from: content)
 
-        XCTAssertGreaterThan(results.count, 0, "Should extract URLs even in markdown format")
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0].name, "Sarah")
+        XCTAssertEqual(results[1].name, "Mike")
     }
 
-    func testParseHitResults_PlainTextFormat() {
-        // Test if the model just includes URLs without bullets
+    func testParseHitResults_FallbackFindsURLs() {
+        // Even if format is totally unknown, we should find the URLs
         let content = """
-        Here are the links:
-
-        Vince: https://robo.app/hit/abc123
-        E: https://robo.app/hit/def456
-        Turtle: https://robo.app/hit/ghi789
+        I made polls for everyone!
+        Check out https://robo.app/hit/xxx111 and https://robo.app/hit/yyy222
         """
 
         let results = extractHitResults(from: content)
 
-        XCTAssertGreaterThan(results.count, 0, "Should extract URLs even in plain text format")
+        XCTAssertEqual(results.count, 2, "Fallback should find URLs even without bullet format")
+        XCTAssertEqual(results[0].url, "https://robo.app/hit/xxx111")
+        XCTAssertEqual(results[1].url, "https://robo.app/hit/yyy222")
     }
 
-    // Helper function that mimics the parsing logic
+    func testParseHitResults_NoHitURLs() {
+        let content = "Sure, I can help you plan a trip! Who's coming?"
+
+        let results = extractHitResults(from: content)
+
+        XCTAssertEqual(results.count, 0, "Should return empty when no HIT URLs present")
+    }
+
+    // MARK: - Content Cleaning Tests
+
+    func testCleanHitContent_RemovesMarkdownLinks() {
+        let content = """
+        Here's the availability poll for the ski trip:
+
+        • Vince: [Link](https://robo.app/hit/IbATsszG)
+        • E: [Link](https://robo.app/hit/PhK9aF6E)
+        • Turtle: [Link](https://robo.app/hit/3OK7tFuX)
+
+        Share each link with the corresponding person.
+        """
+
+        let cleaned = ChatService.cleanHitContent(content)
+
+        XCTAssertFalse(cleaned.contains("robo.app/hit/"), "Cleaned content should not contain HIT URLs")
+        XCTAssertTrue(cleaned.contains("availability poll"), "Should keep the intro text")
+        XCTAssertTrue(cleaned.contains("Share each link"), "Should keep the outro text")
+    }
+
+    func testCleanHitContent_RemovesPlainURLs() {
+        let content = """
+        Created poll:
+
+        • Vince: https://robo.app/hit/abc123
+
+        Done!
+        """
+
+        let cleaned = ChatService.cleanHitContent(content)
+
+        XCTAssertFalse(cleaned.contains("robo.app/hit/"), "Cleaned content should not contain HIT URLs")
+        XCTAssertTrue(cleaned.contains("Created poll"), "Should keep non-URL text")
+        XCTAssertTrue(cleaned.contains("Done!"), "Should keep non-URL text")
+    }
+
+    // MARK: - Test Helper (mirrors ChatService parsing logic)
+
     private func extractHitResults(from content: String) -> [(name: String, url: String)] {
         var results: [(name: String, url: String)] = []
+        let nsContent = content as NSString
 
-        // Strategy 1: Try regex to find all robo.app/hit URLs with context
-        let pattern = "(?:•|\\-|\\*|\\d+\\.)\\s*([^:\\n]+):\\s*(https://robo\\.app/hit/[a-zA-Z0-9\\-]+)"
-        if let regex = try? NSRegularExpression(pattern: pattern, options: []) {
-            let nsContent = content as NSString
+        // Strategy 1: Markdown link format
+        let mdPattern = "(?:•|\\-|\\*)\\s*([^:\\n]+):\\s*\\[[^\\]]*\\]\\((https://robo\\.app/hit/[a-zA-Z0-9\\-]+)\\)"
+        if let regex = try? NSRegularExpression(pattern: mdPattern, options: []) {
             let matches = regex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+            for match in matches where match.numberOfRanges == 3 {
+                let nameRange = match.range(at: 1)
+                let urlRange = match.range(at: 2)
+                if nameRange.location != NSNotFound, urlRange.location != NSNotFound {
+                    let name = nsContent.substring(with: nameRange).trimmingCharacters(in: .whitespaces)
+                    let url = nsContent.substring(with: urlRange)
+                    results.append((name: name, url: url))
+                }
+            }
+        }
 
-            for match in matches {
-                if match.numberOfRanges == 3 {
+        // Strategy 2: Plain URL format
+        if results.isEmpty {
+            let plainPattern = "(?:•|\\-|\\*|\\d+\\.)\\s*([^:\\n]+):\\s*(https://robo\\.app/hit/[a-zA-Z0-9\\-]+)"
+            if let regex = try? NSRegularExpression(pattern: plainPattern, options: []) {
+                let matches = regex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+                for match in matches where match.numberOfRanges == 3 {
                     let nameRange = match.range(at: 1)
                     let urlRange = match.range(at: 2)
-
                     if nameRange.location != NSNotFound, urlRange.location != NSNotFound {
                         let name = nsContent.substring(with: nameRange).trimmingCharacters(in: .whitespaces)
                         let url = nsContent.substring(with: urlRange)
@@ -84,33 +162,14 @@ final class ChatServiceHitParsingTests: XCTestCase {
             }
         }
 
-        // Strategy 2: Fallback - find any robo.app/hit URLs
+        // Strategy 3: Fallback — find any URLs
         if results.isEmpty {
             let urlPattern = "https://robo\\.app/hit/[a-zA-Z0-9\\-]+"
             if let urlRegex = try? NSRegularExpression(pattern: urlPattern, options: []) {
-                let nsContent = content as NSString
                 let urlMatches = urlRegex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
-
-                for urlMatch in urlMatches {
+                for (i, urlMatch) in urlMatches.enumerated() {
                     let url = nsContent.substring(with: urlMatch.range)
-
-                    // Try to find a name near this URL
-                    let searchStart = max(0, urlMatch.range.location - 50)
-                    let searchRange = NSRange(location: searchStart, length: urlMatch.range.location - searchStart)
-                    let context = nsContent.substring(with: searchRange)
-
-                    let lines = context.components(separatedBy: CharacterSet.newlines)
-                    if let lastLine = lines.last {
-                        let cleaned = lastLine
-                            .replacingOccurrences(of: "•", with: "")
-                            .replacingOccurrences(of: "-", with: "")
-                            .replacingOccurrences(of: "*", with: "")
-                            .replacingOccurrences(of: ":", with: "")
-                            .trimmingCharacters(in: .whitespaces)
-
-                        let name = cleaned.isEmpty ? "Link" : cleaned
-                        results.append((name: name, url: url))
-                    }
+                    results.append((name: "Person \(i + 1)", url: url))
                 }
             }
         }

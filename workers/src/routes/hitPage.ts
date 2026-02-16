@@ -356,6 +356,17 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       else { submitBtn.disabled = true; submitBtn.textContent = 'Pick your name, then vote'; }
     }
 
+    function gpShowSuccess(title, msg) {
+      submitBtn.style.display = 'none';
+      var sections = document.querySelectorAll('.availability-section, .name-section, .task-card');
+      for (var i = 0; i < sections.length; i++) sections[i].style.display = 'none';
+      document.getElementById('result-area').innerHTML =
+        '<div class="success"><div class="success-icon">&#10003;</div>' +
+        '<p class="success-title">' + title + '</p>' +
+        '<p class="success-msg">' + msg + '</p></div>';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     submitBtn.addEventListener('click', function() {
       if (submitBtn.disabled) return;
       submitBtn.disabled = true; submitBtn.classList.add('submitting'); submitBtn.textContent = 'Submitting...';
@@ -365,23 +376,11 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       })
       .then(function(res) { if (res.status === 409) throw new Error('already_responded'); if (!res.ok) throw new Error('fail'); return res.json(); })
       .then(function() {
-        document.getElementById('result-area').innerHTML =
-          '<div class="success"><div class="success-icon">&#10003;</div>' +
-          '<p class="success-title">Thanks, ' + esc(selectedName) + '!</p>' +
-          '<p class="success-msg">Your vote has been recorded.</p></div>';
-        submitBtn.style.display = 'none';
-        if (document.querySelector('.availability-section')) document.querySelector('.availability-section').style.display = 'none';
-        document.querySelector('.name-section').style.display = 'none';
+        gpShowSuccess('Thank you!', 'This has been sent to ' + esc(hit.sender_name) + '.');
       })
       .catch(function(err) {
         if (err.message === 'already_responded') {
-          document.getElementById('result-area').innerHTML =
-            '<div class="success"><div class="success-icon">&#10003;</div>' +
-            '<p class="success-title">Already voted!</p>' +
-            '<p class="success-msg">You\\'ve already submitted your response.</p></div>';
-          submitBtn.style.display = 'none';
-          if (document.querySelector('.availability-section')) document.querySelector('.availability-section').style.display = 'none';
-          document.querySelector('.name-section').style.display = 'none';
+          gpShowSuccess('Already voted!', 'Your response was already submitted.');
         } else { submitBtn.disabled = false; submitBtn.classList.remove('submitting'); submitBtn.textContent = 'Error — tap to retry'; }
       });
     });
@@ -520,6 +519,21 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
         submitBtn.textContent = n > 0 ? 'Submit ' + n + ' ' + unit + (n>1?'s':'') : (dateOnly ? 'Select dates, then submit' : 'Select times, then submit');
       }
     }
+    function showSuccess(title, msg) {
+      // Hide all form elements, show only success
+      submitBtn.style.display = 'none';
+      var sections = document.querySelectorAll('.availability-section, .name-section, .task-card');
+      for (var i = 0; i < sections.length; i++) sections[i].style.display = 'none';
+      // Also hide any extra name-section (notes field)
+      var allNameSections = document.querySelectorAll('.name-section');
+      for (var j = 0; j < allNameSections.length; j++) allNameSections[j].style.display = 'none';
+      document.getElementById('result-area').innerHTML =
+        '<div class="success"><div class="success-icon">&#10003;</div>' +
+        '<p class="success-title">' + title + '</p>' +
+        '<p class="success-msg">' + msg + '</p></div>';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     submitBtn.addEventListener('click', function() {
       if (submitBtn.disabled) return;
       var name;
@@ -546,23 +560,11 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
       })
       .then(function(res) { if (res.status === 409) throw new Error('already_responded'); if (!res.ok) throw new Error('fail'); return res.json(); })
       .then(function() {
-        document.getElementById('result-area').innerHTML =
-          '<div class="success"><div class="success-icon">&#10003;</div>' +
-          '<p class="success-title">Thanks, ' + esc(name) + '!</p>' +
-          '<p class="success-msg">Your availability has been shared with ' + esc(hit.sender_name) + '.</p></div>';
-        submitBtn.style.display='none';
-        document.querySelector('.availability-section').style.display='none';
-        document.querySelector('.name-section').style.display='none';
+        showSuccess('Thank you!', 'This has been sent to ' + esc(hit.sender_name) + '.');
       })
       .catch(function(err) {
         if (err.message === 'already_responded') {
-          document.getElementById('result-area').innerHTML =
-            '<div class="success"><div class="success-icon">&#10003;</div>' +
-            '<p class="success-title">Already responded!</p>' +
-            '<p class="success-msg">You\\'ve already submitted your availability.</p></div>';
-          submitBtn.style.display = 'none';
-          document.querySelector('.availability-section').style.display = 'none';
-          document.querySelector('.name-section').style.display = 'none';
+          showSuccess('Already responded!', 'Your availability was already submitted.');
         } else { submitBtn.disabled=false; submitBtn.classList.remove('submitting'); submitBtn.textContent='Error — tap to retry'; }
       });
     });

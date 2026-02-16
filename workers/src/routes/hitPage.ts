@@ -313,6 +313,7 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
 
     html += '<div class="name-section fi"><label class="name-label" for="poll-notes-input">Anything to add?</label>' +
       '<textarea class="name-input" id="poll-notes-input" placeholder="Additional context..." rows="2" style="resize:vertical;font-family:inherit;"></textarea></div>';
+    html += '<div style="height:300px"></div>';
     html += '<button class="submit-btn fi" id="submit-btn" disabled>Pick your name, then vote</button>';
     html += '<div id="result-area"></div>';
     html += '<div class="hit-footer fi"><a href="https://robo.app">Powered by Robo</a></div>';
@@ -477,6 +478,7 @@ function buildHitPageHtml(hitId: string, ogTitle: string, ogDescription: string)
     html += '</div></div>';
     html += '<div class="name-section fi"><label class="name-label" for="notes-input">Anything to add?</label>' +
       '<textarea class="name-input" id="notes-input" placeholder="Additional context..." rows="2" style="resize:vertical;font-family:inherit;"></textarea></div>';
+    html += '<div style="height:300px"></div>';
 
     var hasParticipants = participants.length > 0;
     var defaultBtnText = hasParticipants ? 'Pick your name, then select dates' : (dateOnly ? 'Select dates, then submit' : 'Select times, then submit');

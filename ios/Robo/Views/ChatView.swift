@@ -337,9 +337,13 @@ private struct MessageBubble: View {
 
             ZStack(alignment: .top) {
                 HStack(alignment: .bottom, spacing: 0) {
-                    Text(message.content.isEmpty && isStreaming ? " " : message.content)
-                    if isStreaming && !message.content.isEmpty {
-                        TypingCursor()
+                    if message.content.isEmpty && isStreaming {
+                        TypingDotsView()
+                    } else {
+                        Text(message.content)
+                        if isStreaming && !message.content.isEmpty {
+                            TypingCursor()
+                        }
                     }
                 }
                 .padding(12)
@@ -379,6 +383,30 @@ private struct MessageBubble: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation(.easeInOut(duration: 0.2)) { showCopied = false }
         }
+    }
+}
+
+@available(iOS 26, *)
+private struct TypingDotsView: View {
+    @State private var active = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<3) { i in
+                Circle()
+                    .fill(Color.secondary)
+                    .frame(width: 7, height: 7)
+                    .opacity(active ? 1 : 0.3)
+                    .animation(
+                        .easeInOut(duration: 0.5)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(i) * 0.15),
+                        value: active
+                    )
+            }
+        }
+        .padding(.vertical, 4)
+        .onAppear { active = true }
     }
 }
 

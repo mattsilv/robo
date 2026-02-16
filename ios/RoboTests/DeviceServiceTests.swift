@@ -44,6 +44,51 @@ private enum MockError: Error { case fail }
     #expect(service.registrationError != nil)
 }
 
+// MARK: - Init / Migration Tests
+
+@Test func initWithConfig_preservesDeviceID() {
+    // Simulates the migration path: KeychainHelper.load() returns nil,
+    // UserDefaults has config → DeviceService.init(config:) preserves it.
+    let existingConfig = DeviceConfig(
+        id: "a6fd7c15-1234-5678-abcd-000000000000",
+        name: "Matt's iPhone",
+        apiBaseURL: "https://api.robo.app",
+        mcpToken: "existing-token"
+    )
+    let service = DeviceService(config: existingConfig)
+
+    #expect(service.config.id == "a6fd7c15-1234-5678-abcd-000000000000")
+    #expect(service.config.mcpToken == "existing-token")
+    #expect(service.isRegistered)
+}
+
+@Test func initWithRegisteredConfig_skipsBootstrap() async {
+    // If config is already registered, bootstrap() should be a no-op
+    let config = DeviceConfig(
+        id: "registered-id",
+        name: "Test",
+        apiBaseURL: "https://api.robo.app",
+        mcpToken: "token"
+    )
+    let service = DeviceService(config: config)
+
+    // bootstrap with a mock that would fail — but it should never be called
+    let mock = MockRegistrar(result: .failure(MockError.fail))
+    await service.bootstrap(apiService: mock)
+
+    // ID should be unchanged — bootstrap skipped because already registered
+    #expect(service.config.id == "registered-id")
+    #expect(service.registrationError == nil)
+}
+
+@Test func initWithDefaultConfig_isNotRegistered() {
+    // Fresh install: no keychain, no UserDefaults → .default config
+    let service = DeviceService(config: .default)
+
+    #expect(!service.isRegistered)
+    #expect(service.config.id == DeviceConfig.unregisteredID)
+}
+
 @Test func reRegisterFailure_doesNotWipeDeviceID() async {
     // This is the exact bug from issue #139:
     // Before the fix, reRegister would save "unregistered" before bootstrap,

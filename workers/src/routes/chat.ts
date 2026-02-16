@@ -172,7 +172,7 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
   }
 
   const model = parsed.data.model || c.env.OPENROUTER_MODEL || DEFAULT_MODEL;
-  const deviceId = c.req.header('X-Device-ID') || '';
+  const deviceId = c.get('resolvedDeviceId') || c.req.header('X-Device-ID') || '';
 
   // Inject timezone into system message if provided
   const messages = parsed.data.messages.map((msg) => {
@@ -270,6 +270,11 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
     if (!followUp.ok) {
       const text = await followUp.text();
       console.error('Follow-up request failed:', text);
+      logEvent(c.env, c.executionCtx, {
+        type: 'chat_request', device_id: deviceId, endpoint: '/api/chat',
+        status: 'error', duration_ms: Date.now() - startTime,
+        metadata: { model, error_status: followUp.status, phase: 'tool_followup' },
+      });
       // Fall back to returning tool result directly
       const fallbackContent = toolResults.map((r) => r.content).join('\n');
       return contentToSSE(fallbackContent, allHitResults.length > 0 ? allHitResults : undefined);

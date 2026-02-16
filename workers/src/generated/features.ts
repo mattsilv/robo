@@ -143,7 +143,7 @@ export const activeAgents = agents.filter(a => a.status === 'active');
 export const copy = {
   "app": {
     "name": "Robo",
-    "tagline": "The Context Collector",
+    "tagline": "The Context Cultivator",
     "og_title": "Robo — Phone Sensors as APIs for AI Agents",
     "og_description": "Open-source iOS app that turns your phone's sensors into APIs any AI agent can use. LiDAR, camera, barcodes — no iOS development required."
   },

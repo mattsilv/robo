@@ -179,7 +179,7 @@ enum FeatureRegistry {
 enum AppCopy {
     enum App {
         static let name = "Robo"
-        static let tagline = "The Context Collector"
+        static let tagline = "The Context Cultivator"
         static let ogTitle = "Robo — Phone Sensors as APIs for AI Agents"
         static let ogDescription = "Open-source iOS app that turns your phone's sensors into APIs any AI agent can use. LiDAR, camera, barcodes — no iOS development required."
     }

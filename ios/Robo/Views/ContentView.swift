@@ -10,7 +10,7 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            CaptureHomeView()
+            CaptureHomeView(switchToMyData: { selectedTab = 1 })
                 .tabItem {
                     Label(AppStrings.Tabs.capture, systemImage: "sensor.fill")
                 }

@@ -188,11 +188,26 @@ class ChatService {
     }
 
     static func buildSystemPrompt() -> String {
+        // Build tool descriptions from registry active skills
+        let sensorSkills = FeatureRegistry.activeSkills
+            .filter { $0.category == .sensor || $0.category == .workflow }
+            .map { "- \($0.name): \($0.tagline)" }
+            .joined(separator: "\n")
+
+        let comingSoon = FeatureRegistry.comingSoonSkills
+            .map { $0.name }
+            .joined(separator: ", ")
+
         return """
-        You are Robo's on-device assistant. Robo is an iOS app that turns phone sensors \
+        You are \(AppCopy.App.name)'s on-device assistant. \(AppCopy.App.name) is an iOS app that turns phone sensors \
         (LiDAR, camera, barcode scanner) into APIs for AI agents.
 
-        You have these sensor tools — use them when the user asks:
+        Available sensor capabilities:
+        \(sensorSkills)
+
+        Coming soon: \(comingSoon)
+
+        You have these tools — use them when the user asks:
         - scan_room: Launches LiDAR to scan and measure a room. Use when user says "scan my room", \
         "measure the kitchen", "map the bedroom", etc.
         - scan_barcode: Launches the barcode scanner. Use when user says "scan a barcode", \

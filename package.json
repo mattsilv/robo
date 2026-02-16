@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "codegen": "node registry/generate.js"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "app": {
+    "name": "Robo",
+    "tagline": "The Context Collector",
+    "og_title": "Robo — Phone Sensors as APIs for AI Agents",
+    "og_description": "Open-source iOS app that turns your phone's sensors into APIs any AI agent can use. LiDAR, camera, barcodes — no iOS development required."
+  },
+  "hero": {
+    "headline": "Your phone's sensors,<br>any AI agent.",
+    "subheadline": "Open-source iOS app that turns LiDAR, camera, and barcodes into APIs. No Swift required."
+  },
+  "sections": {
+    "for_developers": "For Developers",
+    "for_everyone": "For Everyone",
+    "from_anyone": "From Anyone"
+  },
+  "tabs": {
+    "capture": "Capture",
+    "history": "My Data",
+    "chat": "Chat",
+    "settings": "Settings"
+  },
+  "footer": {
+    "tagline": "Open source. Privacy-first. Built entirely with Claude Code."
+  }
+}

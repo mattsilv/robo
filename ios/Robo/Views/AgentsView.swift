@@ -9,8 +9,8 @@ struct AgentsView: View {
     @Query(sort: \ProductCaptureRecord.capturedAt, order: .reverse) private var productCaptures: [ProductCaptureRecord]
     @Query(sort: \BeaconEventRecord.capturedAt, order: .reverse) private var beaconEvents: [BeaconEventRecord]
 
-    /// Skill types with verified, working capture flows.
-    private let enabledSkillTypes: Set<AgentRequest.SkillType> = [.lidar, .barcode, .camera, .productScan, .beacon]
+    /// Skill types with verified, working capture flows (from registry).
+    private let enabledSkillTypes: Set<AgentRequest.SkillType> = FeatureRegistry.activeSkillTypes
 
     @State private var agents: [AgentConnection] = MockAgentService.loadAgents()
     @State private var showingLiDARScan = false

@@ -243,7 +243,13 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
     }
 
     const followUpResult = await followUp.json() as any;
-    const finalContent = followUpResult.choices?.[0]?.message?.content || 'Done!';
+    const modelSummary = followUpResult.choices?.[0]?.message?.content || 'Done!';
+    // Append tool results that contain HIT URLs so iOS can parse them into cards
+    const hitUrls = toolResults
+      .map((r) => r.content)
+      .filter((c) => c.includes('robo.app/hit/'))
+      .join('\n');
+    const finalContent = hitUrls ? `${modelSummary}\n\n${hitUrls}` : modelSummary;
     return contentToSSE(finalContent);
   } else {
     // No tool calls — return content as SSE

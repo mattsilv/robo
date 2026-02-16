@@ -62,14 +62,21 @@ export const registerDevice = async (c: Context<{ Bindings: Env }>) => {
 
         if (legacy) {
           // Adopt legacy device: set its vendor_id so future lookups work
+          let mcpToken = legacy.mcp_token;
+
+          if (regenerate_token) {
+            mcpToken = [...crypto.getRandomValues(new Uint8Array(24))]
+              .map(b => b.toString(16).padStart(2, '0')).join('');
+          }
+
           await c.env.DB.prepare(
-            'UPDATE devices SET vendor_id = ?, name = ?, last_seen_at = ? WHERE id = ?'
-          ).bind(vendor_id, name, now, legacy.id).run();
+            'UPDATE devices SET vendor_id = ?, name = ?, mcp_token = ?, last_seen_at = ? WHERE id = ?'
+          ).bind(vendor_id, name, mcpToken, now, legacy.id).run();
 
           return c.json({
             id: legacy.id,
             name,
-            mcp_token: legacy.mcp_token,
+            mcp_token: mcpToken,
             registered_at: now,
             last_seen_at: now,
           }, 200);

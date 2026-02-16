@@ -346,14 +346,12 @@ export async function respondToHit(c: Context<{ Bindings: Env }>) {
         return c.json({ error: 'Name not in participant list' }, 400);
       }
 
-      // Check for duplicate response (only when participants list exists)
-      if (participants.length > 0) {
-        const existing = await c.env.DB.prepare(
-          'SELECT id FROM hit_responses WHERE hit_id = ? AND respondent_name = ?'
-        ).bind(hitId, respondent_name).first();
-        if (existing) {
-          return c.json({ error: 'You have already responded' }, 409);
-        }
+      // Check for duplicate response
+      const existing = await c.env.DB.prepare(
+        'SELECT id FROM hit_responses WHERE hit_id = ? AND respondent_name = ?'
+      ).bind(hitId, respondent_name).first();
+      if (existing) {
+        return c.json({ error: 'You have already responded' }, 409);
       }
     }
 

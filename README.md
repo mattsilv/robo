@@ -2,7 +2,27 @@
 
 > Phone sensors (barcode, camera, LiDAR) as API endpoints for AI agents
 
-**Hackathon Project** | **Deadline:** Mon Feb 16, 3:00 PM EST
+## Hackathon Submission — Built with Opus 4.6
+
+**The problem:** The future of building is agentic — but phone sensor data is trapped on the device. Want LiDAR data in Claude? Build a native iOS app. Months of Swift, Xcode, and App Store review.
+
+**Robo is the missing bridge.** An open-source iOS app that turns your phone's 9 sensors into APIs any AI agent can use — no iOS development required. Provider-agnostic (Claude, ChatGPT, any backend), with MCP integration, HIT links for crowdsourcing data from anyone via browser, and a chat-first UX powered by OpenRouter tool calling.
+
+**Built in 6 days** by one developer pair-programming with Claude Code:
+
+| Metric | Count |
+|--------|-------|
+| Commits | 336 |
+| Pull requests | 100 (95 merged) |
+| Lines of code | ~22,000 (Swift + TypeScript) |
+| Total code churn | 104,734 lines |
+| TestFlight builds | ~40 |
+| Sensors integrated | 9 (LiDAR, camera, barcode, BLE, HealthKit, motion, compass, iBeacon, WiFi) |
+| Integration points | 7 (MCP, HIT links, Share Extension, on-device AI, OpenRouter, webhooks, API keys) |
+
+**Key demo flow:** Download Robo → LiDAR scan a room with AR guidance → share results → agent analyzes: "Your room is 12ft × 14ft. Here's where that couch would fit." Getting LiDAR data into Claude today is impossible. Robo makes it trivial.
+
+**Stack:** SwiftUI (iOS 17+), Cloudflare Workers (Hono + D1 + R2), MCP server, GitHub Actions CI → TestFlight auto-deploy.
 
 ## Overview
 

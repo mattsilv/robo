@@ -17,15 +17,22 @@ import { serveHitPage } from './routes/hitPage';
 import { serveOgImage } from './routes/ogImage';
 import { listAPIKeys, createAPIKey, deleteAPIKey } from './routes/apikeys';
 import { chatProxy } from './routes/chat';
+import { appleAuth, linkDevice, getMe, logout } from './routes/auth';
 import { deviceAuth } from './middleware/deviceAuth';
 import { mcpTokenAuth } from './middleware/mcpTokenAuth';
+import { userAuth } from './middleware/userAuth';
 import { rateLimit } from './middleware/rateLimit';
 import { handleMcpRequest } from './mcp';
 
 const app = new Hono<{ Bindings: Env }>();
 
 // Middleware
-app.use('*', cors());
+app.use('*', cors({
+  origin: ['https://app.robo.app', 'https://robo.app', 'http://localhost:5173'],
+  credentials: true,
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Device-ID'],
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+}));
 app.use('*', logger());
 app.use('*', prettyJSON());
 
@@ -33,6 +40,12 @@ app.use('*', prettyJSON());
 app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Auth routes (public — no middleware)
+app.post('/api/auth/apple', appleAuth);
+app.post('/api/auth/link-device', userAuth, linkDevice);
+app.get('/api/auth/me', userAuth, getMe);
+app.post('/api/auth/logout', logout);
 
 // Device routes
 app.post('/api/devices/register', registerDevice);

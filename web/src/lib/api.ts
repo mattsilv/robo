@@ -11,8 +11,8 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   })
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error((body as any).error || res.statusText)
+    const body: { error?: string } = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(body.error || res.statusText)
   }
 
   return res.json() as Promise<T>

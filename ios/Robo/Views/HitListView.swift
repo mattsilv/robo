@@ -7,8 +7,30 @@ struct HitListView: View {
 
     @State private var hits: [HitSummary] = []
     @State private var isLoading = false
-    @State private var showingCreateInfo = false
     @State private var navigationPath = NavigationPath()
+    @State private var showClearOldConfirm = false
+
+    /// Groups HITs by group_id; ungrouped HITs get their own "group" of 1
+    private var groupedHits: [HitGroup] {
+        var groups: [String: [HitSummary]] = [:]
+        var ungrouped: [HitSummary] = []
+        for hit in hits {
+            if let gid = hit.groupId, !gid.isEmpty {
+                groups[gid, default: []].append(hit)
+            } else {
+                ungrouped.append(hit)
+            }
+        }
+        var result: [HitGroup] = groups.map { gid, members in
+            HitGroup(groupId: gid, hits: members)
+        }
+        for hit in ungrouped {
+            result.append(HitGroup(groupId: nil, hits: [hit]))
+        }
+        // Sort all by newest first
+        result.sort { ($0.hits.first?.createdAt ?? "") > ($1.hits.first?.createdAt ?? "") }
+        return result
+    }
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -29,18 +51,34 @@ struct HitListView: View {
                     }
                 } else {
                     List {
-                        ForEach(hits) { hit in
-                            NavigationLink(value: hit.id) {
-                                HitCard(hit: hit)
-                            }
-                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    Task { await deleteHit(hit) }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
+                        ForEach(groupedHits) { group in
+                            if group.hits.count > 1 {
+                                NavigationLink(value: group.hits.first!.id) {
+                                    CompactGroupRow(group: group)
+                                }
+                                .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        Task { await deleteGroup(group) }
+                                    } label: {
+                                        Label("Delete Group", systemImage: "trash")
+                                    }
+                                }
+                            } else if let hit = group.hits.first {
+                                NavigationLink(value: hit.id) {
+                                    CompactHitRow(hit: hit)
+                                }
+                                .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        Task { await deleteHit(hit) }
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
                                 }
                             }
                         }
@@ -54,6 +92,15 @@ struct HitListView: View {
                 HitDetailView(hitId: hitId)
             }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if !hits.isEmpty {
+                        Button("Clear Old") {
+                            showClearOldConfirm = true
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(.red)
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         NotificationCenter.default.post(name: .switchToChat, object: nil)
@@ -62,6 +109,12 @@ struct HitListView: View {
                             .foregroundStyle(Color(red: 0.15, green: 0.39, blue: 0.92))
                     }
                 }
+            }
+            .confirmationDialog("Clear Old HITs", isPresented: $showClearOldConfirm) {
+                Button("Delete pending HITs older than 7 days", role: .destructive) {
+                    Task { await clearOldHits() }
+                }
+                Button("Cancel", role: .cancel) {}
             }
             .task { await loadHits() }
             .onChange(of: deepLinkHitId) { _, hitId in
@@ -83,6 +136,29 @@ struct HitListView: View {
         }
     }
 
+    private func deleteGroup(_ group: HitGroup) async {
+        let ids = group.hits.map(\.id)
+        do {
+            _ = try await apiService.bulkDeleteHits(ids: ids)
+            withAnimation { hits.removeAll { ids.contains($0.id) } }
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        } catch {
+            // Silently fail — user can retry
+        }
+    }
+
+    private func clearOldHits() async {
+        do {
+            let result = try await apiService.deleteOldHits(olderThanDays: 7, status: "pending")
+            if result.deleted > 0 {
+                withAnimation { hits.removeAll { result.ids.contains($0.id) } }
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            }
+        } catch {
+            // Silently fail
+        }
+    }
+
     private func loadHits() async {
         isLoading = true
         do {
@@ -94,29 +170,19 @@ struct HitListView: View {
     }
 }
 
-// MARK: - HIT Card
+// MARK: - Group Model
 
-private struct HitCard: View {
+private struct HitGroup: Identifiable {
+    let groupId: String?
+    let hits: [HitSummary]
+
+    var id: String { groupId ?? hits.first?.id ?? UUID().uuidString }
+}
+
+// MARK: - Compact Hit Row (~44pt)
+
+private struct CompactHitRow: View {
     let hit: HitSummary
-    private let roboBlue = Color(red: 0.15, green: 0.39, blue: 0.92)
-
-    private var typeIcon: String {
-        switch hit.hitType {
-        case "group_poll": return "chart.bar.fill"
-        case "availability": return "calendar"
-        case "photo": return "camera.fill"
-        default: return "link"
-        }
-    }
-
-    private var typeLabel: String {
-        switch hit.hitType {
-        case "group_poll": return "POLL"
-        case "availability": return "AVAIL"
-        case "photo": return "PHOTO"
-        default: return "HIT"
-        }
-    }
 
     private var statusColor: Color {
         switch hit.status {
@@ -127,12 +193,12 @@ private struct HitCard: View {
         }
     }
 
-    private var statusLabel: String {
-        switch hit.status {
-        case "completed": return "DONE"
-        case "in_progress": return "ACTIVE"
-        case "expired": return "EXPIRED"
-        default: return "PENDING"
+    private var typeIcon: String {
+        switch hit.hitType {
+        case "group_poll": return "chart.bar.fill"
+        case "availability": return "calendar"
+        case "photo": return "camera.fill"
+        default: return "link"
         }
     }
 
@@ -141,102 +207,117 @@ private struct HitCard: View {
         guard let date = formatter.date(from: hit.createdAt) else { return "" }
         let interval = Date().timeIntervalSince(date)
         if interval < 60 { return "now" }
-        if interval < 3600 { return "\(Int(interval / 60))m ago" }
-        if interval < 86400 { return "\(Int(interval / 3600))h ago" }
-        let days = Int(interval / 86400)
-        if days == 1 { return "1d ago" }
-        return "\(days)d ago"
+        if interval < 3600 { return "\(Int(interval / 60))m" }
+        if interval < 86400 { return "\(Int(interval / 3600))h" }
+        return "\(Int(interval / 86400))d"
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Top row: type badge + status + time
-            HStack(spacing: 8) {
-                // Type icon + label
-                HStack(spacing: 4) {
-                    Image(systemName: typeIcon)
-                        .font(.caption2)
-                    Text(typeLabel)
-                        .font(.caption2.bold())
-                        .tracking(0.5)
-                }
-                .foregroundStyle(roboBlue)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(roboBlue.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+        HStack(spacing: 10) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 8, height: 8)
 
-                Spacer()
-
-                // Status dot + label
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 6, height: 6)
-                    Text(statusLabel)
-                        .font(.caption2.bold())
-                        .tracking(0.3)
-                        .foregroundStyle(statusColor)
-                }
-
-                Text(relativeTime)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
-
-            // Recipient name
-            Text(hit.recipientName)
-                .font(.headline)
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-
-            // Task description
-            Text(hit.taskDescription)
-                .font(.subheadline)
+            Image(systemName: typeIcon)
+                .font(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(2)
+                .frame(width: 16)
 
-            // Bottom row: photo count or poll progress
-            HStack(spacing: 12) {
-                if hit.photoCount > 0 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "photo.fill")
-                            .font(.caption2)
-                        Text("\(hit.photoCount)")
-                            .font(.caption.bold())
-                    }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(hit.recipientName)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                Text(hit.taskDescription)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                }
-
-                // Response progress for group polls
-                if let responseCount = hit.responseCount, responseCount > 0 {
-                    let config = hit.config != nil ? (try? JSONSerialization.jsonObject(with: Data((hit.config ?? "{}").utf8)) as? [String: Any]) ?? [:] : [:]
-                    let participants = config["participants"] as? [String] ?? []
-                    let total = participants.isEmpty ? responseCount : participants.count
-                    HStack(spacing: 4) {
-                        Image(systemName: "person.2.fill")
-                            .font(.caption2)
-                        Text("\(responseCount)/\(total) responded")
-                            .font(.caption.bold())
-                    }
-                    .foregroundStyle(responseCount >= total ? .green : .orange)
-                }
-
-                // Short ID
-                Text(hit.id)
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
             }
+
+            Spacer()
+
+            Text(relativeTime)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .monospacedDigit()
         }
-        .padding(14)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.vertical, 6)
+    }
+}
+
+// MARK: - Compact Group Row
+
+private struct CompactGroupRow: View {
+    let group: HitGroup
+
+    private var firstHit: HitSummary { group.hits.first! }
+    private var count: Int { group.hits.count }
+
+    private var overallStatus: String {
+        let statuses = group.hits.map(\.status)
+        if statuses.allSatisfy({ $0 == "completed" }) { return "completed" }
+        if statuses.contains("in_progress") { return "in_progress" }
+        return "pending"
+    }
+
+    private var statusColor: Color {
+        switch overallStatus {
+        case "completed": return .green
+        case "in_progress": return .orange
+        default: return .gray
+        }
+    }
+
+    private var respondedCount: Int {
+        group.hits.filter { ($0.responseCount ?? 0) > 0 || $0.status == "completed" }.count
+    }
+
+    private var typeIcon: String {
+        switch firstHit.hitType {
+        case "group_poll": return "chart.bar.fill"
+        case "availability": return "calendar"
+        case "photo": return "camera.fill"
+        default: return "link"
+        }
+    }
+
+    private var relativeTime: String {
+        let formatter = ISO8601DateFormatter()
+        guard let date = formatter.date(from: firstHit.createdAt) else { return "" }
+        let interval = Date().timeIntervalSince(date)
+        if interval < 60 { return "now" }
+        if interval < 3600 { return "\(Int(interval / 60))m" }
+        if interval < 86400 { return "\(Int(interval / 3600))h" }
+        return "\(Int(interval / 86400))d"
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 8, height: 8)
+
+            Image(systemName: typeIcon)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(firstHit.taskDescription)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                Text("\(count) people \u{2022} \(respondedCount)/\(count) responded")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Text(relativeTime)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .monospacedDigit()
+        }
+        .padding(.vertical, 6)
     }
 }

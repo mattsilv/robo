@@ -12,7 +12,7 @@ import { analyzeWithOpus } from './routes/opus';
 import { debugSync, debugList, debugGet, debugDownload } from './routes/debug';
 import { uploadScreenshot } from './routes/screenshots';
 import { lookupNutrition } from './routes/nutrition';
-import { createHit, getHit, deleteHit, uploadHitPhoto, completeHit, listHits, listHitPhotos, respondToHit, listHitResponses } from './routes/hits';
+import { createHit, getHit, deleteHit, bulkDeleteHits, uploadHitPhoto, completeHit, listHits, listHitPhotos, respondToHit, listHitResponses } from './routes/hits';
 import { serveHitPage } from './routes/hitPage';
 import { serveOgImage } from './routes/ogImage';
 import { listAPIKeys, createAPIKey, deleteAPIKey } from './routes/apikeys';
@@ -59,6 +59,7 @@ app.post('/api/chat', deviceAuth, rateLimit({ endpoint: 'chat', maxRequests: 20,
 // HIT owner routes (auth required)
 app.post('/api/hits', deviceAuth, createHit);
 app.get('/api/hits', deviceAuth, listHits);
+app.post('/api/hits/bulk-delete', deviceAuth, bulkDeleteHits);
 app.delete('/api/hits/:id', deviceAuth, deleteHit);
 app.get('/api/hits/:id/photos', deviceAuth, listHitPhotos);
 app.get('/api/hits/:id/responses', deviceAuth, listHitResponses);

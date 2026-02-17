@@ -5,6 +5,8 @@ iOS app that exposes phone sensors (barcode, camera, LiDAR) as API endpoints for
 
 **Deadline:** Mon Feb 16, 3:00 PM EST
 
+**Open Source:** This project is fully open source. Keep documentation current, the codebase well-organized, and **never commit secrets, API keys, or security-sensitive information** to the repo. Use `.env` files and Cloudflare Worker secrets for all sensitive values.
+
 ## Elevator Pitch (Builders)
 
 The future of building is agentic — but there's an insane amount of friction getting phone sensor data into AI agents. LiDAR, camera, barcodes — all trapped on the device. Want that data? Build a native iOS app. Months of Swift, Xcode, and App Store review.

@@ -3,6 +3,10 @@
   "type": "module",
   "scripts": {
     "codegen": "node registry/generate.js",
-    "test:registry": "node registry/generate.test.js"
-  }
+    "test:registry": "node registry/generate.test.js",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "packageManager": "pnpm@9.15.4"
 }

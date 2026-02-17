@@ -26,7 +26,10 @@ build/
 
 # Swift Package Manager
 .build/
+# Note: Using exact case match. SPM uses "Packages/" but our monorepo uses "packages/".
+# macOS filesystem is case-insensitive, so we negate our workspace dir.
 Packages/
+!packages/
 .swiftpm/
 Package.resolved
 

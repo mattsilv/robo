@@ -20,6 +20,7 @@
   "author": "Matt Silvestrini",
   "license": "MIT",
   "dependencies": {
+    "@robo/shared": "workspace:*",
     "@hono/zod-validator": "^0.7.6",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "aws4fetch": "^1.0.20",

@@ -1,17 +1,7 @@
 import type { Context } from 'hono';
 import type { Env } from '../types';
-import { z } from 'zod';
+import { ChatRequestSchema } from '@robo/shared';
 import { logEvent } from '../services/eventLogger';
-
-const ChatRequestSchema = z.object({
-  messages: z.array(z.object({
-    role: z.enum(['system', 'user', 'assistant']),
-    content: z.string(),
-  })).min(1),
-  model: z.string().optional(),
-  timezone: z.string().optional(),
-  first_name: z.string().optional(),
-});
 
 const DEFAULT_MODEL = 'google/gemini-2.5-flash';
 

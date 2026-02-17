@@ -12,20 +12,27 @@ import { analyzeWithOpus } from './routes/opus';
 import { debugSync, debugList, debugGet, debugDownload } from './routes/debug';
 import { uploadScreenshot } from './routes/screenshots';
 import { lookupNutrition } from './routes/nutrition';
-import { createHit, getHit, deleteHit, uploadHitPhoto, completeHit, listHits, listHitPhotos, respondToHit, listHitResponses } from './routes/hits';
+import { createHit, getHit, deleteHit, bulkDeleteHits, uploadHitPhoto, completeHit, listHits, listHitPhotos, respondToHit, listHitResponses } from './routes/hits';
 import { serveHitPage } from './routes/hitPage';
 import { serveOgImage } from './routes/ogImage';
 import { listAPIKeys, createAPIKey, deleteAPIKey } from './routes/apikeys';
 import { chatProxy } from './routes/chat';
+import { appleAuth, linkDevice, getMe, logout } from './routes/auth';
 import { deviceAuth } from './middleware/deviceAuth';
 import { mcpTokenAuth } from './middleware/mcpTokenAuth';
+import { userAuth, csrfProtect } from './middleware/userAuth';
 import { rateLimit } from './middleware/rateLimit';
 import { handleMcpRequest } from './mcp';
 
 const app = new Hono<{ Bindings: Env }>();
 
 // Middleware
-app.use('*', cors());
+app.use('*', cors({
+  origin: ['https://app.robo.app', 'https://robo.app', 'http://localhost:5173'],
+  credentials: true,
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Device-ID'],
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+}));
 app.use('*', logger());
 app.use('*', prettyJSON());
 
@@ -33,6 +40,12 @@ app.use('*', prettyJSON());
 app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Auth routes
+app.post('/api/auth/apple', csrfProtect, appleAuth);
+app.post('/api/auth/link-device', csrfProtect, userAuth, linkDevice);
+app.get('/api/auth/me', userAuth, getMe);
+app.post('/api/auth/logout', csrfProtect, logout);
 
 // Device routes
 app.post('/api/devices/register', registerDevice);
@@ -59,6 +72,7 @@ app.post('/api/chat', deviceAuth, rateLimit({ endpoint: 'chat', maxRequests: 20,
 // HIT owner routes (auth required)
 app.post('/api/hits', deviceAuth, createHit);
 app.get('/api/hits', deviceAuth, listHits);
+app.post('/api/hits/bulk-delete', deviceAuth, bulkDeleteHits);
 app.delete('/api/hits/:id', deviceAuth, deleteHit);
 app.get('/api/hits/:id/photos', deviceAuth, listHitPhotos);
 app.get('/api/hits/:id/responses', deviceAuth, listHitResponses);

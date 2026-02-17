@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import { CreateHitSchema, HitResponseSchema, HIT_DISTRIBUTION_MODES, type DistributionMode, type Env, type Hit, type HitPhoto, type HitResponse } from '../types';
+import { CreateHitSchema, HitResponseSchema, BulkDeleteHitsSchema, HIT_DISTRIBUTION_MODES, type DistributionMode, type Env, type Hit, type HitPhoto, type HitResponse } from '../types';
 import { sendPushNotification } from '../services/apns';
 
 // Default sender when no name can be resolved
@@ -612,5 +612,73 @@ export async function listHitResponses(c: Context<{ Bindings: Env }>) {
   } catch (error) {
     console.error('Failed to list HIT responses:', error);
     return c.json({ error: 'Failed to list HIT responses' }, 500);
+  }
+}
+
+/**
+ * DELETE /api/hits — Bulk delete HITs (auth required)
+ * Accepts { ids: string[] } or { older_than_days: number, status?: string }
+ */
+export async function bulkDeleteHits(c: Context<{ Bindings: Env }>) {
+  const deviceId = c.req.header('X-Device-ID')!;
+
+  const body = await c.req.json().catch(() => null);
+  if (!body) {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  const validated = BulkDeleteHitsSchema.safeParse(body);
+  if (!validated.success) {
+    return c.json({ error: 'Invalid request body', issues: validated.error.issues }, 400);
+  }
+
+  try {
+    let hitIds: string[];
+
+    if (validated.data.ids) {
+      // Delete by explicit IDs — only those owned by this device
+      const placeholders = validated.data.ids.map(() => '?').join(',');
+      const result = await c.env.DB.prepare(
+        `SELECT id FROM hits WHERE id IN (${placeholders}) AND device_id = ?`
+      ).bind(...validated.data.ids, deviceId).all<{ id: string }>();
+      hitIds = result.results.map((r) => r.id);
+    } else {
+      // Delete by age + optional status filter
+      const cutoff = new Date(Date.now() - validated.data.older_than_days! * 86400000).toISOString();
+      let query = 'SELECT id FROM hits WHERE device_id = ? AND created_at < ?';
+      const binds: (string | number)[] = [deviceId, cutoff];
+      if (validated.data.status) {
+        query += ' AND status = ?';
+        binds.push(validated.data.status);
+      }
+      query += ' LIMIT 50';
+      const result = await c.env.DB.prepare(query).bind(...binds).all<{ id: string }>();
+      hitIds = result.results.map((r) => r.id);
+    }
+
+    if (hitIds.length === 0) {
+      return c.json({ deleted: 0, ids: [] }, 200);
+    }
+
+    // Delete associated R2 photos
+    const photoPlaceholders = hitIds.map(() => '?').join(',');
+    const photos = await c.env.DB.prepare(
+      `SELECT r2_key FROM hit_photos WHERE hit_id IN (${photoPlaceholders})`
+    ).bind(...hitIds).all<{ r2_key: string }>();
+
+    for (const photo of photos.results) {
+      await c.env.BUCKET.delete(photo.r2_key).catch(() => {});
+    }
+
+    // Cascade delete: responses, photos, then hits
+    const hitPlaceholders = hitIds.map(() => '?').join(',');
+    await c.env.DB.prepare(`DELETE FROM hit_responses WHERE hit_id IN (${hitPlaceholders})`).bind(...hitIds).run();
+    await c.env.DB.prepare(`DELETE FROM hit_photos WHERE hit_id IN (${hitPlaceholders})`).bind(...hitIds).run();
+    await c.env.DB.prepare(`DELETE FROM hits WHERE id IN (${hitPlaceholders})`).bind(...hitIds).run();
+
+    return c.json({ deleted: hitIds.length, ids: hitIds }, 200);
+  } catch (error) {
+    console.error('Failed to bulk delete HITs:', error);
+    return c.json({ error: 'Failed to bulk delete HITs' }, 500);
   }
 }

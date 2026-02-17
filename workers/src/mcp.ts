@@ -3,7 +3,6 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { z } from 'zod';
 import { HIT_DISTRIBUTION_MODES, type DistributionMode } from './types';
 import type { Env } from './types';
-import { logEvent } from './services/eventLogger';
 import { detectDistributionMode } from './routes/hits';
 
 const MAX_SAMPLE_BYTES = 5_000; // 5 KB structural sample for room scan context
@@ -631,15 +630,15 @@ export async function handleMcpRequest(request: Request, env: Env, ctx?: Executi
     }), { status: 401, headers: { 'Content-Type': 'application/json' } });
   }
 
-  // Record heartbeat timestamp + event log (fire-and-forget)
+  // Debounced heartbeat: only write to D1 if last_mcp_call_at is >1 minute stale.
+  // Skips the write if already recent, reducing from ~197K writes/day to ~1/device/min.
   if (ctx) {
     ctx.waitUntil(
-      env.DB.prepare('UPDATE devices SET last_mcp_call_at = ? WHERE id = ?')
-        .bind(new Date().toISOString(), device.id).run()
+      env.DB.prepare(
+        `UPDATE devices SET last_mcp_call_at = ?
+         WHERE id = ? AND (last_mcp_call_at IS NULL OR last_mcp_call_at < datetime('now', '-1 minute'))`
+      ).bind(new Date().toISOString(), device.id).run()
     );
-    logEvent(env, ctx, {
-      type: 'mcp_tool_call', device_id: device.id, endpoint: '/mcp', status: 'success',
-    });
   }
 
   const server = createRoboMcpServer(env, device.id);

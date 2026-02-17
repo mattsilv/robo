@@ -17,7 +17,7 @@ import { serveHitPage } from './routes/hitPage';
 import { serveOgImage } from './routes/ogImage';
 import { listAPIKeys, createAPIKey, deleteAPIKey } from './routes/apikeys';
 import { chatProxy } from './routes/chat';
-import { appleAuth, linkDevice, getMe, logout } from './routes/auth';
+import { appleAuth, appleAuthCallback, linkDevice, getMe, logout } from './routes/auth';
 import { getSettings, updateSettings } from './routes/settings';
 import { deviceAuth } from './middleware/deviceAuth';
 import { mcpTokenAuth } from './middleware/mcpTokenAuth';
@@ -44,6 +44,7 @@ app.get('/health', (c) => {
 
 // Auth routes
 app.post('/api/auth/apple', csrfProtect, appleAuth);
+app.post('/api/auth/apple/callback', appleAuthCallback);
 app.post('/api/auth/link-device', csrfProtect, userAuth, linkDevice);
 app.get('/api/auth/me', userAuth, getMe);
 app.post('/api/auth/logout', csrfProtect, logout);

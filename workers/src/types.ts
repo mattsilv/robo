@@ -40,4 +40,6 @@ export type Env = {
   APNS_SANDBOX?: string;
   OPENROUTER_API_KEY: string;
   OPENROUTER_MODEL?: string;
+  JWT_SECRET: string;
+  APPLE_CLIENT_ID: string;
 };

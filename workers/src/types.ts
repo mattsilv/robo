@@ -22,6 +22,7 @@ export {
   PushCardSchema,
   RespondCardSchema,
   CreateHitSchema,
+  BulkDeleteHitsSchema,
   HitResponseSchema,
   AnalyzeRequestSchema,
   ChatRequestSchema,

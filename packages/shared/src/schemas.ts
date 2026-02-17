@@ -73,6 +73,15 @@ export const CreateHitSchema = z.object({
   participants: z.array(z.string().min(1).max(50)).max(50).optional(),
 });
 
+export const BulkDeleteHitsSchema = z.object({
+  ids: z.array(z.string().min(1).max(20)).min(1).max(50).optional(),
+  older_than_days: z.number().int().min(1).max(365).optional(),
+  status: z.enum(['pending', 'in_progress', 'completed', 'expired']).optional(),
+}).refine(
+  (data) => data.ids || data.older_than_days,
+  { message: 'Must provide either ids or older_than_days' }
+);
+
 export const HitResponseSchema = z.object({
   respondent_name: z.string().min(1).max(50),
   response_data: z.record(z.any()),

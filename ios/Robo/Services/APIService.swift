@@ -185,6 +185,19 @@ class APIService {
         let _: DeleteResponse = try await delete(url: url)
     }
 
+    func bulkDeleteHits(ids: [String]) async throws -> BulkDeleteResponse {
+        let url = try makeURL(path: "/api/hits/bulk-delete")
+        let payload: [String: Any] = ["ids": ids]
+        return try await post(url: url, body: payload)
+    }
+
+    func deleteOldHits(olderThanDays: Int, status: String? = nil) async throws -> BulkDeleteResponse {
+        let url = try makeURL(path: "/api/hits/bulk-delete")
+        var payload: [String: Any] = ["older_than_days": olderThanDays]
+        if let status { payload["status"] = status }
+        return try await post(url: url, body: payload)
+    }
+
     // MARK: - API Keys (require MCP token auth)
 
     func fetchAPIKeys() async throws -> [APIKeyMeta] {
@@ -529,4 +542,9 @@ private struct HitResponseListResponse: Decodable {
 
 private struct DeleteResponse: Decodable {
     let deleted: Bool
+}
+
+struct BulkDeleteResponse: Decodable {
+    let deleted: Int
+    let ids: [String]
 }

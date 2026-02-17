@@ -3,7 +3,7 @@
 ## Project Overview
 iOS app that exposes phone sensors (barcode, camera, LiDAR) as API endpoints for AI agents. Backend on Cloudflare Workers.
 
-**Deadline:** Mon Feb 16, 3:00 PM EST
+**Origin:** Built for the Claude Code hackathon (Feb 2026). Now a go-forward open-source project. The `hackathon` label remains on the codebase for judges to review the submission state.
 
 **Open Source:** This project is fully open source. Keep documentation current, the codebase well-organized, and **never commit secrets, API keys, or security-sensitive information** to the repo. Use `.env` files and Cloudflare Worker secrets for all sensitive values.
 

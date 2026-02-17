@@ -115,20 +115,51 @@ for (const skill of activeSkills) {
 
 assert(html.includes('.badge-coming-soon'), 'Landing page has badge CSS');
 
+// ─── Validate Shared Constants ───────────────────────────────────────
+console.log('\n5. Generated shared constants');
+const sharedConstantsPath = join(ROOT, 'packages/shared/src/constants.ts');
+assert(existsSync(sharedConstantsPath), 'constants.ts exists in packages/shared/src/');
+
+const sharedTs = readFileSync(sharedConstantsPath, 'utf-8');
+assert(sharedTs.includes('AUTO-GENERATED'), 'Shared constants has auto-generated header');
+assert(sharedTs.includes('export const SKILL_IDS'), 'Shared constants exports SKILL_IDS');
+assert(sharedTs.includes('export const AGENT_IDS'), 'Shared constants exports AGENT_IDS');
+assert(sharedTs.includes('export const COPY'), 'Shared constants exports COPY');
+assert(sharedTs.includes('export type FeatureStatus'), 'Shared constants exports FeatureStatus type');
+assert(sharedTs.includes('export type FeatureCategory'), 'Shared constants exports FeatureCategory type');
+assert(sharedTs.includes('export type SkillType'), 'Shared constants exports SkillType type');
+
+// Verify all skill IDs are present
+for (const skill of features.skills) {
+  assert(sharedTs.includes(`${skill.id.toUpperCase()}: '${skill.id}'`),
+    `Shared constants SKILL_IDS includes ${skill.id.toUpperCase()}`);
+}
+
+// Verify all agent IDs are present
+for (const agent of features.agents) {
+  assert(sharedTs.includes(`${agent.id.toUpperCase()}: '${agent.id}'`),
+    `Shared constants AGENT_IDS includes ${agent.id.toUpperCase()}`);
+}
+
+// Verify copy data includes app name
+assert(sharedTs.includes('"name": "Robo"'), 'Shared constants COPY includes app name');
+
 // ─── Idempotency ────────────────────────────────────────────────────
-console.log('\n5. Idempotency (run codegen twice)');
+console.log('\n6. Idempotency (run codegen twice)');
 execSync('node registry/generate.js', { cwd: ROOT, stdio: 'pipe' });
 
 const swift2 = readFileSync(swiftPath, 'utf-8');
 const ts2 = readFileSync(tsPath, 'utf-8');
 const html2 = readFileSync(join(ROOT, 'site/index.html'), 'utf-8');
+const sharedTs2 = readFileSync(sharedConstantsPath, 'utf-8');
 
 assert(swift === swift2, 'Swift output is identical after second run');
 assert(ts === ts2, 'TS output is identical after second run');
 assert(html === html2, 'HTML output is identical after second run (no double badges)');
+assert(sharedTs === sharedTs2, 'Shared constants output is identical after second run');
 
 // ─── P1: Swift string escaping ──────────────────────────────────────
-console.log('\n6. Swift string escaping');
+console.log('\n7. Swift string escaping');
 
 // Verify no unescaped special chars in Swift string literals
 // Match all `"..."` inside static let/Skill/Agent declarations
@@ -158,7 +189,7 @@ for (const agent of features.agents) {
 assert(swiftStringLiterals.length > 0, `Found ${swiftStringLiterals.length} Swift string literals to validate`);
 
 // ─── P2: Badge reversibility (status change simulation) ────────────
-console.log('\n7. Badge reversibility');
+console.log('\n8. Badge reversibility');
 
 // Simulate: change a coming_soon skill to active, re-run codegen, verify badge removed
 import { writeFileSync as writeTmp } from 'fs';

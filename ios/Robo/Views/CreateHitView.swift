@@ -27,6 +27,7 @@ struct CreateHitView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var distributionMode: HitDistributionMode = .individual
+    @State private var yourName = ""
     @State private var taskDescription = ""
     @State private var participantNames = ""
     @State private var isLoading = false
@@ -35,18 +36,29 @@ struct CreateHitView: View {
     @State private var createdHitURLs: [(name: String, url: URL)] = []
     @State private var showResults = false
 
-    private var participants: [String] {
+    private var otherParticipants: [String] {
         participantNames
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
     }
 
+    /// All participants including the creator
+    private var allParticipants: [String] {
+        let trimmedName = yourName.trimmingCharacters(in: .whitespaces)
+        var list = otherParticipants
+        if !trimmedName.isEmpty {
+            list.insert(trimmedName, at: 0)
+        }
+        return list
+    }
+
     private var isValid: Bool {
         let hasDescription = !taskDescription.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasYourName = !yourName.trimmingCharacters(in: .whitespaces).isEmpty
         switch distributionMode {
         case .individual, .group:
-            return hasDescription && !participants.isEmpty
+            return hasDescription && hasYourName && !otherParticipants.isEmpty
         case .open:
             return hasDescription
         }
@@ -69,13 +81,19 @@ struct CreateHitView: View {
                 }
 
                 if distributionMode != .open {
-                    Section("Participants") {
+                    Section("Your Name") {
+                        TextField("Your first name", text: $yourName)
+                            .textContentType(.name)
+                            .textInputAutocapitalization(.words)
+                    }
+
+                    Section("Other Participants") {
                         TextField("Names (comma-separated)", text: $participantNames)
                             .textContentType(.name)
                             .textInputAutocapitalization(.words)
 
-                        if !participants.isEmpty {
-                            Text("\(participants.count) participant\(participants.count == 1 ? "" : "s"): \(participants.joined(separator: ", "))")
+                        if !allParticipants.isEmpty {
+                            Text("\(allParticipants.count) total: \(allParticipants.joined(separator: ", "))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -96,7 +114,7 @@ struct CreateHitView: View {
                             if isLoading {
                                 ProgressView()
                             } else {
-                                Label("Generate Link\(distributionMode == .individual && participants.count > 1 ? "s" : "")", systemImage: "link.badge.plus")
+                                Label("Generate Link\(distributionMode == .individual && allParticipants.count > 1 ? "s" : "")", systemImage: "link.badge.plus")
                             }
                             Spacer()
                         }
@@ -154,7 +172,8 @@ struct CreateHitView: View {
             let result = try await apiService.createHitWithMode(
                 distributionMode: distributionMode.rawValue,
                 taskDescription: taskDescription.trimmingCharacters(in: .whitespaces),
-                participants: distributionMode != .open ? participants : nil
+                participants: distributionMode != .open ? allParticipants : nil,
+                senderName: yourName.trimmingCharacters(in: .whitespaces).isEmpty ? nil : yourName.trimmingCharacters(in: .whitespaces)
             )
 
             if let urls = result.hits, !urls.isEmpty {

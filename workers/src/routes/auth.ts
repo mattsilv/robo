@@ -113,13 +113,18 @@ export async function linkDevice(c: Context<{ Bindings: Env }>) {
 
   const { device_id } = parsed.data;
 
-  // Verify device exists
+  // Verify device exists and check ownership
   const device = await c.env.DB.prepare(
-    'SELECT id FROM devices WHERE id = ?'
-  ).bind(device_id).first();
+    'SELECT id, user_id FROM devices WHERE id = ?'
+  ).bind(device_id).first<{ id: string; user_id: string | null }>();
 
   if (!device) {
     return c.json({ error: 'Device not found' }, 404);
+  }
+
+  // Prevent hijacking: if device is already linked to a different user, reject
+  if (device.user_id && device.user_id !== userId) {
+    return c.json({ error: 'Device is already linked to another account' }, 403);
   }
 
   await c.env.DB.prepare(

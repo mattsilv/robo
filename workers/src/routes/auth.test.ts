@@ -4,9 +4,18 @@ import { SignJWT } from 'jose';
 import worker from '../index';
 
 const BASE = 'https://api.robo.app';
+const ORIGIN = 'https://app.robo.app';
 
 function req(path: string, options: RequestInit = {}) {
   return new Request(`${BASE}${path}`, options);
+}
+
+function post(path: string, body: unknown, extraHeaders: Record<string, string> = {}) {
+  return req(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: ORIGIN, ...extraHeaders },
+    body: JSON.stringify(body),
+  });
 }
 
 beforeAll(async () => {
@@ -18,40 +27,84 @@ beforeAll(async () => {
   await env.DB.prepare(`DELETE FROM devices`).run();
 });
 
+async function makeJwt(sub: string) {
+  const secret = new TextEncoder().encode(env.JWT_SECRET);
+  return new SignJWT({ sub, name: 'Test' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('1h')
+    .sign(secret);
+}
+
 describe('Auth routes', () => {
   describe('POST /api/auth/apple', () => {
     it('rejects missing id_token', async () => {
       const ctx = createExecutionContext();
-      const res = await worker.fetch(
-        req('/api/auth/apple', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        }),
-        env,
-        ctx
-      );
+      const res = await worker.fetch(post('/api/auth/apple', {}), env, ctx);
       await waitOnExecutionContext(ctx);
       expect(res.status).toBe(400);
-      const body = await res.json() as any;
+      const body = await res.json() as { error: string };
       expect(body.error).toBe('Invalid request');
     });
 
     it('rejects invalid Apple token', async () => {
       const ctx = createExecutionContext();
+      const res = await worker.fetch(post('/api/auth/apple', { id_token: 'invalid.jwt.token' }), env, ctx);
+      await waitOnExecutionContext(ctx);
+      expect(res.status).toBe(401);
+      const body = await res.json() as { error: string };
+      expect(body.error).toBe('Invalid Apple token');
+    });
+  });
+
+  describe('CSRF protection', () => {
+    it('rejects POST without Origin header', async () => {
+      const ctx = createExecutionContext();
       const res = await worker.fetch(
-        req('/api/auth/apple', {
+        req('/api/auth/logout', { method: 'POST' }),
+        env,
+        ctx
+      );
+      await waitOnExecutionContext(ctx);
+      expect(res.status).toBe(403);
+      const body = await res.json() as { error: string };
+      expect(body.error).toBe('Invalid origin');
+    });
+
+    it('rejects POST with wrong Origin', async () => {
+      const ctx = createExecutionContext();
+      const res = await worker.fetch(
+        req('/api/auth/logout', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id_token: 'invalid.jwt.token' }),
+          headers: { Origin: 'https://evil.com' },
         }),
         env,
         ctx
       );
       await waitOnExecutionContext(ctx);
-      expect(res.status).toBe(401);
-      const body = await res.json() as any;
-      expect(body.error).toBe('Invalid Apple token');
+      expect(res.status).toBe(403);
+    });
+
+    it('allows Bearer token requests without Origin', async () => {
+      // Insert user for JWT
+      await env.DB.prepare(
+        "INSERT OR IGNORE INTO users (id, apple_sub, email, first_name) VALUES (?, ?, ?, ?)"
+      ).bind('csrf-test-user', 'apple-csrf', 'csrf@test.com', 'CSRF').run();
+
+      const jwt = await makeJwt('csrf-test-user');
+      const ctx = createExecutionContext();
+      const res = await worker.fetch(
+        req('/api/auth/link-device', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+          body: JSON.stringify({ device_id: '00000000-0000-0000-0000-000000000099' }),
+        }),
+        env,
+        ctx
+      );
+      await waitOnExecutionContext(ctx);
+      // 404 because device doesn't exist, but NOT 403 — CSRF passed
+      expect(res.status).toBe(404);
     });
   });
 
@@ -64,30 +117,20 @@ describe('Auth routes', () => {
     });
 
     it('returns user info with valid JWT', async () => {
-      // First, insert a test user directly
       await env.DB.prepare(
-        "INSERT INTO users (id, apple_sub, email, first_name) VALUES (?, ?, ?, ?)"
+        "INSERT OR IGNORE INTO users (id, apple_sub, email, first_name) VALUES (?, ?, ?, ?)"
       ).bind('test-user-1', 'apple-sub-1', 'test@test.com', 'Test').run();
 
-      // Create a valid JWT
-      const secret = new TextEncoder().encode(env.JWT_SECRET);
-      const jwt = await new SignJWT({ sub: 'test-user-1', name: 'Test' })
-        .setProtectedHeader({ alg: 'HS256' })
-        .setIssuedAt()
-        .setExpirationTime('1h')
-        .sign(secret);
-
+      const jwt = await makeJwt('test-user-1');
       const ctx = createExecutionContext();
       const res = await worker.fetch(
-        req('/api/auth/me', {
-          headers: { Authorization: `Bearer ${jwt}` },
-        }),
+        req('/api/auth/me', { headers: { Authorization: `Bearer ${jwt}` } }),
         env,
         ctx
       );
       await waitOnExecutionContext(ctx);
       expect(res.status).toBe(200);
-      const body = await res.json() as any;
+      const body = await res.json() as { user: { id: string; first_name: string } };
       expect(body.user.id).toBe('test-user-1');
       expect(body.user.first_name).toBe('Test');
     });
@@ -97,16 +140,43 @@ describe('Auth routes', () => {
     it('rejects unauthenticated requests', async () => {
       const ctx = createExecutionContext();
       const res = await worker.fetch(
+        post('/api/auth/link-device', { device_id: '00000000-0000-0000-0000-000000000001' }),
+        env,
+        ctx
+      );
+      await waitOnExecutionContext(ctx);
+      // Cookie-based request with Origin but no cookie → 401
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects linking a device owned by another user', async () => {
+      // Setup: create two users and a device owned by user-a
+      await env.DB.prepare(
+        "INSERT OR IGNORE INTO users (id, apple_sub, first_name) VALUES (?, ?, ?)"
+      ).bind('user-a', 'apple-a', 'Alice').run();
+      await env.DB.prepare(
+        "INSERT OR IGNORE INTO users (id, apple_sub, first_name) VALUES (?, ?, ?)"
+      ).bind('user-b', 'apple-b', 'Bob').run();
+      await env.DB.prepare(
+        "INSERT OR IGNORE INTO devices (id, name, user_id) VALUES (?, ?, ?)"
+      ).bind('00000000-0000-0000-0000-000000000002', 'Alice Phone', 'user-a').run();
+
+      // user-b tries to claim Alice's device
+      const jwt = await makeJwt('user-b');
+      const ctx = createExecutionContext();
+      const res = await worker.fetch(
         req('/api/auth/link-device', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ device_id: '00000000-0000-0000-0000-000000000001' }),
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+          body: JSON.stringify({ device_id: '00000000-0000-0000-0000-000000000002' }),
         }),
         env,
         ctx
       );
       await waitOnExecutionContext(ctx);
-      expect(res.status).toBe(401);
+      expect(res.status).toBe(403);
+      const body = await res.json() as { error: string };
+      expect(body.error).toBe('Device is already linked to another account');
     });
   });
 
@@ -114,7 +184,7 @@ describe('Auth routes', () => {
     it('clears session cookie', async () => {
       const ctx = createExecutionContext();
       const res = await worker.fetch(
-        req('/api/auth/logout', { method: 'POST' }),
+        req('/api/auth/logout', { method: 'POST', headers: { Origin: ORIGIN } }),
         env,
         ctx
       );

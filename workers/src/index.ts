@@ -20,7 +20,7 @@ import { chatProxy } from './routes/chat';
 import { appleAuth, linkDevice, getMe, logout } from './routes/auth';
 import { deviceAuth } from './middleware/deviceAuth';
 import { mcpTokenAuth } from './middleware/mcpTokenAuth';
-import { userAuth } from './middleware/userAuth';
+import { userAuth, csrfProtect } from './middleware/userAuth';
 import { rateLimit } from './middleware/rateLimit';
 import { handleMcpRequest } from './mcp';
 
@@ -41,11 +41,11 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Auth routes (public — no middleware)
-app.post('/api/auth/apple', appleAuth);
-app.post('/api/auth/link-device', userAuth, linkDevice);
+// Auth routes
+app.post('/api/auth/apple', csrfProtect, appleAuth);
+app.post('/api/auth/link-device', csrfProtect, userAuth, linkDevice);
 app.get('/api/auth/me', userAuth, getMe);
-app.post('/api/auth/logout', logout);
+app.post('/api/auth/logout', csrfProtect, logout);
 
 // Device routes
 app.post('/api/devices/register', registerDevice);

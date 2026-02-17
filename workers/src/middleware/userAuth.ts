@@ -2,6 +2,30 @@ import { createMiddleware } from 'hono/factory';
 import { jwtVerify } from 'jose';
 import type { Env } from '../types';
 
+const ALLOWED_ORIGINS = ['https://app.robo.app', 'https://robo.app', 'http://localhost:5173'];
+
+/**
+ * CSRF protection for cookie-authenticated state-changing requests.
+ * Validates Origin header matches allowed origins. Bearer-token requests
+ * (iOS) are exempt since they aren't vulnerable to CSRF.
+ */
+export const csrfProtect = createMiddleware<{ Bindings: Env }>(async (c, next) => {
+  if (c.req.method === 'GET' || c.req.method === 'HEAD' || c.req.method === 'OPTIONS') {
+    return next();
+  }
+  // Bearer token requests are not CSRF-vulnerable
+  const authHeader = c.req.header('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    return next();
+  }
+  // Cookie-based requests must have a valid Origin
+  const origin = c.req.header('Origin');
+  if (!origin || !ALLOWED_ORIGINS.includes(origin)) {
+    return c.json({ error: 'Invalid origin' }, 403);
+  }
+  await next();
+});
+
 /**
  * Validates user JWT from:
  * - HttpOnly cookie `robo_session` (web)

@@ -64,7 +64,8 @@ class ChatService {
     }
 
     private func setupAppleSession() {
-        let prompt = Self.buildSystemPrompt()
+        let name = UserDefaults.standard.string(forKey: "firstName")
+        let prompt = Self.buildSystemPrompt(firstName: name)
 
         var tools: [any Tool] = []
         if let apiService {
@@ -128,8 +129,9 @@ class ChatService {
         }
 
         // Build messages array with system prompt + conversation history
+        let nameForPrompt = UserDefaults.standard.string(forKey: "firstName")
         var openRouterMessages: [[String: String]] = [
-            ["role": "system", "content": Self.buildSystemPrompt()]
+            ["role": "system", "content": Self.buildSystemPrompt(firstName: nameForPrompt)]
         ]
         for msg in messages.dropLast() { // dropLast to skip empty assistant placeholder
             if msg.role == .user || msg.role == .assistant {
@@ -448,7 +450,7 @@ class ChatService {
         }
     }
 
-    static func buildSystemPrompt(includingTools: Bool = true) -> String {
+    static func buildSystemPrompt(includingTools: Bool = true, firstName: String? = nil) -> String {
         let sensorSkills = FeatureRegistry.activeSkills
             .filter { $0.category == .sensor || $0.category == .workflow }
             .map { "- \($0.name): \($0.tagline)" }
@@ -474,6 +476,7 @@ class ChatService {
         You are \(AppCopy.App.name)'s assistant. \(AppCopy.App.name) is an iOS app that turns phone sensors \
         (LiDAR, camera, barcode scanner) into APIs for AI agents.
 
+        The user's name is \(firstName ?? "unknown").
         Current date and time: \(dateString)
         The user's local timezone is \(tzName) (\(tzAbbrev), \(tzOffsetStr)).
 

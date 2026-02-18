@@ -99,10 +99,15 @@ async function executeCreateAvailabilityPoll(
 
   // Ensure the creator is included as a participant (replace generic "User" if present)
   if (firstName) {
+    const alreadyPresent = participants.some((p: string) => p.toLowerCase() === firstName.toLowerCase());
     const userIdx = participants.findIndex((p: string) => p.toLowerCase() === 'user');
     if (userIdx >= 0) {
-      participants[userIdx] = firstName;
-    } else if (!participants.some((p: string) => p.toLowerCase() === firstName.toLowerCase())) {
+      if (alreadyPresent) {
+        participants.splice(userIdx, 1); // remove "User" — real name already in list
+      } else {
+        participants[userIdx] = firstName;
+      }
+    } else if (!alreadyPresent) {
       participants.unshift(firstName);
     }
   }

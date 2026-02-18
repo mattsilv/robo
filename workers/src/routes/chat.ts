@@ -15,7 +15,7 @@ const tools = [
         type: 'object',
         properties: {
           eventTitle: { type: 'string', description: 'Title of the event (e.g., "Ski Trip")' },
-          participants: { type: 'string', description: 'Comma-separated participant names (e.g., "Sam, Vince, Greg")' },
+          participants: { type: 'string', description: 'Comma-separated participant names including the user (use their actual name from the system prompt, NEVER use "User"). Example: "Matt, Sam, Vince"' },
           dateOptions: { type: 'string', description: 'Comma-separated date RANGES for weekends or multi-day options. For weekends, group Sat+Sun as a single range: "2026-03-07:2026-03-08,2026-03-14:2026-03-15". For single days use just the date: "2026-03-10". Each range becomes one selectable option.' },
           timeSlots: { type: 'string', description: 'LEAVE EMPTY. Time slots are not used — only date-level availability.' },
         },
@@ -96,6 +96,21 @@ async function executeCreateAvailabilityPoll(
 
   // Fallback: first_name from request → device name from DB → "Someone"
   let senderName = firstName || '';
+
+  // Ensure the creator is included as a participant (replace generic "User" if present)
+  if (firstName) {
+    const alreadyPresent = participants.some((p: string) => p.toLowerCase() === firstName.toLowerCase());
+    const userIdx = participants.findIndex((p: string) => p.toLowerCase() === 'user');
+    if (userIdx >= 0) {
+      if (alreadyPresent) {
+        participants.splice(userIdx, 1); // remove "User" — real name already in list
+      } else {
+        participants[userIdx] = firstName;
+      }
+    } else if (!alreadyPresent) {
+      participants.unshift(firstName);
+    }
+  }
   if (!senderName) {
     const device = await db.prepare('SELECT name FROM devices WHERE id = ?').bind(deviceId).first<{ name: string | null }>();
     const deviceName = device?.name || '';
@@ -164,10 +179,17 @@ export async function chatProxy(c: Context<{ Bindings: Env }>): Promise<Response
   const model = parsed.data.model || c.env.OPENROUTER_MODEL || DEFAULT_MODEL;
   const deviceId = c.get('resolvedDeviceId') || c.req.header('X-Device-ID') || '';
 
-  // Inject timezone into system message if provided
+  // Inject timezone and user name into system message if provided
   const messages = parsed.data.messages.map((msg) => {
-    if (msg.role === 'system' && parsed.data.timezone) {
-      return { ...msg, content: `${msg.content}\n\nUser's timezone: ${parsed.data.timezone}` };
+    if (msg.role === 'system') {
+      let content = msg.content;
+      if (parsed.data.timezone) {
+        content += `\n\nUser's timezone: ${parsed.data.timezone}`;
+      }
+      if (parsed.data.first_name) {
+        content += `\nThe user's name is ${parsed.data.first_name}. Always use this name (never "User") when including them as a participant.`;
+      }
+      return { ...msg, content };
     }
     return msg;
   });
